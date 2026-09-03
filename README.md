@@ -32,18 +32,31 @@ need and explicit approval.
 
 ## Development status
 
-**Current phase: Phase 0 — Project Setup & Architecture Freeze.**
+**Current phase: Phase 1 — Foundation & Design System.**
 
-This repository currently contains planning and engineering guardrails only. The
-Next.js application and application dependencies are intentionally deferred to
-Phase 1. The approved sequence and phase boundaries are in the
+The Phase 1 frontend foundation is implemented with a responsive public shell,
+centralized placeholder content, reusable UI primitives, local application-served
+typography, reduced-motion-aware transitions, and a cinematic placeholder
+homepage. The approved sequence and phase boundaries remain in the
 [roadmap](docs/ROADMAP.md).
 
 ## Local development
 
-There is no runnable application yet. After Phase 1 is approved and implemented,
-this section will contain the exact install and development commands. Until then,
-no dependency installation is required.
+Install the pinned dependencies and start the development server:
+
+```powershell
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3000`. Before proposing changes, run the available
+quality checks:
+
+```powershell
+npm run lint
+npm run typecheck
+npm run build
+```
 
 Before contributing, read [Development](docs/DEVELOPMENT.md). Useful initial
 checks are:
