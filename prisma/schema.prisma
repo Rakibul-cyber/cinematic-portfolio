@@ -1,0 +1,139 @@
+// Cinematic Portfolio database schema.
+//
+// Phase 2 models only the authentication, role, and audit foundation. Content
+// entities (projects, media, services, inquiries, customers, testimonials)
+// belong to later phases and are intentionally absent.
+//
+// The Better Auth core tables (user, session, account, verification) follow the
+// field contract expected by the Better Auth Prisma adapter, with two
+// deliberate additions: `role` on `user`, and extra indexes.
+//
+// After upgrading Better Auth, re-check that contract by printing the shape it
+// expects and diffing it against this file:
+//
+//   npx auth@<installed version> generate --config <a probe config> -o out.prisma
+//
+// The CLI refuses any config that imports `server-only`, so point it at a
+// throwaway config that mirrors `database`, `emailAndPassword`,
+// `user.additionalFields`, and `plugins` from src/server/auth/config.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Application role for the private admin area.
+///
+/// Roles are server-owned. A role is never accepted from client input and is
+/// always read back from the database before an authorization decision.
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  EDITOR
+}
+
+/// Administrative user. This is the Better Auth `user` table extended with the
+/// application role. No public sign-up exists, so every row is created by the
+/// bootstrap script or by an already-authorized administrator.
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          AdminRole @default(EDITOR)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts  Account[]
+  sessions  Session[]
+  auditLogs AuditLog[]
+
+  @@index([role])
+  @@map("user")
+}
+
+/// Better Auth session. Deleting a user removes their sessions so revoking an
+/// account immediately revokes access.
+model Session {
+  id        String   @id
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("session")
+}
+
+/// Better Auth account. For this private admin application only the credential
+/// provider is used, so `password` holds the Better Auth password hash.
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([providerId, accountId])
+  @@map("account")
+}
+
+/// Better Auth verification tokens (email verification, password reset).
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@index([expiresAt])
+  @@map("verification")
+}
+
+/// Audit foundation for privileged administrative actions.
+///
+/// `actorUserId` is nullable and set to NULL when a user is deleted so the audit
+/// history survives account removal. `metadata` is deliberately `Json` because
+/// entries describe heterogeneous actions across future admin features; it must
+/// never contain passwords, tokens, secrets, or connection strings.
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    Json?
+  actorEmail  String?
+  actorUserId String?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_log")
+}

@@ -55,3 +55,7 @@ Desktop.ini
 # Prisma local development databases (PostgreSQL is the approved database)
 *.db
 *.db-journal
+.neon
+
+# Generated Prisma Client (recreated by `npm run db:generate` / postinstall)
+src/generated/
