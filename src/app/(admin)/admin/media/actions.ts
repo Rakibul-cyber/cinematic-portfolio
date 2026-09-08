@@ -4,12 +4,14 @@ import { z } from "zod";
 import { ADMIN_MEDIA_PATH } from "@/lib/admin-routes";
 import { requireUser } from "@/server/auth/session";
 import { deleteMedia, updateMediaMetadata } from "@/server/media/service";
+import { revalidatePublicContent } from "@/server/public/revalidate";
 
 export async function deleteMediaAction(formData: FormData): Promise<void> {
   const actor = await requireUser(ADMIN_MEDIA_PATH);
   const id = z.string().uuid().parse(formData.get("id"));
   await deleteMedia(id, actor);
   revalidatePath(ADMIN_MEDIA_PATH);
+  revalidatePublicContent("media");
 }
 
 const metadataSchema = z.object({
@@ -33,4 +35,7 @@ export async function updateMediaMetadataAction(
     actor,
   );
   revalidatePath(ADMIN_MEDIA_PATH);
+  // Alt text and captions are rendered publicly, so a metadata edit must
+  // refresh every project page that shows this image.
+  revalidatePublicContent("media");
 }

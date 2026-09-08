@@ -63,6 +63,12 @@ Public visitors may read published content and submit validated inquiries. They
 must never receive unpublished content, administrative data, secrets, or internal
 customer notes.
 
+From Phase 5, all public database access goes through one server-side read layer
+(`src/server/public/`) that applies the publication filters and maps rows into
+explicit view models. Components never receive Prisma rows, so internal columns
+cannot reach public HTML, and publication is enforced in the query rather than
+by hiding content in the UI.
+
 ### Admin application
 
 The admin area lives under `/admin` and prioritizes clarity, speed, accessibility,
@@ -141,10 +147,20 @@ Critical images load eagerly only when justified; other images use responsive
 sizing and lazy loading. Small optimized hero clips may use R2. Long-form
 portfolio videos remain with a video provider.
 
-Video data will use a provider-neutral shape such as provider, provider video ID,
-embed URL, thumbnail URL, title, description, duration, and privacy mode. YouTube
-embeds should use `youtube-nocookie.com` and a click-to-load/consent-aware
-experience so a later provider change does not require redesigning the domain.
+The public site serves those R2 variants directly through `srcset` rather than
+through the Next.js image optimizer, because the variants are already optimized
+at the widths the layouts use. Layout stability and lazy loading are therefore
+handled explicitly. Public delivery needs only the public read origin, so the
+public site renders on a deployment holding no media write credentials. See
+[ADR 0005](DECISIONS/0005-public-portfolio.md).
+
+Video data uses a provider-neutral shape. Phase 5 implemented the minimum of it:
+a `VideoProvider` enum plus provider, provider video ID, and title on `Project`
+and on `SiteSetting` (the showreel). Embed URLs are built in code from those two
+fields, never stored, so no iframe markup or embed script can come from content
+and a later provider change touches one helper. YouTube embeds use
+`youtube-nocookie.com` behind a click-to-load player that requests nothing from
+the provider — not even a poster image — before the visitor activates it.
 
 ## Deployment direction
 

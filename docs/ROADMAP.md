@@ -47,7 +47,7 @@ Cloudflare/R2 is opened/configured during this phase.
 - Manage services, testimonials, settings, and publishing controls.
 - Integrate media selection into content workflows.
 
-## Phase 5 — Public Portfolio
+## Phase 5 — Public Portfolio *(implemented)*
 
 - Complete the final homepage and Work listing.
 - Build project detail pages and galleries.

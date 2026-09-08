@@ -1,15 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 
-import { siteContent } from "@/content/site";
+import { navigation } from "@/content/site";
 
-export function MobileNavigation() {
+/**
+ * Mobile primary navigation.
+ *
+ * Interaction is genuine, so this stays a Client Component: it traps focus
+ * while open, closes on Escape, restores focus to the toggle, and locks body
+ * scroll. `tagline` is passed in from the Server Component header so the CMS
+ * value never requires a client-side fetch.
+ */
+export function MobileNavigation({ tagline }: { tagline: string | null }) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const firstLinkRef = useRef<HTMLAnchorElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const pathname = usePathname();
+
+  // Close the panel whenever a navigation actually completes.
+  useEffect(() => setIsOpen(false), [pathname]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -78,9 +92,10 @@ export function MobileNavigation() {
             className="flex h-full flex-col justify-between px-5 py-10 sm:px-8"
           >
             <ul className="space-y-1">
-              {siteContent.navigation.map((item, index) => (
+              {navigation.map((item, index) => (
                 <li key={item.href}>
-                  <a
+                  <Link
+                    aria-current={pathname === item.href ? "page" : undefined}
                     className="flex min-h-16 items-center justify-between border-b border-border font-display text-4xl tracking-[-0.02em] transition-colors hover:text-accent"
                     href={item.href}
                     onClick={() => setIsOpen(false)}
@@ -93,13 +108,15 @@ export function MobileNavigation() {
                     >
                       0{index + 1}
                     </span>
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
-            <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase">
-              {siteContent.brand.descriptor}
-            </p>
+            {tagline ? (
+              <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase">
+                {tagline}
+              </p>
+            ) : null}
           </nav>
         </div>
       ) : null}

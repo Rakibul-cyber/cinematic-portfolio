@@ -21,6 +21,9 @@ type Project = {
   sortOrder: number;
   seoTitle: string | null;
   seoDescription: string | null;
+  videoProvider: "YOUTUBE" | "VIMEO" | "EXTERNAL" | null;
+  videoId: string | null;
+  videoTitle: string | null;
   media: { mediaId: string }[];
 };
 export function ProjectForm({
@@ -161,6 +164,43 @@ export function ProjectForm({
           defaultValue={project?.seoDescription ?? ""}
         />
       </label>
+      <fieldset className="grid gap-3 border border-border p-4 sm:grid-cols-3">
+        <legend>Project film</legend>
+        <p className="text-sm text-muted-foreground sm:col-span-3">
+          Long-form video stays with the video provider. Enter the provider and
+          its video ID only — never a URL or embed code. Leave both empty for no
+          film. The public player loads nothing from the provider until a
+          visitor presses play.
+        </p>
+        <label>
+          Video provider
+          <select
+            className={inputClass}
+            name="videoProvider"
+            defaultValue={project?.videoProvider ?? ""}
+          >
+            <option value="">None</option>
+            <option value="YOUTUBE">YOUTUBE</option>
+            <option value="VIMEO">VIMEO</option>
+          </select>
+        </label>
+        <label>
+          Video ID
+          <input
+            className={inputClass}
+            name="videoId"
+            defaultValue={project?.videoId ?? ""}
+          />
+        </label>
+        <label>
+          Video title
+          <input
+            className={inputClass}
+            name="videoTitle"
+            defaultValue={project?.videoTitle ?? ""}
+          />
+        </label>
+      </fieldset>
       <fieldset className="grid gap-2 border border-border p-4">
         <legend>Project media</legend>
         <p className="text-sm text-muted-foreground">

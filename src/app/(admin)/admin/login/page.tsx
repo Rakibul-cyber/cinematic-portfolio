@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/app/(admin)/admin/login/login-form";
-import { siteContent } from "@/content/site";
+import { FALLBACK_STUDIO_NAME } from "@/content/site";
 import { ADMIN_ROOT_PATH, isSafeInternalPath } from "@/lib/admin-routes";
 import { getCurrentUser } from "@/server/auth/session";
+import { getPublicSiteSettings } from "@/server/public/queries";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -36,6 +37,8 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
     redirect(redirectTo);
   }
 
+  const settings = await getPublicSiteSettings();
+
   return (
     <main
       className="flex min-h-screen items-center justify-center px-5 py-12"
@@ -44,7 +47,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
       <div className="w-full max-w-sm">
         <div className="flex flex-col gap-3 border-b border-border pb-8 text-center">
           <p className="font-display text-2xl tracking-[0.14em] uppercase">
-            {siteContent.brand.name}
+            {settings?.studioName ?? FALLBACK_STUDIO_NAME}
           </p>
           <h1 className="text-[0.7rem] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
             Studio administration

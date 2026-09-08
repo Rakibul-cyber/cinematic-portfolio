@@ -32,7 +32,7 @@ need and explicit approval.
 
 ## Development status
 
-**Current phase: Phase 4 — Admin CMS.**
+**Current phase: Phase 5 — Public Portfolio.**
 
 Phase 1 delivered the frontend foundation: a responsive public shell,
 centralized placeholder content, reusable UI primitives, local
@@ -53,7 +53,83 @@ audit events. It does not add project or other Phase 4 CMS entities.
 
 Phase 4 adds a focused private CMS for projects, categories, project media,
 services, testimonials, stable page copy, site settings, social links, and basic
-SEO fields. Public database-backed portfolio rendering remains Phase 5.
+SEO fields.
+
+Phase 5 connects that CMS to the public site: a CMS-backed homepage, a work
+index with category filtering, project detail pages with ordered galleries,
+Services, About, and a presentation-only Contact page, responsive R2 image
+delivery, and a privacy-enhanced click-to-load video player. Inquiry
+submission, email, analytics, and the full SEO system remain later phases. See
+[ADR 0005](docs/DECISIONS/0005-public-portfolio.md).
+
+## Public site
+
+| Route | Content |
+| --- | --- |
+| `/` | Hero, selected work, showreel, services, studio statement, testimonials, contact invitation. |
+| `/work` | Published projects, filterable by active category via `?category=<slug>`. |
+| `/work/<slug>` | One published project: cover, details, description, optional film, ordered gallery. |
+| `/services` | Active services in configured order, with the studio's own price labels. |
+| `/about` | The CMS About page plus studio settings. |
+| `/contact` | Contact details and social links. Presentation only — no form in Phase 5. |
+
+### How content reaches the public site
+
+The CMS is the source of truth. `src/content/site.ts` holds interface chrome
+only — navigation targets, section labels, and neutral wording for an empty
+CMS. It contains no studio, client, project, or price content.
+
+`src/server/public/` is the only place public pages read the database. It
+applies the publication filters, then maps rows into explicit view models, so
+components never see Prisma rows and internal columns cannot reach public HTML.
+
+Publication rules, enforced in the query rather than the UI:
+
+| Entity | Public when |
+| --- | --- |
+| Project | `status` is `PUBLISHED` **and** its category is active |
+| Category | active **and** it contains published work |
+| Service, testimonial, social link | active |
+| Page (`about`, `contact`, `services`) | always, if saved |
+
+A draft project and a slug that never existed both return a normal 404. Nothing
+indicates that a draft exists.
+
+Sections with no content are omitted rather than filled: no services means no
+services section, no testimonials means no testimonial block, no showreel video
+means no showreel. Visitors never see administrative wording.
+
+To publish work, an editor creates a category, uploads media at
+`/admin/media` with alt text, creates a project at `/admin/projects`, selects
+its media in order (the first selection is the cover), sets the status to
+`PUBLISHED`, and saves. The change appears on the public site immediately —
+each mutation invalidates the public cache tags and routes it affects.
+
+### Caching
+
+Public reads are cached and tagged per entity; admin saves call
+`revalidatePublicContent`, which purges the affected tags and routes. A
+one-hour `revalidate` bounds staleness if an invalidation is ever missed.
+`/`, `/about`, `/services`, and `/contact` are statically rendered with ISR;
+`/work/<slug>` is pre-rendered for published slugs and renders newly published
+work on demand; `/work` is per-request because of its category filter.
+
+Do not add a `loading.tsx` to the public route group: a streaming boundary
+commits HTTP 200 before `notFound()` runs and turns draft URLs into soft 404s.
+
+### Images and video
+
+Public images are the Phase 3 R2 variants served directly through `srcset`,
+sized by layout, with intrinsic dimensions and the tiny blur placeholder to
+prevent layout shift. The 2560 master is never served when a smaller variant
+covers the layout. URLs are built only from `R2_PUBLIC_BASE_URL`, so no bucket
+name or host appears in a component.
+
+Long-form video stays with a video provider. Administrators enter a provider
+and that provider's video ID only — never a URL or embed code — for a project
+film (`/admin/projects`) or the homepage showreel (`/admin/settings`). The
+player requests nothing from the provider until a visitor presses play, and
+YouTube is embedded through `youtube-nocookie.com`.
 
 ## Local development
 
@@ -237,6 +313,28 @@ Destructive operations and global settings require `ADMIN` or `SUPER_ADMIN`.
 Projects use only draft/published states. Deleting a project preserves its media;
 referenced media must be detached before deletion. See
 [ADR 0004](docs/DECISIONS/0004-admin-cms.md).
+
+## Verifying the public site
+
+Pure rules — publication filters, view-model mapping, responsive source
+selection, video privacy, and metadata fallbacks — run under `npm test`.
+
+Behaviour that only exists over HTTP is checked against a running application.
+The script creates temporary CMS content and real media, asserts the public
+rendering, then removes everything and restores the previous settings and
+pages:
+
+```powershell
+npm run public:verify -- --seed
+npm run build
+npx next start
+# in a second terminal:
+npm run public:verify -- --check
+npm run public:verify -- --cleanup
+```
+
+Seed before building: the build renders the public pages, so it must see the
+seeded content.
 
 ## Repository rules
 

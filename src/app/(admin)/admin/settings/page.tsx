@@ -110,6 +110,42 @@ export default async function Page({
             defaultValue={settings?.defaultSeoDescription ?? ""}
           />
         </label>
+        <fieldset className="grid gap-3 border border-border p-4 sm:col-span-2 sm:grid-cols-3">
+          <legend>Homepage showreel</legend>
+          <p className="text-sm text-muted-foreground sm:col-span-3">
+            Provider and video ID only — never a URL or embed code. Leave both
+            empty to hide the showreel section. Nothing is requested from the
+            provider until a visitor presses play.
+          </p>
+          <label>
+            Showreel provider
+            <select
+              className={inputClass}
+              name="showreelProvider"
+              defaultValue={settings?.showreelProvider ?? ""}
+            >
+              <option value="">None</option>
+              <option value="YOUTUBE">YOUTUBE</option>
+              <option value="VIMEO">VIMEO</option>
+            </select>
+          </label>
+          <label>
+            Showreel video ID
+            <input
+              className={inputClass}
+              name="showreelVideoId"
+              defaultValue={settings?.showreelVideoId ?? ""}
+            />
+          </label>
+          <label>
+            Showreel title
+            <input
+              className={inputClass}
+              name="showreelTitle"
+              defaultValue={settings?.showreelTitle ?? ""}
+            />
+          </label>
+        </fieldset>
         <button className={buttonClass}>Save settings</button>
       </form>
       <h2 className="mt-10 font-display text-2xl">Social links</h2>

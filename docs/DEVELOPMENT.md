@@ -71,6 +71,16 @@ npm test
 npm run build
 ```
 
+Live flows that only exist against a database, R2, or HTTP have their own
+verification scripts, each of which cleans up after itself:
+
+```powershell
+npm run auth:verify     # route protection and sessions (needs a running app)
+npm run media:verify    # upload, variants, and deletion against R2
+npm run cms:verify      # admin CRUD, publishing, and reference protection
+npm run public:verify   # public rendering; see the README for its three steps
+```
+
 Business-critical behavior receives priority over high-volume, low-value tests.
 Expected coverage eventually includes authentication and authorization, inquiry
 validation, admin CRUD, accessibility, and critical public/admin E2E flows.

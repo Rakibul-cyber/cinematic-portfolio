@@ -18,6 +18,7 @@
     "auth:verify": "node scripts/verify-auth-flow.mjs",
     "media:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-media-flow.ts",
     "cms:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-cms-flow.ts",
+    "public:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-public-flow.ts",
     "admin:bootstrap": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/bootstrap-admin.ts"
   },
   "overrides": {

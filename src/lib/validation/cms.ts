@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isValidVideoId, VIDEO_PROVIDERS } from "@/lib/video";
+
 export function slugify(value: string): string {
   return value
     .normalize("NFKD")
@@ -21,6 +23,62 @@ const slug = z
     "Use lowercase letters, numbers, and hyphens only.",
   );
 const order = z.coerce.number().int().min(-10_000).max(10_000).default(0);
+/**
+ * Provider-neutral video input.
+ *
+ * Only a provider and that provider's own identifier are accepted; iframe
+ * markup, embed scripts, and full URLs are rejected outright. The pair must be
+ * complete and the identifier must match the provider's shape, so a half-filled
+ * form cannot store a video reference the public player would fail to build.
+ */
+const videoProvider = z
+  .enum(VIDEO_PROVIDERS)
+  .or(z.literal(""))
+  .default("")
+  .transform((value) => value || null);
+
+const videoIdentifier = z
+  .string()
+  .trim()
+  .max(64)
+  .default("")
+  .transform((value) => value || null);
+
+/** Optional free text that may be missing from the form entirely. */
+const videoTitle = z
+  .string()
+  .trim()
+  .max(160)
+  .default("")
+  .transform((value) => value || null);
+
+function checkVideoPair(
+  provider: (typeof VIDEO_PROVIDERS)[number] | null,
+  id: string | null,
+  ctx: z.RefinementCtx,
+  path: string,
+) {
+  if (!provider && !id) return;
+
+  if (!provider || !id) {
+    ctx.addIssue({
+      code: "custom",
+      path: [path],
+      message: "Set both a video provider and a video ID, or leave both empty.",
+    });
+    return;
+  }
+
+  if (!isValidVideoId(provider, id)) {
+    ctx.addIssue({
+      code: "custom",
+      path: [path],
+      message:
+        "Enter the provider's video ID only — not a URL or embed code.",
+    });
+  }
+}
+
 const optional = (max: number) =>
   z
     .string()
@@ -77,7 +135,17 @@ export const settingsSchema = z.object({
   footerCopyright: optional(200),
   defaultSeoTitle: optional(70),
   defaultSeoDescription: optional(160),
-});
+  showreelProvider: videoProvider,
+  showreelVideoId: videoIdentifier,
+  showreelTitle: videoTitle,
+}).superRefine((value, ctx) =>
+  checkVideoPair(
+    value.showreelProvider,
+    value.showreelVideoId,
+    ctx,
+    "showreelVideoId",
+  ),
+);
 export const socialSchema = z.object({
   id: z.string().uuid().optional(),
   platform: z.string().trim().min(1).max(50),
@@ -103,5 +171,10 @@ export const projectSchema = z.object({
   sortOrder: order,
   seoTitle: optional(70),
   seoDescription: optional(160),
+  videoProvider,
+  videoId: videoIdentifier,
+  videoTitle,
   mediaIds: z.array(z.string().uuid()).default([]),
-});
+}).superRefine((value, ctx) =>
+  checkVideoPair(value.videoProvider, value.videoId, ctx, "videoId"),
+);

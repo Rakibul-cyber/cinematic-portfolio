@@ -61,6 +61,19 @@ enum ProjectMediaRole {
   GALLERY
 }
 
+/// Provider of a long-form video shown on the public site.
+///
+/// Long-form portfolio video is hosted with a video provider rather than in R2.
+/// Only the provider and the provider's own identifier are stored: never iframe
+/// markup, embed scripts, or arbitrary URLs. The public player builds the embed
+/// URL itself, so changing provider or privacy domain is a code change in one
+/// helper rather than a content migration.
+enum VideoProvider {
+  YOUTUBE
+  VIMEO
+  EXTERNAL
+}
+
 /// Administrative user. This is the Better Auth `user` table extended with the
 /// application role. No public sign-up exists, so every row is created by the
 /// bootstrap script or by an already-authorized administrator.
@@ -140,6 +153,9 @@ model Project {
   sortOrder      Int               @default(0)
   seoTitle       String?
   seoDescription String?
+  videoProvider  VideoProvider?
+  videoId        String?
+  videoTitle     String?
   publishedAt    DateTime?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
@@ -224,7 +240,10 @@ model SiteSetting {
   footerCopyright       String?
   defaultSeoTitle       String?
   defaultSeoDescription String?
-  updatedAt             DateTime @updatedAt
+  showreelProvider      VideoProvider?
+  showreelVideoId       String?
+  showreelTitle         String?
+  updatedAt             DateTime       @updatedAt
 
   @@map("site_setting")
 }
