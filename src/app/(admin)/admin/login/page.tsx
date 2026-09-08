@@ -20,7 +20,8 @@ type LoginPageProps = {
 
 export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
-  const requestedNext = typeof params.next === "string" ? params.next : undefined;
+  const requestedNext =
+    typeof params.next === "string" ? params.next : undefined;
 
   // Only same-origin admin paths are accepted, so a crafted `next` value cannot
   // turn the login page into an open redirect.

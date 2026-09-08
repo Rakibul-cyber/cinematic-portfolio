@@ -35,7 +35,9 @@ export const viewport: Viewport = {
   themeColor: SITE_THEME_COLOR,
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${displayFont.variable} ${sansFont.variable}`}>
       <body>{children}</body>

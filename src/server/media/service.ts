@@ -27,10 +27,16 @@ export async function uploadMedia(file: File, altText: string | null, actor: Adm
 export async function deleteMedia(id: string, actor: AdminUser): Promise<void> {
   const media = await prisma.media.findUnique({ where: { id }, include: { variants: true } });
   if (!media) return;
+  const references = await prisma.projectMedia.count({ where: { mediaId: id } });
+  if (references > 0) throw new MediaInUseError();
   const keys = [media.objectKey, ...media.variants.map((v) => v.objectKey)];
   await deleteR2Objects(keys);
   await prisma.media.delete({ where: { id } });
   await recordAuditLog({ action: AuditAction.MediaDeleted, entityType: AuditEntityType.Media, entityId: id, actorUserId: actor.id, actorEmail: actor.email, metadata: { objectCount: keys.length } });
+}
+
+export class MediaInUseError extends Error {
+  constructor() { super("This image is assigned to a project. Remove it from the project before deleting it."); this.name = "MediaInUseError"; }
 }
 
 export async function updateMediaMetadata(

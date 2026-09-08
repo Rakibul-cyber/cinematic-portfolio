@@ -32,7 +32,7 @@ need and explicit approval.
 
 ## Development status
 
-**Current phase: Phase 3 — Media System.**
+**Current phase: Phase 4 — Admin CMS.**
 
 Phase 1 delivered the frontend foundation: a responsive public shell,
 centralized placeholder content, reusable UI primitives, local
@@ -50,6 +50,10 @@ decisions behind it, and the [roadmap](docs/ROADMAP.md) for phase boundaries.
 Phase 3 adds authenticated image upload, metadata-free responsive WebP
 processing, Cloudflare R2 storage, a PostgreSQL media catalogue, deletion, and
 audit events. It does not add project or other Phase 4 CMS entities.
+
+Phase 4 adds a focused private CMS for projects, categories, project media,
+services, testimonials, stable page copy, site settings, social links, and basic
+SEO fields. Public database-backed portfolio rendering remains Phase 5.
 
 ## Local development
 
@@ -214,12 +218,25 @@ Remove-Item Env:\ADMIN_TEST_PASSWORD
 | --- | --- |
 | `/admin/login` | Public. Redirects to `/admin` when already signed in. |
 | `/admin` | Requires a valid session. Redirects to `/admin/login` otherwise. |
+| `/admin/projects` | Project CRUD, publishing, and ordered media assignment. |
+| `/admin/categories` | Ordered portfolio category management. |
+| `/admin/media` | Media management with project-reference protection. |
+| `/admin/services` | Ordered service and display-price management. |
+| `/admin/testimonials` | Ordered testimonial management. |
+| `/admin/pages` | Stable About, Contact, and Services copy. |
+| `/admin/settings` | ADMIN+ global settings and social links. |
 | `/api/auth/*` | Better Auth endpoints. Sign-up is disabled. |
 
 Middleware redirects visitors without a session cookie for routing convenience
 only; it verifies nothing. Every protected page and mutation enforces
 authentication and role requirements on the server through the helpers in
 `src/server/auth/session.ts`.
+
+Editors may create and edit CMS content and manage project-media relationships.
+Destructive operations and global settings require `ADMIN` or `SUPER_ADMIN`.
+Projects use only draft/published states. Deleting a project preserves its media;
+referenced media must be detached before deletion. See
+[ADR 0004](docs/DECISIONS/0004-admin-cms.md).
 
 ## Repository rules
 

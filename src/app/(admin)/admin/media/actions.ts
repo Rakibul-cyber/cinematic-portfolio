@@ -18,9 +18,19 @@ const metadataSchema = z.object({
   caption: z.string().trim().max(2_000),
 });
 
-export async function updateMediaMetadataAction(formData: FormData): Promise<void> {
+export async function updateMediaMetadataAction(
+  formData: FormData,
+): Promise<void> {
   const actor = await requireUser(ADMIN_MEDIA_PATH);
-  const input = metadataSchema.parse({ id: formData.get("id"), altText: formData.get("altText"), caption: formData.get("caption") });
-  await updateMediaMetadata(input.id, { altText: input.altText || null, caption: input.caption || null }, actor);
+  const input = metadataSchema.parse({
+    id: formData.get("id"),
+    altText: formData.get("altText"),
+    caption: formData.get("caption"),
+  });
+  await updateMediaMetadata(
+    input.id,
+    { altText: input.altText || null, caption: input.caption || null },
+    actor,
+  );
   revalidatePath(ADMIN_MEDIA_PATH);
 }

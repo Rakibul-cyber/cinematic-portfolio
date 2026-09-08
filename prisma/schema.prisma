@@ -50,6 +50,17 @@ enum MediaVariantName {
   MASTER
 }
 
+enum PublicationStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ProjectMediaRole {
+  COVER
+  HERO
+  GALLERY
+}
+
 /// Administrative user. This is the Better Auth `user` table extended with the
 /// application role. No public sign-up exists, so every row is created by the
 /// bootstrap script or by an already-authorized administrator.
@@ -92,10 +103,144 @@ model Media {
 
   createdBy User           @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
   variants  MediaVariant[]
+  projects  ProjectMedia[]
 
   @@index([createdAt])
   @@index([createdByUserId])
   @@map("media")
+}
+
+model PortfolioCategory {
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  description String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  projects    Project[]
+
+  @@index([isActive, sortOrder])
+  @@map("portfolio_category")
+}
+
+model Project {
+  id             String            @id @default(uuid())
+  title          String
+  slug           String            @unique
+  summary        String
+  description    String
+  clientName     String?
+  location       String?
+  projectDate    DateTime?
+  categoryId     String
+  status         PublicationStatus @default(DRAFT)
+  featured       Boolean           @default(false)
+  sortOrder      Int               @default(0)
+  seoTitle       String?
+  seoDescription String?
+  publishedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  category PortfolioCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  media    ProjectMedia[]
+
+  @@index([status, sortOrder])
+  @@index([categoryId])
+  @@map("project")
+}
+
+model ProjectMedia {
+  projectId String
+  mediaId   String
+  role      ProjectMediaRole @default(GALLERY)
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  media   Media   @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@id([projectId, mediaId])
+  @@index([projectId, sortOrder])
+  @@index([mediaId])
+  @@map("project_media")
+}
+
+model Service {
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  shortDescription String
+  description      String
+  priceLabel       String?
+  sortOrder        Int      @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@map("service")
+}
+
+model Testimonial {
+  id          String   @id @default(uuid())
+  quote       String
+  authorName  String
+  authorRole  String?
+  company     String?
+  projectName String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@map("testimonial")
+}
+
+model Page {
+  id             String   @id @default(uuid())
+  key            String   @unique
+  title          String
+  eyebrow        String?
+  body           String
+  seoTitle       String?
+  seoDescription String?
+  updatedAt      DateTime @updatedAt
+
+  @@map("page")
+}
+
+model SiteSetting {
+  id                    String   @id @default("primary")
+  studioName            String
+  tagline               String?
+  contactEmail          String?
+  contactPhone          String?
+  whatsappNumber        String?
+  locationText          String?
+  footerCopyright       String?
+  defaultSeoTitle       String?
+  defaultSeoDescription String?
+  updatedAt             DateTime @updatedAt
+
+  @@map("site_setting")
+}
+
+model SocialLink {
+  id        String   @id @default(uuid())
+  platform  String
+  label     String
+  url       String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@map("social_link")
 }
 
 model MediaVariant {

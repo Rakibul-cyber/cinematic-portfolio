@@ -24,6 +24,11 @@ export const AuditAction = {
   MediaUploaded: "media.uploaded",
   MediaUpdated: "media.updated",
   MediaDeleted: "media.deleted",
+  CmsCreated: "cms.created",
+  CmsUpdated: "cms.updated",
+  CmsDeleted: "cms.deleted",
+  ProjectPublished: "project.published",
+  ProjectUnpublished: "project.unpublished",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
@@ -33,6 +38,13 @@ export const AuditEntityType = {
   AdminUser: "admin_user",
   Session: "session",
   Media: "media",
+  Project: "project",
+  Category: "category",
+  Service: "service",
+  Testimonial: "testimonial",
+  Page: "page",
+  Settings: "settings",
+  SocialLink: "social_link",
 } as const;
 
 export type AuditEntityType =

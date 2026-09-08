@@ -123,7 +123,11 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
       >
         {isPending ? (
           <>
-            <Loader2 aria-hidden="true" className="size-4 animate-spin" strokeWidth={2} />
+            <Loader2
+              aria-hidden="true"
+              className="size-4 animate-spin"
+              strokeWidth={2}
+            />
             Signing in…
           </>
         ) : (

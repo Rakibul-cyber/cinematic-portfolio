@@ -4,7 +4,11 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { ADMIN_LOGIN_PATH } from "@/lib/admin-routes";
-import { AuditAction, AuditEntityType, recordAuditLog } from "@/server/audit/audit-log";
+import {
+  AuditAction,
+  AuditEntityType,
+  recordAuditLog,
+} from "@/server/audit/audit-log";
 import { auth } from "@/server/auth/config";
 import { getCurrentUser } from "@/server/auth/session";
 
