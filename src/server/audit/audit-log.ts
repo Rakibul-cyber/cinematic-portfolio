@@ -21,6 +21,9 @@ export const AuditAction = {
   AdminSignInFailed: "admin.sign_in_failed",
   AdminSignedOut: "admin.signed_out",
   AdminUserBootstrapped: "admin_user.bootstrapped",
+  MediaUploaded: "media.uploaded",
+  MediaUpdated: "media.updated",
+  MediaDeleted: "media.deleted",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
@@ -29,6 +32,7 @@ export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
 export const AuditEntityType = {
   AdminUser: "admin_user",
   Session: "session",
+  Media: "media",
 } as const;
 
 export type AuditEntityType =

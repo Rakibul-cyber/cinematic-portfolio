@@ -1,4 +1,5 @@
 import { LogOut, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 
 import { signOutAction } from "@/app/(admin)/admin/actions";
 import { ADMIN_ROOT_PATH } from "@/lib/admin-routes";
@@ -121,6 +122,7 @@ export default async function AdminHomePage() {
           ))}
         </ul>
       </section>
+      <Link className="inline-flex min-h-12 items-center justify-center bg-accent px-5 text-sm font-semibold text-accent-foreground" href="/admin/media">Open media library</Link>
     </div>
   );
 }

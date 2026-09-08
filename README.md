@@ -32,7 +32,7 @@ need and explicit approval.
 
 ## Development status
 
-**Current phase: Phase 2 — Database & Authentication.**
+**Current phase: Phase 3 — Media System.**
 
 Phase 1 delivered the frontend foundation: a responsive public shell,
 centralized placeholder content, reusable UI primitives, local
@@ -46,6 +46,10 @@ helpers, a protected minimal admin shell at `/admin`, and the audit log
 foundation. There is no public sign-up, and content management does not exist
 yet. See [ADR 0002](docs/DECISIONS/0002-auth-database-foundation.md) for the
 decisions behind it, and the [roadmap](docs/ROADMAP.md) for phase boundaries.
+
+Phase 3 adds authenticated image upload, metadata-free responsive WebP
+processing, Cloudflare R2 storage, a PostgreSQL media catalogue, deletion, and
+audit events. It does not add project or other Phase 4 CMS entities.
 
 ## Local development
 
@@ -124,6 +128,22 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 Set `BETTER_AUTH_URL` to the application's absolute origin —
 `http://localhost:3000` for local development. Production values belong in the
 deployment platform, not in the repository.
+
+### Cloudflare R2 media
+
+Use a dedicated development bucket (recommended
+`cinematic-portfolio-media-dev`) and a bucket-scoped Object Read & Write API
+token. Put `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+`R2_BUCKET_NAME`, and the public-read origin `R2_PUBLIC_BASE_URL` in
+`.env.local`. Credentials remain server-only.
+
+The library at `/admin/media` accepts JPEG, PNG, and WebP images up to 15 MB and
+12,000 pixels per dimension. Uploads become metadata-free WebP: a master capped
+at 2560px plus useful 320, 640, 1280, and 1920px widths without upscaling. Keys
+are collision-safe and filename-independent. Deletion removes R2 objects before
+database metadata; future CMS references must block direct deletion.
+Replacements use new identities rather than overwriting cached keys. See
+[ADR 0003](docs/DECISIONS/0003-media-storage.md).
 
 ## Database workflow
 

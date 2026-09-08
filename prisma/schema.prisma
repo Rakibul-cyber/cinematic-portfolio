@@ -1,8 +1,6 @@
 // Cinematic Portfolio database schema.
 //
-// Phase 2 models only the authentication, role, and audit foundation. Content
-// entities (projects, media, services, inquiries, customers, testimonials)
-// belong to later phases and are intentionally absent.
+// Phase 2 models authentication, roles, and audit. Phase 3 adds only media.
 //
 // The Better Auth core tables (user, session, account, verification) follow the
 // field contract expected by the Better Auth Prisma adapter, with two
@@ -36,6 +34,22 @@ enum AdminRole {
   EDITOR
 }
 
+enum MediaKind {
+  IMAGE
+}
+
+enum StorageProvider {
+  R2
+}
+
+enum MediaVariantName {
+  THUMBNAIL
+  W640
+  W1280
+  W1920
+  MASTER
+}
+
 /// Administrative user. This is the Better Auth `user` table extended with the
 /// application role. No public sign-up exists, so every row is created by the
 /// bootstrap script or by an already-authorized administrator.
@@ -52,9 +66,54 @@ model User {
   accounts  Account[]
   sessions  Session[]
   auditLogs AuditLog[]
+  media     Media[]
 
   @@index([role])
   @@map("user")
+}
+
+model Media {
+  id              String          @id @default(uuid())
+  kind            MediaKind       @default(IMAGE)
+  originalName    String
+  mimeType        String
+  sizeBytes       Int
+  width           Int
+  height          Int
+  altText         String?
+  caption         String?
+  storageProvider StorageProvider @default(R2)
+  bucket          String
+  objectKey       String          @unique
+  blurDataUrl     String?
+  createdByUserId String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  createdBy User           @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  variants  MediaVariant[]
+
+  @@index([createdAt])
+  @@index([createdByUserId])
+  @@map("media")
+}
+
+model MediaVariant {
+  id        String           @id @default(uuid())
+  mediaId   String
+  variant   MediaVariantName
+  width     Int
+  height    Int
+  mimeType  String
+  sizeBytes Int
+  objectKey String           @unique
+  createdAt DateTime         @default(now())
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaId, variant])
+  @@index([mediaId])
+  @@map("media_variant")
 }
 
 /// Better Auth session. Deleting a user removes their sessions so revoking an

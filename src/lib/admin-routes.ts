@@ -7,6 +7,7 @@
  */
 export const ADMIN_ROOT_PATH = "/admin";
 export const ADMIN_LOGIN_PATH = "/admin/login";
+export const ADMIN_MEDIA_PATH = "/admin/media";
 export const AUTH_API_BASE_PATH = "/api/auth";
 
 /**
