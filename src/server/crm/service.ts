@@ -14,6 +14,7 @@ export async function createInquiry(data: InquiryInput) {
   const service = data.serviceSlug ? await prisma.service.findFirst({ where: { slug: data.serviceSlug, isActive: true }, select: { id: true, name: true } }) : null;
   if (data.serviceSlug && !service) throw new InvalidServiceError("The selected service is no longer available.");
   const normalizedEmail = normalizeEmail(data.email);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
   try {
     const result = await prisma.$transaction(async (tx) => {
       const customer = await tx.customer.upsert({
@@ -35,12 +36,15 @@ export async function createInquiry(data: InquiryInput) {
     await recordAuditLog({ action: "customer.created_or_matched", entityType: "customer", entityId: result.customer.id });
     return { id: result.inquiry.id, duplicate: false };
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034" && attempt < 2) continue;
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const existing = await prisma.inquiry.findUnique({ where: { submissionToken: data.submissionToken }, select: { id: true } });
       if (existing) return { id: existing.id, duplicate: true };
     }
     throw error;
   }
+  }
+  throw new Error("Inquiry transaction could not be completed.");
 }
 
 export async function updateCustomer(data: CustomerInput, actor: AdminUser) {
