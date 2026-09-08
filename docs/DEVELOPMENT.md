@@ -79,6 +79,7 @@ npm run auth:verify     # route protection and sessions (needs a running app)
 npm run media:verify    # upload, variants, and deletion against R2
 npm run cms:verify      # admin CRUD, publishing, and reference protection
 npm run public:verify   # public rendering; see the README for its three steps
+npm run crm:verify      # CRM transactions, deduplication, snapshots and cleanup
 ```
 
 Business-critical behavior receives priority over high-volume, low-value tests.

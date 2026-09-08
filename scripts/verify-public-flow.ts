@@ -367,7 +367,8 @@ async function check(): Promise<void> {
   assert.equal(contact.status, 200);
   assert.ok(contact.html.includes(`hello-${token}@invalid.example`));
   assert.ok(contact.html.includes("wa.me/49301234567"), "WhatsApp link");
-  assert.ok(!contact.html.includes("<form"), "no contact form in Phase 5");
+  assert.ok(contact.html.includes("<form"), "Phase 6 inquiry form rendered");
+  assert.ok(contact.html.includes('name="submissionToken"'), "duplicate token rendered");
 
   console.log(
     "Live public verification passed: publication rules, category filter, gallery order, " +

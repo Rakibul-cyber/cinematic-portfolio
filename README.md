@@ -62,6 +62,13 @@ delivery, and a privacy-enhanced click-to-load video player. Inquiry
 submission, email, analytics, and the full SEO system remain later phases. See
 [ADR 0005](docs/DECISIONS/0005-public-portfolio.md).
 
+Phase 6 adds a real inquiry form and a deliberately small internal CRM.
+Customers are conservatively matched by normalized email while each inquiry
+retains the visitor's original snapshot. Editors can review the pipeline,
+update customer details, and append internal notes; ADMIN and SUPER_ADMIN can
+export formula-safe CSV. No email is sent until Phase 7. See
+[ADR 0006](docs/DECISIONS/0006-inquiry-crm.md).
+
 ## Public site
 
 | Route | Content |
@@ -71,7 +78,9 @@ submission, email, analytics, and the full SEO system remain later phases. See
 | `/work/<slug>` | One published project: cover, details, description, optional film, ordered gallery. |
 | `/services` | Active services in configured order, with the studio's own price labels. |
 | `/about` | The CMS About page plus studio settings. |
-| `/contact` | Contact details and social links. Presentation only — no form in Phase 5. |
+| `/contact` | Contact details, social links, and the validated inquiry form. |
+| `/admin/inquiries` | Searchable, status-filtered and paginated inquiry pipeline. |
+| `/admin/customers` | Searchable customer records, inquiry history and internal notes. |
 
 ### How content reaches the public site
 

@@ -57,7 +57,7 @@ Cloudflare/R2 is opened/configured during this phase.
 
 A YouTube account/channel is configured during this phase if needed.
 
-## Phase 6 — Inquiry & CRM
+## Phase 6 — Inquiry & CRM *(implemented)*
 
 - Build and validate the public inquiry form.
 - Persist inquiries and deduplicate customer records.

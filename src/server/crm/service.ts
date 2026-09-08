@@ -39,7 +39,14 @@ export async function createInquiry(data: InquiryInput) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034" && attempt < 2) continue;
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const existing = await prisma.inquiry.findUnique({ where: { submissionToken: data.submissionToken }, select: { id: true } });
+      // The same submission arriving twice is idempotent: return the inquiry
+      // the first attempt already created rather than creating a second one.
       if (existing) return { id: existing.id, duplicate: true };
+      // Otherwise the conflict was on the customer's normalized email, meaning
+      // a concurrent first-time submission won the race. The unique index has
+      // already guaranteed a single Customer; retrying now matches it instead
+      // of failing a legitimate visitor.
+      if (attempt < 2) continue;
     }
     throw error;
   }
