@@ -6,13 +6,15 @@ import { prisma } from "@/server/db/prisma";
 export const dynamic = "force-dynamic";
 export default async function AdminHomePage() {
   const user = await requireUser("/admin");
-  const [projects, published, media, services, testimonials] =
+  const [projects, published, media, services, testimonials, newInquiries, openInquiries] =
     await Promise.all([
       prisma.project.count(),
       prisma.project.count({ where: { status: "PUBLISHED" } }),
       prisma.media.count(),
       prisma.service.count(),
       prisma.testimonial.count(),
+      prisma.inquiry.count({where:{status:"NEW"}}),
+      prisma.inquiry.count({where:{status:{notIn:["COMPLETED","CANCELLED"]}}}),
     ]);
   const metrics = [
     ["Projects", projects],
@@ -21,6 +23,8 @@ export default async function AdminHomePage() {
     ["Media", media],
     ["Services", services],
     ["Testimonials", testimonials],
+    ["New inquiries", newInquiries],
+    ["Open inquiries", openInquiries],
   ];
   return (
     <AdminShell user={user} title="Dashboard">

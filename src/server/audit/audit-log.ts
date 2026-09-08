@@ -29,6 +29,11 @@ export const AuditAction = {
   CmsDeleted: "cms.deleted",
   ProjectPublished: "project.published",
   ProjectUnpublished: "project.unpublished",
+  InquiryCreated: "inquiry.created",
+  InquiryStatusChanged: "inquiry.status_changed",
+  CustomerUpdated: "customer.updated",
+  CustomerNoteCreated: "customer_note.created",
+  CrmExported: "crm.exported",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
@@ -45,6 +50,9 @@ export const AuditEntityType = {
   Page: "page",
   Settings: "settings",
   SocialLink: "social_link",
+  Inquiry: "inquiry",
+  Customer: "customer",
+  CustomerNote: "customer_note",
 } as const;
 
 export type AuditEntityType =

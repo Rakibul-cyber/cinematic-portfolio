@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { FadeReveal } from "@/components/motion/fade-reveal";
 import { PageIntro } from "@/components/public/page-intro";
 import { SocialLinks } from "@/components/public/social-links";
+import { InquiryForm } from "@/components/public/inquiry-form";
 import { Container } from "@/components/ui/container";
 import { FALLBACK_STUDIO_NAME } from "@/content/site";
 import { buildPublicMetadata } from "@/server/public/metadata";
@@ -10,6 +11,7 @@ import {
   getActiveSocialLinks,
   getPublicPage,
   getPublicSiteSettings,
+  getActiveServices,
 } from "@/server/public/queries";
 
 // Next.js requires a literal here. Keep it equal to PUBLIC_REVALIDATE_SECONDS
@@ -37,10 +39,11 @@ export async function generateMetadata(): Promise<Metadata> {
  * address, phone number, or location is invented.
  */
 export default async function ContactPage() {
-  const [page, settings, socialLinks] = await Promise.all([
+  const [page, settings, socialLinks, services] = await Promise.all([
     getPublicPage("contact"),
     getPublicSiteSettings(),
     getActiveSocialLinks(),
+    getActiveServices(),
   ]);
 
   const studioName = settings?.studioName ?? FALLBACK_STUDIO_NAME;
@@ -130,6 +133,12 @@ export default async function ContactPage() {
               links={socialLinks}
             />
           </FadeReveal>
+        </div>
+      </Container>
+      <Container className="pb-24 sm:pb-32">
+        <div className="grid gap-10 border-t border-border pt-16 lg:grid-cols-12">
+          <div className="lg:col-span-4"><p className="text-xs tracking-[0.16em] text-accent uppercase">Project inquiry</p><h2 className="mt-4 font-display text-4xl">Tell us what you are planning.</h2></div>
+          <div className="lg:col-span-7 lg:col-start-6"><InquiryForm services={services}/></div>
         </div>
       </Container>
     </main>

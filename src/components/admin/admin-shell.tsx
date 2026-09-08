@@ -5,6 +5,8 @@ import type { AdminUser } from "@/server/auth/session";
 
 const links = [
   ["Dashboard", "/admin"],
+  ["Inquiries", "/admin/inquiries"],
+  ["Customers", "/admin/customers"],
   ["Projects", "/admin/projects"],
   ["Categories", "/admin/categories"],
   ["Media", "/admin/media"],

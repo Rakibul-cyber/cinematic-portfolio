@@ -74,6 +74,17 @@ enum VideoProvider {
   EXTERNAL
 }
 
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  DISCUSSION
+  QUOTE_SENT
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 /// Administrative user. This is the Better Auth `user` table extended with the
 /// application role. No public sign-up exists, so every row is created by the
 /// bootstrap script or by an already-authorized administrator.
@@ -91,6 +102,8 @@ model User {
   sessions  Session[]
   auditLogs AuditLog[]
   media     Media[]
+  customerNotes CustomerNote[]
+  inquiryStatusChanges InquiryStatusHistory[]
 
   @@index([role])
   @@map("user")
@@ -195,9 +208,89 @@ model Service {
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  inquiries        Inquiry[]
 
   @@index([isActive, sortOrder])
   @@map("service")
+}
+
+model Customer {
+  id              String   @id @default(uuid())
+  name            String
+  email           String
+  normalizedEmail String   @unique
+  phone           String?
+  whatsapp        String?
+  company         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  inquiries Inquiry[]
+  notes     CustomerNote[]
+
+  @@index([updatedAt])
+  @@map("customer")
+}
+
+model Inquiry {
+  id                 String        @id @default(uuid())
+  submissionToken    String        @unique
+  customerId         String
+  serviceId          String?
+  serviceNameSnapshot String?
+  nameSnapshot       String
+  emailSnapshot      String
+  phoneSnapshot      String?
+  whatsappSnapshot   String?
+  companySnapshot    String?
+  projectType        String
+  projectDate        DateTime?     @db.Date
+  location           String?
+  budgetLabel        String?
+  message            String
+  referralSource     String?
+  status             InquiryStatus @default(NEW)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  service  Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  statusHistory InquiryStatusHistory[]
+
+  @@index([status, createdAt])
+  @@index([customerId, createdAt])
+  @@index([serviceId])
+  @@index([createdAt])
+  @@map("inquiry")
+}
+
+model InquiryStatusHistory {
+  id              String        @id @default(uuid())
+  inquiryId       String
+  fromStatus      InquiryStatus?
+  toStatus        InquiryStatus
+  changedByUserId String?
+  createdAt       DateTime      @default(now())
+
+  inquiry   Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  changedBy User?   @relation(fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([inquiryId, createdAt])
+  @@map("inquiry_status_history")
+}
+
+model CustomerNote {
+  id           String   @id @default(uuid())
+  customerId   String
+  authorUserId String?
+  body         String
+  createdAt    DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  author   User?    @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, createdAt])
+  @@map("customer_note")
 }
 
 model Testimonial {
