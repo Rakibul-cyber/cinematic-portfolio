@@ -79,8 +79,6 @@ export formula-safe CSV. No email is sent until Phase 7. See
 | `/services` | Active services in configured order, with the studio's own price labels. |
 | `/about` | The CMS About page plus studio settings. |
 | `/contact` | Contact details, social links, and the validated inquiry form. |
-| `/admin/inquiries` | Searchable, status-filtered and paginated inquiry pipeline. |
-| `/admin/customers` | Searchable customer records, inquiry history and internal notes. |
 
 ### How content reaches the public site
 
@@ -310,6 +308,9 @@ Remove-Item Env:\ADMIN_TEST_PASSWORD
 | `/admin/testimonials` | Ordered testimonial management. |
 | `/admin/pages` | Stable About, Contact, and Services copy. |
 | `/admin/settings` | ADMIN+ global settings and social links. |
+| `/admin/inquiries` | Searchable, status-filtered and paginated inquiry pipeline. |
+| `/admin/inquiries/export` | ADMIN+ CSV export. Other signed-in roles receive 403. |
+| `/admin/customers` | Searchable customer records, inquiry history and internal notes. |
 | `/api/auth/*` | Better Auth endpoints. Sign-up is disabled. |
 
 Middleware redirects visitors without a session cookie for routing convenience

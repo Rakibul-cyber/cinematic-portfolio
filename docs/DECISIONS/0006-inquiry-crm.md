@@ -11,7 +11,24 @@ snapshot of the visitor's fields on `Inquiry` while associating the submission
 with a reusable `Customer`. Customer identity is the trimmed, lower-cased email
 only; provider-specific dot or alias rewriting and name/phone matching are not
 used. A unique constraint, serializable transaction, atomic upsert, and bounded
-retry make concurrent matching safe.
+retry make concurrent matching safe. The retry covers both `P2034` serialization
+conflicts and the `P2002` unique violation on `normalizedEmail` that a concurrent
+first-time submission can raise; a `P2002` on `submissionToken` is not retried
+but resolved to the inquiry the first attempt already created.
+
+`Inquiry` rows are immutable historical submissions. Nothing outside the
+submission itself ever rewrites a snapshot, so an inquiry always shows what the
+visitor actually sent, however the customer record or the referenced service
+changes afterwards.
+
+A later inquiry from a known email never overwrites an existing non-empty
+`Customer` field. `normalizedEmail` is assigned once at creation and is never
+reassigned by a submission, and the current `email`, `name`, `phone`, `whatsapp`,
+and `company` an administrator curates are left intact. A submission may only
+fill those contact fields while they are still blank, which adds information
+without discarding any. Administrators change current customer details through
+`/admin/customers`, which is the single place that value is authored; the
+visitor's own wording always survives on the inquiry snapshot regardless.
 
 An opaque client-generated submission token is unique on `Inquiry`, making a
 double click or browser retry idempotent without blocking later legitimate

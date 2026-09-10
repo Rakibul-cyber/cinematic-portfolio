@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import type { z } from "zod";
+import { fillMissingCustomerFields } from "@/lib/crm/customer-fields";
 import { normalizeEmail, type customerSchema, type inquirySchema } from "@/lib/validation/crm";
 import { recordAuditLog } from "@/server/audit/audit-log";
 import type { AdminUser } from "@/server/auth/session";
@@ -17,11 +18,21 @@ export async function createInquiry(data: InquiryInput) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const customer = await tx.customer.upsert({
+      // An empty `update` makes the upsert a pure "find or create": a returning
+      // visitor never rewrites the record an administrator curates, and the
+      // normalized email that identifies them is never reassigned. The
+      // submission is preserved in full on the Inquiry snapshot below.
+      const matched = await tx.customer.upsert({
         where: { normalizedEmail },
         create: { name: data.name, email: data.email, normalizedEmail, phone: data.phone, whatsapp: data.whatsapp, company: data.company },
-        update: { name: data.name, email: data.email, ...(data.phone ? { phone: data.phone } : {}), ...(data.whatsapp ? { whatsapp: data.whatsapp } : {}), ...(data.company ? { company: data.company } : {}) },
+        update: {},
       });
+      // Blank contact fields are still worth filling from a later submission,
+      // since that adds information rather than replacing any.
+      const fill = fillMissingCustomerFields(matched, data);
+      const customer = Object.keys(fill).length
+        ? await tx.customer.update({ where: { id: matched.id }, data: fill })
+        : matched;
       const inquiry = await tx.inquiry.create({ data: {
         submissionToken: data.submissionToken, customerId: customer.id, serviceId: service?.id,
         serviceNameSnapshot: service?.name, nameSnapshot: data.name, emailSnapshot: data.email,
