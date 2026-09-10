@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --conditions=react-server --test \"src/**/*.test.ts\"",
+    "test": "tsx --conditions=react-server --test \"src/**/*.test.ts\" && tsx --test \"src/**/*.render-test.ts\"",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -20,7 +20,8 @@
     "cms:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-cms-flow.ts",
     "public:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-public-flow.ts",
     "crm:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-crm-flow.ts",
-    "admin:bootstrap": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/bootstrap-admin.ts"
+    "admin:bootstrap": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/bootstrap-admin.ts",
+    "email:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-email-flow.ts"
   },
   "overrides": {
     "postcss": "8.5.26",
@@ -32,6 +33,7 @@
     "@neondatabase/serverless": "1.1.0",
     "@prisma/adapter-neon": "7.10.0",
     "@prisma/client": "7.10.0",
+    "@react-email/components": "^1.0.12",
     "better-auth": "1.7.3",
     "clsx": "^2.1.1",
     "lucide-react": "^1.39.0",
@@ -39,6 +41,7 @@
     "next": "^15.5.25",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "resend": "^6.27.0",
     "server-only": "0.0.1",
     "sharp": "^0.35.4",
     "tailwind-merge": "^3.6.0",

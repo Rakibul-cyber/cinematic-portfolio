@@ -64,7 +64,7 @@ A YouTube account/channel is configured during this phase if needed.
 - Add the CRM pipeline, statuses, internal notes, search, and filters.
 - Add customer/inquiry history and CSV export.
 
-## Phase 7 — Email & Notifications
+## Phase 7 — Email & Notifications *(implemented)*
 
 - Configure Resend.
 - Send admin inquiry notifications and customer confirmations.

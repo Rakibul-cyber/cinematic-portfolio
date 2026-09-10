@@ -85,6 +85,34 @@ enum InquiryStatus {
   CANCELLED
 }
 
+/// The transactional emails a submitted inquiry can produce.
+///
+/// Deliberately closed and small. Phase 7 sends exactly these two messages;
+/// marketing, status-change, quote, and reminder emails are out of scope.
+enum EmailDeliveryType {
+  INQUIRY_ADMIN_NOTIFICATION
+  INQUIRY_CUSTOMER_ACKNOWLEDGMENT
+}
+
+/// Lifecycle of one delivery attempt.
+///
+/// `ACCEPTED` means the provider accepted the API request and returned a
+/// message id. It is deliberately not called `SENT` or `DELIVERED`: without
+/// provider webhooks the application has no evidence the message reached an
+/// inbox, and a status name should not claim more than is known.
+///
+/// `PROCESSING` doubles as the claim: a row exists only because some request
+/// took ownership of that delivery, which is what stops two concurrent attempts
+/// from both calling the provider.
+///
+/// `SKIPPED` records an honest non-attempt, used when email is not configured.
+enum EmailDeliveryStatus {
+  PROCESSING
+  ACCEPTED
+  FAILED
+  SKIPPED
+}
+
 /// Administrative user. This is the Better Auth `user` table extended with the
 /// application role. No public sign-up exists, so every row is created by the
 /// bootstrap script or by an already-authorized administrator.
@@ -256,6 +284,7 @@ model Inquiry {
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   service  Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
   statusHistory InquiryStatusHistory[]
+  emailDeliveries EmailDelivery[]
 
   @@index([status, createdAt])
   @@index([customerId, createdAt])
@@ -277,6 +306,39 @@ model InquiryStatusHistory {
 
   @@index([inquiryId, createdAt])
   @@map("inquiry_status_history")
+}
+
+/// One transactional email attempt for one inquiry.
+///
+/// The unique constraint on (inquiryId, type) is the idempotency guarantee: a
+/// replayed submission cannot create a second delivery row, so it cannot
+/// trigger a second provider call. Creating the row *is* claiming the send.
+///
+/// No rendered subject, HTML, or text is stored. The Inquiry snapshot already
+/// holds everything the templates need, so re-storing the message would only
+/// duplicate personal data. `lastErrorCode` holds a short sanitized category,
+/// never a raw provider response.
+model EmailDelivery {
+  id                String              @id @default(uuid())
+  inquiryId         String
+  type              EmailDeliveryType
+  status            EmailDeliveryStatus @default(PROCESSING)
+  /// Provider actually contacted, or null when nothing was attempted.
+  provider          String?
+  providerMessageId String?
+  attemptCount      Int                 @default(0)
+  /// Short sanitized failure category. Never a raw provider payload.
+  lastErrorCode     String?
+  /// When the provider accepted the request. Not proof of inbox delivery.
+  sentAt            DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  @@unique([inquiryId, type])
+  @@index([status, updatedAt])
+  @@map("email_delivery")
 }
 
 model CustomerNote {

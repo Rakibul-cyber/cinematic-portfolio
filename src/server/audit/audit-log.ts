@@ -34,6 +34,10 @@ export const AuditAction = {
   CustomerUpdated: "customer.updated",
   CustomerNoteCreated: "customer_note.created",
   CrmExported: "crm.exported",
+  EmailDeliveryAccepted: "email.delivery_accepted",
+  EmailDeliveryFailed: "email.delivery_failed",
+  EmailDeliverySkipped: "email.delivery_skipped",
+  EmailDeliveryRetried: "email.delivery_retried",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
@@ -53,6 +57,7 @@ export const AuditEntityType = {
   Inquiry: "inquiry",
   Customer: "customer",
   CustomerNote: "customer_note",
+  EmailDelivery: "email_delivery",
 } as const;
 
 export type AuditEntityType =

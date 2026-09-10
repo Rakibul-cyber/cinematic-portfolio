@@ -96,6 +96,25 @@ The domain will grow deliberately. Expected entities include users and roles,
 projects and categories, media, services, inquiries and customers, testimonials,
 pages/settings, SEO data, and audit logs. They are not created during Phase 0.
 
+## Transactional email
+
+Email is a side effect of persistence, never a participant in it. The CRM
+transaction commits first; delivery is attempted afterwards, outside any
+transaction, and no provider failure can roll back or hide a stored inquiry.
+
+One provider (Resend) is reached through a single small sender interface, so
+nothing above that boundary imports the SDK and a provider change touches one
+file. Templates are React Email components rendered from a pure content model,
+which keeps the HTML and plain-text alternatives in step and makes wording and
+field selection testable without a provider key.
+
+Delivery state lives in `EmailDelivery`, one row per inquiry and email type
+under a unique constraint. Creating that row is how a request claims the send,
+which is what makes replays and concurrent attempts safe without a queue. No
+rendered body is stored, and provider acceptance is recorded as `ACCEPTED`
+rather than `SENT`, because without webhooks inbox delivery is not known. See
+[ADR 0007](DECISIONS/0007-transactional-email.md).
+
 ## External services
 
 | Concern | Approved service | Introduction phase |

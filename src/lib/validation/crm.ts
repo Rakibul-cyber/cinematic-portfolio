@@ -22,6 +22,8 @@ export const inquirySchema = z.object({
 });
 
 export const statusSchema = z.object({ id: z.string().uuid(), status: z.enum(INQUIRY_STATUSES) });
+export const EMAIL_DELIVERY_TYPES = ["INQUIRY_ADMIN_NOTIFICATION", "INQUIRY_CUSTOMER_ACKNOWLEDGMENT"] as const;
+export const retryEmailSchema = z.object({ inquiryId: z.string().uuid(), type: z.enum(EMAIL_DELIVERY_TYPES) });
 export const noteSchema = z.object({ customerId: z.string().uuid(), body: z.string().trim().min(1).max(4000) });
 export const customerSchema = z.object({
   id: z.string().uuid(), name: z.string().trim().min(1).max(120),

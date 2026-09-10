@@ -69,6 +69,14 @@ update customer details, and append internal notes; ADMIN and SUPER_ADMIN can
 export formula-safe CSV. No email is sent until Phase 7. See
 [ADR 0006](docs/DECISIONS/0006-inquiry-crm.md).
 
+Phase 7 adds transactional email through Resend and React Email: a studio
+inquiry notification and a customer acknowledgment, both built from the Inquiry
+snapshot. The inquiry is committed before any provider call, so an email
+failure never affects a stored inquiry or the visitor's success state. Delivery
+state is persisted per inquiry and email type, replays cannot resend, and
+administrators can retry a failed send from the inquiry page. See
+[ADR 0007](docs/DECISIONS/0007-transactional-email.md).
+
 ## Public site
 
 | Route | Content |
@@ -232,6 +240,26 @@ database metadata; future CMS references must block direct deletion.
 Replacements use new identities rather than overwriting cached keys. See
 [ADR 0003](docs/DECISIONS/0003-media-storage.md).
 
+### Transactional email
+
+Set `RESEND_API_KEY`, `EMAIL_FROM`, and `EMAIL_ADMIN_RECIPIENTS` in
+`.env.local`, plus the optional `EMAIL_REPLY_TO`. `EMAIL_FROM` must be on a
+domain verified in Resend, and `EMAIL_ADMIN_RECIPIENTS` is a comma-separated
+list where every entry must be valid.
+
+Leaving all of them empty is supported and is the normal local setup: inquiries
+are still stored, the public form still succeeds, and each delivery is recorded
+as `SKIPPED` rather than pretending a message was sent. Setting some but not all
+is treated as a misconfiguration and warned about once in production, naming
+variables only. The API key is server-only and must never reach a
+`NEXT_PUBLIC_` variable, the CMS, or the database.
+
+Two emails are sent per inquiry — a studio notification and a customer
+acknowledgment — both built from the Inquiry snapshot, with the acknowledgment
+addressed to the exact submitted address. `ACCEPTED` in the admin UI means the
+provider accepted the request, which is not proof of inbox delivery; there is no
+webhook tracking. See [ADR 0007](docs/DECISIONS/0007-transactional-email.md).
+
 ## Database workflow
 
 Prisma is configured through `prisma.config.ts`, which loads `.env.local` and
@@ -311,6 +339,7 @@ Remove-Item Env:\ADMIN_TEST_PASSWORD
 | `/admin/inquiries` | Searchable, status-filtered and paginated inquiry pipeline. |
 | `/admin/inquiries/export` | ADMIN+ CSV export. Other signed-in roles receive 403. |
 | `/admin/customers` | Searchable customer records, inquiry history and internal notes. |
+| `/admin/inquiries/<id>` | Inquiry snapshot, status pipeline, and transactional email state with retry. |
 | `/api/auth/*` | Better Auth endpoints. Sign-up is disabled. |
 
 Middleware redirects visitors without a session cookie for routing convenience

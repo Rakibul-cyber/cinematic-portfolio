@@ -1,10 +1,12 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { customerSchema, noteSchema, statusSchema } from "@/lib/validation/crm";
+import { customerSchema, noteSchema, retryEmailSchema } from "@/lib/validation/crm";
+import { statusSchema } from "@/lib/validation/crm";
 import { recordAuditLog } from "@/server/audit/audit-log";
 import { requireUser } from "@/server/auth/session";
 import { updateCustomer } from "@/server/crm/service";
+import { DeliveryNotRetryableError, retryInquiryEmail } from "@/server/email/service";
 import { prisma } from "@/server/db/prisma";
 
 const values = (form: FormData) => Object.fromEntries(form);
@@ -23,4 +25,43 @@ export async function addCustomerNoteAction(form: FormData) {
 export async function updateCustomerAction(form: FormData) {
   const actor = await requireUser("/admin/customers"); const data = customerSchema.parse(values(form)); await updateCustomer(data, actor);
   revalidatePath(`/admin/customers/${data.id}`); redirect(`/admin/customers/${data.id}?saved=Customer+updated`);
+}
+
+/**
+ * Re-attempts one transactional email for an inquiry.
+ *
+ * Available to EDITOR and above, matching the rest of the CRM: re-sending a
+ * notification about an inquiry an editor already manages is an ordinary part
+ * of that work, not a privileged operation like CSV export.
+ *
+ * The service performs the authorization-independent safety checks: only a
+ * failed, skipped, or stale delivery can be claimed, so this can never resend
+ * a message the provider already accepted, and two administrators clicking at
+ * once cannot both send.
+ */
+export async function retryInquiryEmailAction(form: FormData) {
+  const actor = await requireUser("/admin/inquiries");
+  const data = retryEmailSchema.parse(values(form));
+
+  let notice = "Email retried";
+  try {
+    const outcome = await retryInquiryEmail(data.inquiryId, data.type, actor);
+    notice =
+      outcome.status === "ACCEPTED"
+        ? "Email accepted by the provider"
+        : outcome.status === "SKIPPED"
+          ? "Email is not configured, so nothing was sent"
+          : "Email could not be sent";
+  } catch (error) {
+    // Provider detail is never surfaced to the admin UI.
+    notice =
+      error instanceof DeliveryNotRetryableError
+        ? error.message
+        : "The email could not be retried.";
+  }
+
+  revalidatePath(`/admin/inquiries/${data.inquiryId}`);
+  redirect(
+    `/admin/inquiries/${data.inquiryId}?saved=${encodeURIComponent(notice)}`,
+  );
 }
