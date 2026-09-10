@@ -436,24 +436,37 @@ export async function retryInquiryEmail(
 ): Promise<DeliveryOutcome> {
   const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS);
 
-  const claimed = await prisma.emailDelivery.updateMany({
+  // A definite FAILED/SKIPPED result starts a new logical provider attempt and
+  // therefore gets a new key. A stale PROCESSING row is different: the prior
+  // request may already have reached Resend before this process died, so keep
+  // its durable attempt number and replay the same key. Resend can then return
+  // the original result instead of accepting a duplicate during its 24-hour
+  // idempotency window.
+  let claimed = await prisma.emailDelivery.updateMany({
     where: {
       inquiryId,
       type,
-      OR: [
-        { status: EmailDeliveryStatus.FAILED },
-        { status: EmailDeliveryStatus.SKIPPED },
-        {
-          status: EmailDeliveryStatus.PROCESSING,
-          updatedAt: { lt: staleBefore },
-        },
-      ],
+      status: { in: [EmailDeliveryStatus.FAILED, EmailDeliveryStatus.SKIPPED] },
     },
     data: {
       status: EmailDeliveryStatus.PROCESSING,
       attemptCount: { increment: 1 },
     },
   });
+
+  if (claimed.count === 0) {
+    claimed = await prisma.emailDelivery.updateMany({
+      where: {
+        inquiryId,
+        type,
+        status: EmailDeliveryStatus.PROCESSING,
+        updatedAt: { lt: staleBefore },
+      },
+      // Updating the timestamp takes ownership without changing attempt
+      // identity; concurrent retry requests can no longer match this row.
+      data: { status: EmailDeliveryStatus.PROCESSING },
+    });
+  }
 
   if (claimed.count !== 1) {
     throw new DeliveryNotRetryableError(

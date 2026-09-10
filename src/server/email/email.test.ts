@@ -91,7 +91,7 @@ describe("email addresses", () => {
         address: "jane@example.invalid",
         name: `Jane${hostile}Bcc: evil@example.com`,
       }),
-      "Jane Bcc: evil@example.com <jane@example.invalid>",
+      "Jane Bcc evilexample.com <jane@example.invalid>",
     );
     // A name that tries to smuggle a second address keeps its text but loses
     // every character that could make it a separate envelope entry.
@@ -102,6 +102,14 @@ describe("email addresses", () => {
     assert.ok(smuggled.endsWith("<jane@example.invalid>"));
     assert.equal(smuggled.match(/</g)?.length, 1);
     assert.ok(!smuggled.includes('"'));
+    assert.ok(!/[,():;@\\]/.test(smuggled.slice(0, smuggled.indexOf("<"))));
+    assert.equal(
+      formatMailAddress({
+        address: "jane@example.invalid",
+        name: "Miyuki 山田, Cc: victim@example.com; (team)",
+      }),
+      "Miyuki 山田 Cc victimexample.com team <jane@example.invalid>",
+    );
     // A name that sanitizes down to nothing leaves a bare address.
     assert.equal(
       formatMailAddress({ address: "jane@example.invalid", name: "<>" }),
@@ -173,6 +181,27 @@ describe("email configuration", () => {
     const config = parseEmailConfig({ EMAIL_FROM: valid.EMAIL_FROM });
     assert.equal(config.configured, false);
     assert.equal(config.configured === false && config.reason, "invalid");
+
+    const replyOnly = parseEmailConfig({
+      EMAIL_REPLY_TO: "replies@example.com",
+    });
+    assert.equal(replyOnly.configured, false);
+    assert.equal(
+      replyOnly.configured === false && replyOnly.reason,
+      "invalid",
+    );
+  });
+
+  it("rejects a malformed or non-origin admin-link base URL", () => {
+    for (const BETTER_AUTH_URL of [
+      "javascript:alert(1)",
+      "https://studio.example.com/admin",
+      "https://user:secret@studio.example.com",
+      "https://studio.example.com/?next=evil",
+    ]) {
+      const config = parseEmailConfig({ ...valid, BETTER_AUTH_URL });
+      assert.equal(config.configured, false, `accepted: ${BETTER_AUTH_URL}`);
+    }
   });
 
   it("never reports configuration values, only variable names", () => {

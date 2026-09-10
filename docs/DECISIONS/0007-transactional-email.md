@@ -60,10 +60,11 @@ one. Retrying is available to `EDITOR` and above, matching the rest of the CRM.
 
 Exactly-once external delivery is not claimed. The residual window is a process
 dying between claiming a delivery and recording its outcome: the row stays
-`PROCESSING` and is recoverable only after the five-minute stale threshold, and
-if the provider had in fact accepted that message, a subsequent manual retry
-sends a second copy. Attempt-scoped idempotency keys narrow this but cannot
-close it, because a genuine retry must be allowed to send.
+`PROCESSING` and is recoverable only after the five-minute stale threshold.
+Recovery reuses that attempt's idempotency key, allowing Resend to return the
+original result during its 24-hour retention window; after that window a
+duplicate remains possible. A definite `FAILED` or `SKIPPED` result increments
+the attempt and uses a new key so a genuine retry can send.
 
 The installed Resend SDK accepts no `AbortSignal` and no timeout. Racing a timer
 against the call was rejected: it would abandon the caller without cancelling

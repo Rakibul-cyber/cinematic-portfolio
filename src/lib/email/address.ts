@@ -13,6 +13,8 @@
 /** Characters that must never appear in a header value. */
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 const CONTROL_CHARACTERS_GLOBAL = /[\u0000-\u001f\u007f]/g;
+/** RFC address-list delimiters and quoting characters excluded from names. */
+const DISPLAY_NAME_SYNTAX = /["<>(),:;@\\]/g;
 
 /** Conservative address shape. Deliberately stricter than RFC 5322. */
 const ADDRESS = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
@@ -55,9 +57,10 @@ export function parseMailAddress(value: string): MailAddress | null {
   const address = angled[2].trim();
   if (!isEmailAddress(address)) return null;
 
-  // Quotes and angle brackets are dropped rather than escaped: a display name
-  // is cosmetic, and a stripped one can never break the envelope.
-  const name = angled[1].trim().replace(/^"|"$/g, '').replace(/[<>]/g, '').trim();
+  // Address-list syntax is dropped rather than escaped: display names are
+  // cosmetic, and a conservative safe subset cannot introduce another
+  // mailbox when the provider parses the resulting string.
+  const name = angled[1].trim().replace(DISPLAY_NAME_SYNTAX, "").trim();
 
   return name ? { address, name } : { address };
 }
@@ -76,7 +79,7 @@ export function formatMailAddress(value: MailAddress): string {
 
   const name = value.name
     .replace(CONTROL_CHARACTERS_GLOBAL, ' ')
-    .replace(/["<>]/g, "")
+    .replace(DISPLAY_NAME_SYNTAX, "")
     .replace(/\s+/g, ' ')
     .trim();
 

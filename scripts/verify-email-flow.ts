@@ -304,6 +304,56 @@ async function main() {
     );
     assert.equal(guardSender.sent.length, 0, "no provider call for a guarded retry");
 
+    // A stale PROCESSING recovery replays the same logical provider attempt.
+    // Two administrators racing for it still produce one call.
+    const staleToken = randomUUID();
+    const stale = await createInquiry({
+      ...base,
+      submissionToken: staleToken,
+      message: "A stale delivery recovery verification inquiry.",
+    });
+    await prisma.emailDelivery.create({
+      data: {
+        inquiryId: stale.id,
+        type: "INQUIRY_ADMIN_NOTIFICATION",
+        status: "PROCESSING",
+        attemptCount: 1,
+        updatedAt: new Date(Date.now() - 10 * 60_000),
+      },
+    });
+    const staleSender = fakeSender("accept");
+    const staleRetries = await Promise.allSettled([
+      retryInquiryEmail(stale.id, "INQUIRY_ADMIN_NOTIFICATION", actor, {
+        sender: staleSender,
+        renderer,
+        config: configured,
+      }),
+      retryInquiryEmail(stale.id, "INQUIRY_ADMIN_NOTIFICATION", actor, {
+        sender: staleSender,
+        renderer,
+        config: configured,
+      }),
+    ]);
+    assert.equal(staleSender.sent.length, 1, "a stale retry race sends once");
+    assert.equal(
+      staleRetries.filter((result) => result.status === "fulfilled").length,
+      1,
+      "only one stale retry acquires the claim",
+    );
+    assert.ok(
+      staleSender.sent[0].idempotencyKey?.endsWith(":1"),
+      "stale recovery reuses the original attempt key",
+    );
+    const staleRow = await prisma.emailDelivery.findUniqueOrThrow({
+      where: {
+        inquiryId_type: {
+          inquiryId: stale.id,
+          type: "INQUIRY_ADMIN_NOTIFICATION",
+        },
+      },
+    });
+    assert.equal(staleRow.attemptCount, 1, "stale recovery preserves attempt identity");
+
     // 8. Missing configuration is represented honestly, never as sent.
     const skippedToken = randomUUID();
     const skipped = await createInquiry({

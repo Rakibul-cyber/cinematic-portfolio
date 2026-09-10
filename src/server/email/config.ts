@@ -56,6 +56,27 @@ function value(env: EmailEnvironment, key: string): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+function parseAppBaseUrl(raw: string | undefined): string | null {
+  if (!raw) return null;
+
+  try {
+    const url = new URL(raw);
+    if (
+      (url.protocol !== "https:" && url.protocol !== "http:") ||
+      url.username ||
+      url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash
+    ) {
+      return null;
+    }
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Validates the email environment.
  *
@@ -70,10 +91,11 @@ export function parseEmailConfig(env: EmailEnvironment): EmailConfig {
 
   // A trusted, configured origin. `BETTER_AUTH_URL` is already the absolute
   // origin this deployment answers on, so admin links never need a Host header.
-  const appBaseUrl =
-    value(env, "NEXT_PUBLIC_SITE_URL") ?? value(env, "BETTER_AUTH_URL") ?? null;
+  const appBaseUrlRaw =
+    value(env, "NEXT_PUBLIC_SITE_URL") ?? value(env, "BETTER_AUTH_URL");
+  const appBaseUrl = parseAppBaseUrl(appBaseUrlRaw);
 
-  if (!apiKey && !from && !recipients) {
+  if (!apiKey && !from && !replyTo && !recipients) {
     return {
       configured: false,
       reason: "not_configured",
@@ -82,6 +104,10 @@ export function parseEmailConfig(env: EmailEnvironment): EmailConfig {
   }
 
   const problems: string[] = [];
+
+  if (appBaseUrlRaw && !appBaseUrl) {
+    problems.push("NEXT_PUBLIC_SITE_URL or BETTER_AUTH_URL is not a valid origin");
+  }
 
   if (!apiKey) problems.push("RESEND_API_KEY is missing");
 
