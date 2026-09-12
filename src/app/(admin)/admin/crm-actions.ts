@@ -1,10 +1,11 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { customerSchema, noteSchema, retryEmailSchema } from "@/lib/validation/crm";
+import { anonymizeCustomerSchema, customerSchema, noteSchema, retryEmailSchema } from "@/lib/validation/crm";
 import { statusSchema } from "@/lib/validation/crm";
 import { recordAuditLog } from "@/server/audit/audit-log";
-import { requireUser } from "@/server/auth/session";
+import { requireSuperAdmin, requireUser } from "@/server/auth/session";
+import { anonymizeCustomer } from "@/server/privacy/service";
 import { updateCustomer } from "@/server/crm/service";
 import { DeliveryNotRetryableError, retryInquiryEmail } from "@/server/email/service";
 import { prisma } from "@/server/db/prisma";
@@ -18,9 +19,19 @@ export async function changeInquiryStatusAction(form: FormData) {
 }
 export async function addCustomerNoteAction(form: FormData) {
   const actor = await requireUser("/admin/customers"); const data = noteSchema.parse(values(form));
+  const active = await prisma.customer.count({ where: { id: data.customerId, anonymizedAt: null } });
+  if (!active) redirect(`/admin/customers/${data.customerId}?saved=Customer+is+anonymized`);
   const note = await prisma.customerNote.create({ data: { customerId: data.customerId, body: data.body, authorUserId: actor.id } });
   await recordAuditLog({ action: "customer_note.created", entityType: "customer_note", entityId: note.id, actorUserId: actor.id, actorEmail: actor.email });
   revalidatePath(`/admin/customers/${data.customerId}`); redirect(`/admin/customers/${data.customerId}?saved=Note+added`);
+}
+
+export async function anonymizeCustomerAction(form: FormData) {
+  const actor = await requireSuperAdmin("/admin/customers");
+  const data = anonymizeCustomerSchema.parse(values(form));
+  await anonymizeCustomer(data.customerId, actor);
+  revalidatePath(`/admin/customers/${data.customerId}`);
+  redirect(`/admin/customers/${data.customerId}?saved=Customer+anonymized`);
 }
 export async function updateCustomerAction(form: FormData) {
   const actor = await requireUser("/admin/customers"); const data = customerSchema.parse(values(form)); await updateCustomer(data, actor);

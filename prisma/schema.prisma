@@ -252,6 +252,7 @@ model Customer {
   company         String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  anonymizedAt    DateTime?
 
   inquiries Inquiry[]
   notes     CustomerNote[]
@@ -280,6 +281,7 @@ model Inquiry {
   status             InquiryStatus @default(NEW)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+  anonymizedAt       DateTime?
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   service  Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
@@ -291,6 +293,22 @@ model Inquiry {
   @@index([serviceId])
   @@index([createdAt])
   @@map("inquiry")
+}
+
+/// Short-lived, pseudonymous fixed-window counters for public abuse controls.
+model RateLimitBucket {
+  id          String   @id @default(uuid())
+  scope       String
+  keyHash     String
+  windowStart DateTime
+  count       Int      @default(1)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([scope, keyHash, windowStart])
+  @@index([expiresAt])
+  @@map("rate_limit_bucket")
 }
 
 model InquiryStatusHistory {

@@ -138,7 +138,7 @@ export default async function ContactPage() {
       <Container className="pb-24 sm:pb-32">
         <div className="grid gap-10 border-t border-border pt-16 lg:grid-cols-12">
           <div className="lg:col-span-4"><p className="text-xs tracking-[0.16em] text-accent uppercase">Project inquiry</p><h2 className="mt-4 font-display text-4xl">Tell us what you are planning.</h2></div>
-          <div className="lg:col-span-7 lg:col-start-6"><InquiryForm services={services}/></div>
+          <div className="lg:col-span-7 lg:col-start-6"><InquiryForm services={services} turnstileSiteKey={process.env.TURNSTILE_SITE_KEY?.trim() ?? null}/></div>
         </div>
       </Container>
     </main>

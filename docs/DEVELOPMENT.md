@@ -81,6 +81,7 @@ npm run cms:verify      # admin CRUD, publishing, and reference protection
 npm run public:verify   # public rendering; see the README for its three steps
 npm run crm:verify      # CRM transactions, deduplication, snapshots and cleanup
 npm run email:verify    # email orchestration with a fake provider; no API key needed
+npm run security:verify # rate limiting and privacy workflow against Neon
 ```
 
 Business-critical behavior receives priority over high-volume, low-value tests.

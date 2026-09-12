@@ -77,6 +77,12 @@ state is persisted per inquiry and email type, replays cannot resend, and
 administrators can retry a failed send from the inquiry page. See
 [ADR 0007](docs/DECISIONS/0007-transactional-email.md).
 
+Phase 8 adds server-verified Turnstile on the inquiry form, durable pseudonymous
+rate limits, application-specific security headers, and SUPER_ADMIN customer
+export/anonymization operations. These are GDPR-conscious operational controls,
+not legal certification. See
+[ADR 0008](docs/DECISIONS/0008-security-privacy.md).
+
 ## Public site
 
 | Route | Content |

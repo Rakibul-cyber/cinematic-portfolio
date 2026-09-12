@@ -130,6 +130,14 @@ rather than `SENT`, because without webhooks inbox delivery is not known. See
 | Uptime/log monitoring | Better Stack or free-compatible option | Phase 9/10 |
 | Hosting | Netlify Free | Phase 10 |
 
+## Security and privacy controls
+
+Phase 8 adds server-verified Turnstile, short-lived pseudonymous PostgreSQL rate
+limits, application-specific security headers, and SUPER_ADMIN-only customer
+export/anonymization. New inquiries pass abuse controls before persistence while
+committed submission replays retain Phase 6 idempotency. See
+[ADR 0008](DECISIONS/0008-security-privacy.md).
+
 Accounts and credentials are requested only when their phase begins. The MVP
 targets approximately EUR 0/month infrastructure cost, excluding domain
 registration.

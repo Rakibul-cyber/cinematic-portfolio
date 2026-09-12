@@ -43,10 +43,12 @@ export function EmailDeliveryRows({
   deliveries,
   inquiryId,
   retryAction,
+  anonymized = false,
 }: {
   deliveries: Delivery[];
   inquiryId: string;
   retryAction: (form: FormData) => Promise<void>;
+  anonymized?: boolean;
 }) {
   if (deliveries.length === 0) {
     return (
@@ -60,7 +62,8 @@ export function EmailDeliveryRows({
     <ul className="mt-3 grid gap-3">
       {deliveries.map((delivery) => {
         const retryable =
-          delivery.status === "FAILED" || delivery.status === "SKIPPED";
+          !anonymized &&
+          (delivery.status === "FAILED" || delivery.status === "SKIPPED");
 
         return (
           <li className="border border-border p-3" key={delivery.type}>

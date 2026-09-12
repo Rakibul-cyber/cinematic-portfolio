@@ -361,10 +361,14 @@ export async function deliverInquiryEmails(
   try {
     const inquiry = await prisma.inquiry.findUnique({
       where: { id: inquiryId },
-      select: snapshotSelect,
+      select: { ...snapshotSelect, anonymizedAt: true },
     });
 
-    if (!inquiry) return [];
+    // An erased inquiry has no deliverable recipient and no content worth
+    // sending. This path is reachable unauthenticated through the idempotent
+    // replay branch of the public action, so the guard belongs here and not
+    // only on the administrator retry path.
+    if (!inquiry || inquiry.anonymizedAt) return [];
 
     const outcomes: DeliveryOutcome[] = [];
 
@@ -446,6 +450,10 @@ export async function retryInquiryEmail(
     where: {
       inquiryId,
       type,
+      // Claiming and the erasure check must be one statement. A separate read
+      // after the claim would leave a window in which anonymization commits
+      // between the check and the provider call.
+      inquiry: { anonymizedAt: null },
       status: { in: [EmailDeliveryStatus.FAILED, EmailDeliveryStatus.SKIPPED] },
     },
     data: {
@@ -459,6 +467,7 @@ export async function retryInquiryEmail(
       where: {
         inquiryId,
         type,
+        inquiry: { anonymizedAt: null },
         status: EmailDeliveryStatus.PROCESSING,
         updatedAt: { lt: staleBefore },
       },
@@ -481,10 +490,10 @@ export async function retryInquiryEmail(
 
   const inquiry = await prisma.inquiry.findUnique({
     where: { id: inquiryId },
-    select: snapshotSelect,
+    select: { ...snapshotSelect, anonymizedAt: true },
   });
 
-  if (!inquiry) {
+  if (!inquiry || inquiry.anonymizedAt) {
     throw new DeliveryNotRetryableError("This inquiry no longer exists.");
   }
 

@@ -72,7 +72,7 @@ A YouTube account/channel is configured during this phase if needed.
 
 Resend is opened/configured during this phase.
 
-## Phase 8 — Security & GDPR
+## Phase 8 — Security & GDPR *(implemented)*
 
 - Add Cloudflare Turnstile, database-backed rate limiting, and a honeypot.
 - Apply security headers and review application security.

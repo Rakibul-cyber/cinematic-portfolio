@@ -26,19 +26,25 @@ export function middleware(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
 
   if (pathname === ADMIN_LOGIN_PATH) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
   }
 
   const hasSessionCookie = Boolean(getSessionCookie(request));
 
   if (hasSessionCookie) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
   }
 
   const loginUrl = new URL(ADMIN_LOGIN_PATH, request.url);
   loginUrl.searchParams.set("next", `${pathname}${search}`);
 
-  return NextResponse.redirect(loginUrl);
+  const response = NextResponse.redirect(loginUrl);
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
 }
 
 export const config = {

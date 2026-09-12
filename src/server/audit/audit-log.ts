@@ -38,6 +38,8 @@ export const AuditAction = {
   EmailDeliveryFailed: "email.delivery_failed",
   EmailDeliverySkipped: "email.delivery_skipped",
   EmailDeliveryRetried: "email.delivery_retried",
+  PrivacyCustomerExported: "privacy.customer_exported",
+  PrivacyCustomerAnonymized: "privacy.customer_anonymized",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

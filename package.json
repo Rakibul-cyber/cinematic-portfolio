@@ -21,7 +21,8 @@
     "public:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-public-flow.ts",
     "crm:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-crm-flow.ts",
     "admin:bootstrap": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/bootstrap-admin.ts",
-    "email:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-email-flow.ts"
+    "email:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-email-flow.ts",
+    "security:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-security-flow.ts"
   },
   "overrides": {
     "postcss": "8.5.26",

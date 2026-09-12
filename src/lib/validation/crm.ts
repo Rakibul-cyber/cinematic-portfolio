@@ -29,3 +29,7 @@ export const customerSchema = z.object({
   id: z.string().uuid(), name: z.string().trim().min(1).max(120),
   email: z.string().trim().email().max(254), phone, whatsapp: phone, company: optional(160),
 });
+export const anonymizeCustomerSchema = z.object({
+  customerId: z.string().uuid(),
+  confirmation: z.literal("ANONYMIZE"),
+});
