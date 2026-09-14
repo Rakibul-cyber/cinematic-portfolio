@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FadeReveal } from "@/components/motion/fade-reveal";
 import { PageIntro } from "@/components/public/page-intro";
 import { TestimonialsSection } from "@/components/sections/testimonials-section";
+import { JsonLd } from "@/components/seo/json-ld";
 import { Container } from "@/components/ui/container";
 import { FALLBACK_STUDIO_NAME } from "@/content/site";
 import { buildPublicMetadata } from "@/server/public/metadata";
@@ -12,6 +13,7 @@ import {
   getPublicPage,
   getPublicSiteSettings,
 } from "@/server/public/queries";
+import { aboutStructuredData } from "@/server/seo/structured-data";
 
 // Next.js requires a literal here. Keep it equal to PUBLIC_REVALIDATE_SECONDS
 // in src/server/public/cache-tags.ts, which is the documented safety net;
@@ -37,10 +39,11 @@ export async function generateMetadata(): Promise<Metadata> {
  * — quiet, but honest and never a placeholder story.
  */
 export default async function AboutPage() {
-  const [page, settings, testimonials] = await Promise.all([
+  const [page, settings, testimonials, structuredData] = await Promise.all([
     getPublicPage("about"),
     getPublicSiteSettings(),
     getActiveTestimonials({ take: 4 }),
+    aboutStructuredData(),
   ]);
 
   const studioName = settings?.studioName ?? FALLBACK_STUDIO_NAME;
@@ -100,6 +103,8 @@ export default async function AboutPage() {
         className="border-t border-border py-20 sm:py-28"
         testimonials={testimonials}
       />
+
+      <JsonLd nodes={structuredData} />
     </main>
   );
 }

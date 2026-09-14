@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import { normalizeEmail } from "@/lib/validation/crm";
 import { createInquiry } from "@/server/crm/service";
 import { prisma } from "@/server/db/prisma";
-import { deliverInquiryEmails, retryInquiryEmail, DeliveryNotRetryableError } from "@/server/email/service";
+import { hasAllDeliveryClaims } from "@/lib/email/delivery-claims";
+import { deliverInquiryEmails, retryInquiryEmail, DeliveryNotRetryableError, EMAIL_DELIVERY_TYPES } from "@/server/email/service";
 import { anonymizeCustomer } from "@/server/privacy/service";
 import { consumeInquiryLimit } from "@/server/security/rate-limit";
 
@@ -42,22 +43,57 @@ async function main() {
     assert.equal(erased.inquiries.length, 1, "operational inquiry relation remains");
     await assert.rejects(() => retryInquiryEmail(inquiry.id, "INQUIRY_CUSTOMER_ACKNOWLEDGMENT", actor), DeliveryNotRetryableError);
 
-    // The public action's idempotent replay branch reaches delivery without
-    // authentication, rate limiting, or Turnstile. After erasure it must claim
-    // nothing and attempt nothing, including for a delivery type that was never
-    // claimed in the first place.
+    // D. Anonymized inquiry with a genuinely missing delivery row. This inquiry
+    // holds only one of the two claims, so the replay branch does enter
+    // recovery -- and the erasure guard, which stays authoritative, must still
+    // claim nothing and send nothing.
+    const replayErased = await prisma.inquiry.findUniqueOrThrow({
+      where: { id: inquiry.id },
+      select: { emailDeliveries: { select: { type: true } } },
+    });
+    assert.equal(hasAllDeliveryClaims(replayErased.emailDeliveries), false, "erased inquiry is missing a claim, so recovery is attempted");
     const beforeReplay = await prisma.emailDelivery.count({ where: { inquiryId: inquiry.id } });
     assert.deepEqual(await deliverInquiryEmails(inquiry.id), [], "erased inquiry yields no delivery attempt");
     assert.equal(await prisma.emailDelivery.count({ where: { inquiryId: inquiry.id } }), beforeReplay, "no delivery row is created after erasure");
 
-    const later = await createInquiry({ ...base, submissionToken: randomUUID(), message: "A later legitimate inquiry." });
+    const laterToken = randomUUID();
+    const laterMessage = "A later legitimate inquiry.";
+    const later = await createInquiry({ ...base, submissionToken: laterToken, message: laterMessage });
     createdIds.push(later.id);
     const laterInquiry = await prisma.inquiry.findUniqueOrThrow({ where: { id: later.id } });
     assert.notEqual(laterInquiry.customerId, inquiry.customerId, "erased identity is not resurrected");
+    // A completed submission: both deliveries claimed, both with a definite
+    // FAILED outcome that only the admin retry workflow may act on.
+    await prisma.emailDelivery.createMany({ data: EMAIL_DELIVERY_TYPES.map((type) => ({ inquiryId: later.id, type, status: "FAILED" as const, attemptCount: 1 })) });
+    const deliveriesBefore = await prisma.emailDelivery.findMany({ where: { inquiryId: later.id }, orderBy: { type: "asc" }, select: { id: true, type: true, status: true, attemptCount: true, updatedAt: true } });
+
+    // The exact lookup the public replay branch performs. It must be answerable
+    // without orchestration, and it must carry no inquiry PII.
+    const replay = await prisma.inquiry.findUniqueOrThrow({
+      where: { submissionToken: laterToken },
+      select: { id: true, emailDeliveries: { select: { type: true } } },
+    });
+    assert.equal(replay.id, later.id, "token resolves to the original inquiry");
+    assert.ok(!JSON.stringify(replay).includes(email), "replay lookup carries no inquiry PII");
+    assert.equal(hasAllDeliveryClaims(replay.emailDeliveries), true, "completed submission needs no delivery orchestration");
+    assert.deepEqual(
+      await prisma.emailDelivery.findMany({ where: { inquiryId: later.id }, orderBy: { type: "asc" }, select: { id: true, type: true, status: true, attemptCount: true, updatedAt: true } }),
+      deliveriesBefore,
+      "completed replay performs no EmailDelivery writes",
+    );
+
+    // E. A replay carrying a materially changed payload changes nothing: the
+    // committed inquiry stays authoritative.
+    const authoritative = await prisma.inquiry.findUniqueOrThrow({ where: { submissionToken: laterToken }, select: { id: true, message: true, nameSnapshot: true } });
+    assert.equal(authoritative.id, later.id);
+    assert.equal(authoritative.message, laterMessage, "original message survives a changed-payload replay");
+    assert.equal(authoritative.nameSnapshot, base.name, "original identity survives a changed-payload replay");
+    assert.equal(await prisma.inquiry.count({ where: { submissionToken: laterToken } }), 1, "a token never yields a second inquiry");
+
     const audits = await prisma.auditLog.findMany({ where: { action: "privacy.customer_anonymized", entityId: inquiry.customerId } });
     assert.equal(audits.length, 1);
     assert.ok(!JSON.stringify(audits).includes(email));
-    console.log("Live security verification passed: atomic pseudonymous rate limits, anonymization, retry and replay blocking, idempotency, new-customer behavior, and PII-free audit.");
+    console.log("Live security verification passed: atomic pseudonymous rate limits, anonymization, retry and replay blocking, zero-write completed replay, idempotency, new-customer behavior, and PII-free audit.");
   } finally {
     const inquiries = await prisma.inquiry.findMany({ where: { id: { in: createdIds } }, select: { id: true, customerId: true, emailDeliveries: { select: { id: true } } } });
     const customerIds = [...new Set(inquiries.map((row) => row.customerId))];

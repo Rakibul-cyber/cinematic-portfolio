@@ -79,9 +79,21 @@ npm run auth:verify     # route protection and sessions (needs a running app)
 npm run media:verify    # upload, variants, and deletion against R2
 npm run cms:verify      # admin CRUD, publishing, and reference protection
 npm run public:verify   # public rendering; see the README for its three steps
+                        # (--seed clears .next/cache/fetch-cache so the build
+                        #  cannot reuse a previous build's cached reads)
 npm run crm:verify      # CRM transactions, deduplication, snapshots and cleanup
 npm run email:verify    # email orchestration with a fake provider; no API key needed
 npm run security:verify # rate limiting and privacy workflow against Neon
+```
+
+Three checks need nothing at all -- no database, no network, no running
+application -- because the logic behind them was factored into pure builders.
+Run them freely, and in CI:
+
+```powershell
+npm run seo:verify       # canonical, robots, sitemap, metadata, JSON-LD, OG/Twitter
+npm run analytics:verify # analytics and monitoring configuration, CSP, PII scrubbing
+npm run deploy:verify    # netlify.toml: cache headers, ISR safety, header ownership
 ```
 
 Business-critical behavior receives priority over high-volume, low-value tests.

@@ -5,6 +5,8 @@ import { isSafeInternalPath } from "@/lib/admin-routes";
 import { securityHeaders } from "@/lib/security-headers";
 import { pseudonymousKey } from "@/lib/security/rate-limit";
 import { verifyTurnstile } from "@/server/security/turnstile";
+import { hasAllDeliveryClaims } from "@/lib/email/delivery-claims";
+import { EMAIL_DELIVERY_TYPES } from "@/lib/validation/crm";
 
 describe("security headers", () => {
   it("uses a narrow application-specific CSP", () => {
@@ -139,5 +141,35 @@ describe("Turnstile malformed input and provider faults", () => {
     assert.equal((await verifyTurnstile({ token: "t" }, { env: scoped, fetcher: body({ action: "signup" }) })).ok, false);
     // A challenge solved long ago must not be replayed.
     assert.equal((await verifyTurnstile({ token: "t" }, { env: scoped, fetcher: body({ challenge_ts: new Date(Date.now() - 60 * 60_000).toISOString() }) })).ok, false);
+  });
+});
+
+describe("committed-submission replay cost", () => {
+  const [ADMIN, CUSTOMER] = EMAIL_DELIVERY_TYPES;
+
+  it("A. treats a fully claimed submission as complete, so replay skips orchestration", () => {
+    assert.equal(hasAllDeliveryClaims([{ type: ADMIN }, { type: CUSTOMER }]), true);
+    // Order is irrelevant; only the set of claimed types matters.
+    assert.equal(hasAllDeliveryClaims([{ type: CUSTOMER }, { type: ADMIN }]), true);
+  });
+
+  it("B. reports a genuinely unclaimed delivery so recovery still runs", () => {
+    assert.equal(hasAllDeliveryClaims([{ type: ADMIN }]), false);
+    assert.equal(hasAllDeliveryClaims([{ type: CUSTOMER }]), false);
+    // An interrupted first submission that claimed nothing must still recover.
+    assert.equal(hasAllDeliveryClaims([]), false);
+  });
+
+  it("C. never treats a FAILED or SKIPPED row as missing", () => {
+    // The replay lookup selects `type` alone, so a definite failure outcome is
+    // structurally indistinguishable from a success here: both are claims. A
+    // failed delivery is recovered by the admin retry workflow, never by a
+    // public replay, so this must report nothing to do.
+    const failedAndSkipped = [{ type: ADMIN }, { type: CUSTOMER }];
+    assert.equal(hasAllDeliveryClaims(failedAndSkipped), true);
+  });
+
+  it("ignores duplicate or unexpected rows rather than miscounting", () => {
+    assert.equal(hasAllDeliveryClaims([{ type: ADMIN }, { type: ADMIN }]), false);
   });
 });

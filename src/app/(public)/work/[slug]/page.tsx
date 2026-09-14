@@ -6,12 +6,14 @@ import { FadeReveal } from "@/components/motion/fade-reveal";
 import { MediaImage } from "@/components/public/media-image";
 import { ProjectGallery } from "@/components/public/project-gallery";
 import { VideoPlayer } from "@/components/public/video-player";
+import { JsonLd } from "@/components/seo/json-ld";
 import { Container } from "@/components/ui/container";
 import { buildPublicMetadata } from "@/server/public/metadata";
 import {
   getPublishedProjectBySlug,
   getPublishedProjectSlugs,
 } from "@/server/public/queries";
+import { projectStructuredData } from "@/server/seo/structured-data";
 
 type ProjectPageProps = { params: Promise<{ slug: string }> };
 
@@ -64,6 +66,10 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const project = await getPublishedProjectBySlug(slug);
 
   if (!project) notFound();
+
+  // Built after the 404 check, so an unknown slug never triggers a CMS read
+  // that would only describe a page the visitor is not getting.
+  const structuredData = await projectStructuredData(project);
 
   const [cover, ...gallery] = project.gallery;
 
@@ -156,6 +162,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             <ProjectGallery images={gallery} />
           </section>
         ) : null}
+
+        <JsonLd nodes={structuredData} />
 
         <FadeReveal className="border-t border-border py-14 sm:py-20">
           <Link

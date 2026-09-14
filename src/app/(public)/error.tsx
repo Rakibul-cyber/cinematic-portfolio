@@ -3,13 +3,14 @@
 import { useEffect } from "react";
 
 import { Container } from "@/components/ui/container";
+import { reportBoundaryError } from "@/lib/monitoring/report";
 
 /**
  * Public error boundary.
  *
  * Shows a calm, branded message and a retry. The error itself is logged to the
- * server console only — a visitor never sees a stack trace, a query, or any
- * other internal detail.
+ * console and, when monitoring is configured, reported to the error tracker —
+ * a visitor never sees a stack trace, a query, or any other internal detail.
  */
 export default function PublicError({
   error,
@@ -20,6 +21,7 @@ export default function PublicError({
 }) {
   useEffect(() => {
     console.error("[public] Rendering failed:", error.digest ?? error.message);
+    reportBoundaryError(error, "public");
   }, [error]);
 
   return (

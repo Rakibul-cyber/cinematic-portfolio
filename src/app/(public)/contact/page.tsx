@@ -4,6 +4,7 @@ import { FadeReveal } from "@/components/motion/fade-reveal";
 import { PageIntro } from "@/components/public/page-intro";
 import { SocialLinks } from "@/components/public/social-links";
 import { InquiryForm } from "@/components/public/inquiry-form";
+import { JsonLd } from "@/components/seo/json-ld";
 import { Container } from "@/components/ui/container";
 import { FALLBACK_STUDIO_NAME } from "@/content/site";
 import { buildPublicMetadata } from "@/server/public/metadata";
@@ -13,6 +14,7 @@ import {
   getPublicSiteSettings,
   getActiveServices,
 } from "@/server/public/queries";
+import { breadcrumbStructuredData } from "@/server/seo/structured-data";
 
 // Next.js requires a literal here. Keep it equal to PUBLIC_REVALIDATE_SECONDS
 // in src/server/public/cache-tags.ts, which is the documented safety net;
@@ -39,12 +41,17 @@ export async function generateMetadata(): Promise<Metadata> {
  * address, phone number, or location is invented.
  */
 export default async function ContactPage() {
-  const [page, settings, socialLinks, services] = await Promise.all([
-    getPublicPage("contact"),
-    getPublicSiteSettings(),
-    getActiveSocialLinks(),
-    getActiveServices(),
-  ]);
+  const [page, settings, socialLinks, services, structuredData] =
+    await Promise.all([
+      getPublicPage("contact"),
+      getPublicSiteSettings(),
+      getActiveSocialLinks(),
+      getActiveServices(),
+      breadcrumbStructuredData([
+        { name: "Home", path: "/" },
+        { name: "Contact", path: "/contact" },
+      ]),
+    ]);
 
   const studioName = settings?.studioName ?? FALLBACK_STUDIO_NAME;
 
@@ -141,6 +148,8 @@ export default async function ContactPage() {
           <div className="lg:col-span-7 lg:col-start-6"><InquiryForm services={services} turnstileSiteKey={process.env.TURNSTILE_SITE_KEY?.trim() ?? null}/></div>
         </div>
       </Container>
+
+      <JsonLd nodes={structuredData} />
     </main>
   );
 }

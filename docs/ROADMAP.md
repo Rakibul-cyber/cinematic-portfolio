@@ -79,19 +79,22 @@ Resend is opened/configured during this phase.
 - Finalize consent-aware embeds and privacy controls.
 - Implement the retention, deletion, and anonymization strategy.
 
-## Phase 9 — SEO, Analytics & Testing
+## Phase 9 — SEO, Analytics & Observability *(implemented)*
 
 - Implement Metadata API usage, canonical URLs, Open Graph, and Twitter metadata.
 - Add JSON-LD, sitemap, robots controls, and project metadata.
-- Configure Umami and Sentry.
-- Add valuable unit, integration, critical E2E, accessibility, and performance
-  checks.
+- Add an optional, cookieless Umami integration and optional Sentry reporting.
+- Add the Netlify production configuration and its verification.
+- Add offline SEO, analytics, and deployment verification scripts.
 
-Umami, Sentry, and potentially Better Stack are configured during this phase.
+This phase is infrastructure only: no schema, CRM, inquiry, email, auth, media,
+Turnstile, or privacy behaviour changes. Umami, Sentry, and any uptime/log
+monitoring accounts are opened in Phase 10, when production exists.
 
 ## Phase 10 — Production Launch
 
 - Configure Netlify and production environment variables.
+- Open the Umami, Sentry, and uptime-monitoring accounts and set their variables.
 - Connect the production database, DNS/domain, media domain, and HTTPS.
 - Configure Search Console, monitoring, and backups.
 - Run final security and production smoke tests.

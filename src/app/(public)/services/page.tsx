@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FadeReveal } from "@/components/motion/fade-reveal";
 import { PageIntro } from "@/components/public/page-intro";
 import { TestimonialsSection } from "@/components/sections/testimonials-section";
+import { JsonLd } from "@/components/seo/json-ld";
 import { Container } from "@/components/ui/container";
 import { buildPublicMetadata } from "@/server/public/metadata";
 import {
@@ -11,6 +12,7 @@ import {
   getActiveTestimonials,
   getPublicPage,
 } from "@/server/public/queries";
+import { breadcrumbStructuredData } from "@/server/seo/structured-data";
 
 // Next.js requires a literal here. Keep it equal to PUBLIC_REVALIDATE_SECONDS
 // in src/server/public/cache-tags.ts, which is the documented safety net;
@@ -35,10 +37,14 @@ export async function generateMetadata(): Promise<Metadata> {
  * is derived or invented, and there is no checkout, booking, or quote flow.
  */
 export default async function ServicesPage() {
-  const [page, services, testimonials] = await Promise.all([
+  const [page, services, testimonials, structuredData] = await Promise.all([
     getPublicPage("services"),
     getActiveServices(),
     getActiveTestimonials({ take: 2 }),
+    breadcrumbStructuredData([
+      { name: "Home", path: "/" },
+      { name: "Services", path: "/services" },
+    ]),
   ]);
 
   return (
@@ -119,6 +125,8 @@ export default async function ServicesPage() {
         className="border-t border-border py-20 sm:py-28"
         testimonials={testimonials}
       />
+
+      <JsonLd nodes={structuredData} />
     </main>
   );
 }

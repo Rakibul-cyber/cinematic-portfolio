@@ -115,6 +115,40 @@ rendered body is stored, and provider acceptance is recorded as `ACCEPTED`
 rather than `SENT`, because without webhooks inbox delivery is not known. See
 [ADR 0007](DECISIONS/0007-transactional-email.md).
 
+## SEO, analytics, and observability
+
+SEO decisions live in pure builders under `src/lib/seo/` — canonical
+normalization, crawl policy, sitemap contents, metadata assembly, and the JSON-LD
+graph — with thin server wrappers supplying CMS content. That split is what makes
+the whole SEO surface assertable offline, and it keeps the framework's metadata
+contract in one place rather than spread across route files.
+
+`NEXT_PUBLIC_SITE_URL` is the deployment origin, with `BETTER_AUTH_URL` as a
+fallback. Without a usable origin nothing invents a hostname: the sitemap is
+empty, `robots.txt` omits its sitemap reference, and canonicals stay relative.
+Structured data is emitted as one `@graph` per page, built only from CMS content,
+with every unsourced field omitted rather than guessed and every value escaped so
+no content can close the script element. The admin area publishes no structured
+data and is disallowed in `robots.txt`.
+
+Analytics and error monitoring are optional and silently absent unless
+configured. Umami is cookieless, mounted once in the public layout, and never
+loaded in the admin area.
+
+Error monitoring is the official `@sentry/nextjs` SDK in its current Next.js 15
+App Router shape: `src/instrumentation.ts` initializes the Node and Edge
+runtimes and exports `Sentry.captureRequestError` as `onRequestError`,
+`src/instrumentation-client.ts` initializes the browser, and `next.config.ts` is
+wrapped in `withSentryConfig`. All three `Sentry.init` calls spread one option
+object, so a privacy decision cannot apply to some runtimes and not others.
+Reporting is production-only and DSN-gated; with no DSN, `Sentry.init` is never
+called. Tracing, session tracking, and Session Replay are off, every
+`dataCollection` switch is at its narrowest value, and a `beforeSend` pass
+strips user, cookie, header, body, and query data from any event regardless of
+configuration. The Phase 8 Content-Security-Policy is widened by exactly two
+directives, and only for origins actually configured. See
+[ADR 0009](DECISIONS/0009-seo-production-deployment.md).
+
 ## External services
 
 | Concern | Approved service | Introduction phase |
@@ -128,7 +162,7 @@ rather than `SENT`, because without webhooks inbox delivery is not known. See
 | Analytics | Umami | Phase 9 |
 | Error monitoring | Sentry | Phase 9 |
 | Uptime/log monitoring | Better Stack or free-compatible option | Phase 9/10 |
-| Hosting | Netlify Free | Phase 10 |
+| Hosting | Netlify Free | Phase 9 (configuration) / Phase 10 (account) |
 
 ## Security and privacy controls
 
@@ -195,7 +229,17 @@ GitHub Actions will eventually run installation, linting, type checking, tests,
 and a production build. Production deployment targets Netlify Free, backed by
 Neon and the external services above. Production environment variables are
 configured in the deployment platform, never committed. DNS, HTTPS, backups,
-monitoring, and final smoke tests belong to Phase 10.
+monitoring accounts, and final smoke tests belong to Phase 10.
+
+`netlify.toml` publishes the Next.js build output through `@netlify/plugin-nextjs`
+rather than a static export, so server rendering, ISR, on-demand revalidation by
+tag, and the admin area all survive deployment. It deliberately declares no
+security header — those stay owned by `securityHeaders()`, so one source of truth
+applies identically to `next dev`, `next start`, and Netlify — and no cache rule
+for a rendered route, because `Cache-Control` on rendered pages belongs to the
+Next.js runtime and a blanket CDN rule would make on-demand revalidation
+invisible. Only content-hashed output, image-handler output, fonts, generated
+metadata files, and the private admin area carry cache rules.
 
 ## Internationalization readiness
 

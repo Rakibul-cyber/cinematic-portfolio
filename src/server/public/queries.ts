@@ -192,6 +192,30 @@ export const getPublishedProjectSlugs = cached(
 );
 
 /**
+ * Published slugs with their last content change, for the sitemap.
+ *
+ * Timestamps are returned as ISO strings rather than `Date` instances, for the
+ * same reason the mappers run inside the cache: what `unstable_cache` stores
+ * must be plain serializable data.
+ */
+export const getPublishedProjectSitemapRows = cached(
+  "public-project-sitemap",
+  [PublicTag.Projects, PublicTag.Categories],
+  async (): Promise<{ slug: string; updatedAt: string }[]> => {
+    const rows = await prisma.project.findMany({
+      where: PUBLISHED_PROJECT_WHERE,
+      orderBy: projectOrderBy(),
+      select: { slug: true, updatedAt: true },
+    });
+
+    return rows.map((row) => ({
+      slug: row.slug,
+      updatedAt: row.updatedAt.toISOString(),
+    }));
+  },
+);
+
+/**
  * One published project, or `null`.
  *
  * A draft project and a nonexistent slug are indistinguishable here by

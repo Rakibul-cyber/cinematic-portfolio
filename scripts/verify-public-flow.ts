@@ -254,8 +254,26 @@ async function seed(): Promise<void> {
   };
 
   await writeFile(MANIFEST, JSON.stringify(manifest), "utf8");
+
+  // Next.js persists every `unstable_cache` result to .next/cache/fetch-cache,
+  // tagged and with this project's one-hour `revalidate`. Those entries survive
+  // between builds, and a write made straight to the database — as this seed
+  // does — invalidates nothing, because `revalidateTag` only runs inside the
+  // application. A build started within that hour would therefore prerender the
+  // *previous* build's content and `--check` would assert against stale HTML.
+  //
+  // Clearing that one directory makes the seed/build/check workflow correct by
+  // construction rather than by remembering. The webpack and SWC caches are
+  // left alone, and nothing about how the deployed site caches changes: this is
+  // local build state only.
+  await rm(join(".next", "cache", "fetch-cache"), {
+    recursive: true,
+    force: true,
+  });
+
   console.log(
     `Seeded temporary public verification content (token ${token}).\n` +
+      "Cleared the local Next.js data cache so the next build reads the seed.\n" +
       "Start the application, then run: npm run public:verify -- --check",
   );
 }

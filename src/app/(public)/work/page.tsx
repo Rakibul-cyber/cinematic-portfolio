@@ -4,11 +4,13 @@ import { FadeReveal } from "@/components/motion/fade-reveal";
 import { CategoryFilter } from "@/components/public/category-filter";
 import { PageIntro } from "@/components/public/page-intro";
 import { ProjectCard } from "@/components/public/project-card";
+import { JsonLd } from "@/components/seo/json-ld";
 import { Container } from "@/components/ui/container";
 import { emptyStates } from "@/content/site";
 import { cn } from "@/lib/utils";
 import { buildPublicMetadata } from "@/server/public/metadata";
 import { getPublicCategories, getPublishedProjects } from "@/server/public/queries";
+import { breadcrumbStructuredData } from "@/server/seo/structured-data";
 
 type WorkPageProps = {
   searchParams: Promise<{ category?: string | string[] }>;
@@ -49,6 +51,13 @@ export default async function WorkPage({ searchParams }: WorkPageProps) {
     activeSlug ? { categorySlug: activeSlug } : undefined,
   );
 
+  // The trail names the unfiltered index, matching the canonical URL: a
+  // category filter is a view of this page, not a page of its own.
+  const structuredData = await breadcrumbStructuredData([
+    { name: "Home", path: "/" },
+    { name: "Work", path: "/work" },
+  ]);
+
   return (
     <main id="main-content">
       <PageIntro eyebrow="Portfolio" title="Work" />
@@ -88,6 +97,8 @@ export default async function WorkPage({ searchParams }: WorkPageProps) {
           </div>
         )}
       </Container>
+
+      <JsonLd nodes={structuredData} />
     </main>
   );
 }

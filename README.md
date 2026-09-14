@@ -32,7 +32,7 @@ need and explicit approval.
 
 ## Development status
 
-**Current phase: Phase 5 — Public Portfolio.**
+**Current phase: Phase 9 — SEO, Analytics & Observability.**
 
 Phase 1 delivered the frontend foundation: a responsive public shell,
 centralized placeholder content, reusable UI primitives, local
@@ -82,6 +82,14 @@ rate limits, application-specific security headers, and SUPER_ADMIN customer
 export/anonymization operations. These are GDPR-conscious operational controls,
 not legal certification. See
 [ADR 0008](docs/DECISIONS/0008-security-privacy.md).
+
+Phase 9 adds the production SEO surface — canonical URLs, Open Graph and Twitter
+cards with a generated fallback share image, JSON-LD, a dynamic sitemap, and
+`robots.txt` — plus optional cookieless analytics, optional error monitoring, the
+Netlify production configuration, and three offline verification scripts. It
+changes no business logic: no schema, CRM, inquiry, email, authentication, media,
+Turnstile, or privacy behaviour is touched. See
+[ADR 0009](docs/DECISIONS/0009-seo-production-deployment.md).
 
 ## Public site
 
@@ -266,6 +274,90 @@ addressed to the exact submitted address. `ACCEPTED` in the admin UI means the
 provider accepted the request, which is not proof of inbox delivery; there is no
 webhook tracking. See [ADR 0007](docs/DECISIONS/0007-transactional-email.md).
 
+### Deployment origin, analytics, and error monitoring
+
+`NEXT_PUBLIC_SITE_URL` is this deployment's absolute origin, and it is what makes
+canonical URLs, Open Graph, JSON-LD, the sitemap, and `robots.txt` absolute.
+`BETTER_AUTH_URL` is used as a fallback. With neither set nothing guesses a
+hostname: the sitemap is empty, `robots.txt` omits its sitemap reference, share
+images are omitted, and canonicals stay relative.
+
+Analytics and error monitoring are both optional, and leaving them unset is the
+normal local setup — no script loads, no request is made, and nothing warns.
+
+Set `NEXT_PUBLIC_UMAMI_WEBSITE_ID` (or `UMAMI_WEBSITE_ID`) to enable analytics,
+and `NEXT_PUBLIC_UMAMI_SCRIPT_URL` when self-hosting Umami rather than using
+Umami Cloud. The website id is public by nature — it is rendered as an attribute
+on a script tag. Umami is cookieless and stores nothing in the browser, which is
+why the site needs no analytics consent banner. The tracker loads on public pages
+only; the admin area is never measured.
+
+Error monitoring uses the official `@sentry/nextjs` SDK. Set
+`NEXT_PUBLIC_SENTRY_DSN` to enable it for the browser, Node, and Edge runtimes
+alike — one DSN serves all three, and a DSN is public by design. Reporting
+happens in production only, so a local stack trace stays in your terminal, and
+with no DSN `Sentry.init` is never called at all. **No Sentry account is needed
+to develop, build, test, or verify this project.**
+
+Tracing, session tracking, and Session Replay are off, and every collection
+switch is set to its narrowest value: no user or IP, no cookies, no request or
+response headers, no request bodies, no query parameters, no database query
+data, and no stack-frame local variables. A `beforeSend` pass strips those
+carriers from the event regardless, and free text is scrubbed for addresses,
+phone numbers, credentials, and tokens. That scrubbing is pattern matching, not
+a proof — an unusual string in a stack trace can still slip through, which is
+why the collection switches above, not the scrubbing, are the primary control.
+
+Source maps are uploaded only when `SENTRY_AUTH_TOKEN` is set, which is a Phase
+10, Netlify-only concern; local builds skip the upload silently. That token is a
+secret, is read only by `next.config.ts` at build time, and never reaches the
+browser.
+
+Enabling either service widens the Content-Security-Policy for that service's
+origin and nothing else. `npm run analytics:verify` asserts all of this.
+
+## SEO
+
+| Route | Content |
+| --- | --- |
+| `/sitemap.xml` | The five public routes plus every published project, dated from its last change. |
+| `/robots.txt` | Allows the public site, disallows `/admin` and `/api/`, points at the sitemap. |
+| `/opengraph-image` | Generated fallback share card: the CMS studio name and tagline. |
+
+Every public page declares a canonical URL, Open Graph tags, a Twitter card, and
+explicit robots directives, resolved through the same fallback chain as its title
+and description: the page's own SEO field, then its natural content, then the CMS
+global default, then a neutral constant. A canonical drops query strings, so
+`/work?category=film` stays a view of `/work` rather than a competing document.
+Project pages share their cover photograph; pages with no image of their own fall
+back to the generated card.
+
+Structured data is emitted as one JSON-LD graph per page: Organization and
+WebSite site-wide, a CreativeWork plus breadcrumb trail on each project, and
+breadcrumb trails elsewhere. Every field comes from CMS content — an empty CMS
+yields the studio identity and nothing else. No address, rating, price, award,
+or date is invented, and the admin area publishes none of it.
+
+No `Person` node is published. The CMS cannot tell a sole trader from a company,
+so naming a natural person from the studio name would be an unverifiable claim
+rather than a description.
+
+## Deployment
+
+`netlify.toml` is the committed production configuration. It publishes the
+Next.js build output through `@netlify/plugin-nextjs`, so server rendering, ISR,
+on-demand revalidation, and the admin area survive deployment. Production
+environment variables are set in the Netlify UI, never in the repository.
+
+Two things it deliberately does not declare: security headers, which stay owned
+by `securityHeaders()` so one source of truth applies to `next dev`, `next
+start`, and Netlify alike; and cache rules for rendered routes, because
+`Cache-Control` on those belongs to the Next.js runtime and a blanket CDN rule
+would freeze stale pages. `npm run deploy:verify` fails if either appears.
+
+Opening the Netlify, Umami, and Sentry accounts, connecting DNS, and running
+production smoke tests belong to Phase 10.
+
 ## Database workflow
 
 Prisma is configured through `prisma.config.ts`, which loads `.env.local` and
@@ -380,6 +472,36 @@ npm run public:verify -- --cleanup
 
 Seed before building: the build renders the public pages, so it must see the
 seeded content.
+
+`--seed` also clears `.next/cache/fetch-cache`, and that step matters. Next.js
+persists every `unstable_cache` result there with this project's one-hour
+`revalidate`, and those entries survive between builds. Seeding writes straight
+to the database, which invalidates nothing — `revalidateTag` only runs inside
+the application — so a build started within that hour would otherwise prerender
+the *previous* build's content and `--check` would assert against stale HTML.
+Only that one directory is cleared; the webpack and SWC caches are untouched,
+and nothing about how the deployed site caches is affected.
+
+If you build for a verification run by some other route, clear it yourself
+first:
+
+```powershell
+Remove-Item -Recurse -Force .next\cache\fetch-cache
+```
+
+## Verifying SEO, analytics, and deployment
+
+These three need nothing — no database, no network, no running application —
+because the logic behind them is pure:
+
+```powershell
+npm run seo:verify       # canonical, robots, sitemap, metadata, JSON-LD, OG/Twitter
+npm run analytics:verify # analytics and monitoring configuration, CSP, PII scrubbing
+npm run deploy:verify    # netlify.toml: cache headers, ISR safety, header ownership
+```
+
+What they cannot see is whether Next.js emits the tags it is handed; that is
+covered by `npm run public:verify` against a running application.
 
 ## Repository rules
 

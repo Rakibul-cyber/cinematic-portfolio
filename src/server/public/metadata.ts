@@ -3,22 +3,34 @@ import "server-only";
 import type { Metadata } from "next";
 
 import { fallbackMetadata, FALLBACK_STUDIO_NAME } from "@/content/site";
-import { resolveMetadataFields } from "@/lib/public/metadata-fallback";
+import { normalizeOrigin } from "@/lib/seo/canonical";
+import { buildMetadataDocument } from "@/lib/seo/metadata-document";
 import { getPublicSiteSettings } from "@/server/public/queries";
 
 /**
- * Metadata foundation for public pages.
+ * Metadata for public pages.
  *
- * A deliberately small layer: page title, description, canonical path, and an
- * optional share image, each resolved through the same fallback chain — the
- * page's own SEO field, then its natural content, then the CMS global default,
- * then a neutral constant. The full SEO system (sitemap, JSON-LD, robots,
- * Twitter cards) belongs to Phase 9.
+ * This module does one thing the pure builder cannot: read the CMS. The
+ * document itself — title precedence, canonical URL, Open Graph, Twitter card,
+ * robots directives, and the share-image fallback — is assembled by
+ * `buildMetadataDocument`, which is exercised directly by `npm test` and
+ * `npm run seo:verify`.
  */
 
-/** Absolute origin used for canonical and Open Graph URLs. */
-export function siteOrigin(): string | undefined {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? process.env.BETTER_AUTH_URL;
+/**
+ * Absolute origin used for canonical URLs, Open Graph, JSON-LD, the sitemap,
+ * and `robots.txt`.
+ *
+ * `BETTER_AUTH_URL` is the deliberate second choice: it is already required to
+ * be this application's absolute origin, so a deployment that configured
+ * authentication has a correct value even before the SEO variable is set.
+ * Returns `null` rather than a guess when neither is usable.
+ */
+export function siteOrigin(): string | null {
+  return (
+    normalizeOrigin(process.env.NEXT_PUBLIC_SITE_URL) ??
+    normalizeOrigin(process.env.BETTER_AUTH_URL)
+  );
 }
 
 export type PublicMetadataInput = {
@@ -30,42 +42,20 @@ export type PublicMetadataInput = {
   imageUrl?: string | null;
 };
 
-export async function buildPublicMetadata({
-  description,
-  imageUrl,
-  path,
-  title,
-}: PublicMetadataInput): Promise<Metadata> {
+export async function buildPublicMetadata(
+  input: PublicMetadataInput,
+): Promise<Metadata> {
   const settings = await getPublicSiteSettings();
-  const studioName = settings?.studioName ?? FALLBACK_STUDIO_NAME;
 
-  const { description: resolvedDescription, title: resolvedTitle } =
-    resolveMetadataFields({
-      title,
-      description,
-      defaultTitle: settings?.defaultSeoTitle,
-      defaultDescription: settings?.defaultSeoDescription,
-      studioName,
-      fallbackDescription: fallbackMetadata.description,
-    });
-
-  return {
-    // When a page has no title of its own the fallback is the studio name, and
-    // the root template would render it twice ("Studio — Studio"). An absolute
-    // title suppresses the template in exactly that case.
-    title:
-      resolvedTitle === studioName ? { absolute: studioName } : resolvedTitle,
-    description: resolvedDescription,
-    alternates: { canonical: path },
-    openGraph: {
-      type: "website",
-      siteName: studioName,
-      title: resolvedTitle,
-      description: resolvedDescription,
-      url: path,
-      // Share images come from the media delivery helper, so no storage path
-      // is constructed here.
-      ...(imageUrl ? { images: [{ url: imageUrl }] } : {}),
-    },
-  };
+  return buildMetadataDocument({
+    title: input.title,
+    description: input.description,
+    path: input.path,
+    imageUrl: input.imageUrl,
+    studioName: settings?.studioName ?? FALLBACK_STUDIO_NAME,
+    defaultTitle: settings?.defaultSeoTitle,
+    defaultDescription: settings?.defaultSeoDescription,
+    fallbackDescription: fallbackMetadata.description,
+    origin: siteOrigin(),
+  });
 }

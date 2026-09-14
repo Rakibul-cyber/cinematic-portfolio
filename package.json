@@ -22,7 +22,10 @@
     "crm:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-crm-flow.ts",
     "admin:bootstrap": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/bootstrap-admin.ts",
     "email:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-email-flow.ts",
-    "security:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-security-flow.ts"
+    "security:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-security-flow.ts",
+    "seo:verify": "tsx --env-file-if-exists=.env.local scripts/verify-seo-flow.ts",
+    "analytics:verify": "tsx --env-file-if-exists=.env.local scripts/verify-analytics-flow.ts",
+    "deploy:verify": "tsx --env-file-if-exists=.env.local scripts/verify-deploy-flow.ts"
   },
   "overrides": {
     "postcss": "8.5.26",
@@ -35,6 +38,7 @@
     "@prisma/adapter-neon": "7.10.0",
     "@prisma/client": "7.10.0",
     "@react-email/components": "^1.0.12",
+    "@sentry/nextjs": "^10.74.0",
     "better-auth": "1.7.3",
     "clsx": "^2.1.1",
     "lucide-react": "^1.39.0",

@@ -38,6 +38,14 @@ idempotent, blocks editing and email retry, and releases the former normalized
 email so a later inquiry creates an active customer. Privacy audit metadata
 contains IDs and operation names only; authenticated actor identity remains.
 
+The replay lookup answers a completed submission from its delivery claim rows
+alone, in one narrow query that selects no inquiry PII. A token whose deliveries
+were all claimed returns the ordinary success response without re-entering email
+orchestration, so holding a valid token grants no repeatable work. Only a
+genuinely unclaimed delivery triggers recovery; a `FAILED` or `SKIPPED` row is a
+claim that reached a definite outcome and remains the administrator's explicit
+retry, never a public one.
+
 Anonymization is checked inside the delivery claim itself, so no email attempt
 can start for an erased inquiry through either the administrator retry path or
 the public idempotent replay path. Work that has already crossed the claim

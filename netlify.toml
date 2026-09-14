@@ -1,0 +1,77 @@
+# Netlify production configuration.
+#
+# Deliberately small. Two things are NOT configured here, and both omissions
+# are load-bearing:
+#
+#   * Security headers. They are produced by `securityHeaders()` in
+#     src/lib/security-headers.ts and emitted by Next.js itself, so they apply
+#     identically to `next dev`, `next start`, and Netlify, and the
+#     Content-Security-Policy can react to which services are configured.
+#     Repeating any of them here would create a second source of truth that
+#     drifts. `npm run deploy:verify` fails if one appears in this file.
+#
+#   * Cache headers on HTML routes. Incremental Static Regeneration works by
+#     letting the Next.js runtime own `Cache-Control` and `Netlify-CDN-Cache-
+#     Control` on rendered pages. A blanket rule here would freeze stale pages
+#     in the CDN and make on-demand revalidation invisible to visitors, so only
+#     immutable build output and generated metadata files are given cache rules
+#     below. `npm run deploy:verify` fails if a rule targets `/*`.
+#
+# Environment variables are configured in the Netlify UI, never in this file.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Dev dependencies are required at build time: Prisma generates the client in
+  # `postinstall`, and TypeScript and Tailwind run during `next build`.
+  NPM_FLAGS = "--include=dev"
+
+# The Next.js Runtime. It provides serverless rendering, ISR, on-demand
+# revalidation by tag, and the image and middleware handlers. Netlify installs
+# it; it is not a repository dependency.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Build output addressed by content hash. Safe to cache forever, and the single
+# largest win available to a returning visitor.
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Output of the Next.js image handler. Keyed by source URL and transform
+# parameters, so a long shared cache is safe while the browser revalidates.
+# Portfolio images themselves are served from R2 and are cached by that origin.
+[[headers]]
+  for = "/_next/image*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, s-maxage=31536000, stale-while-revalidate=86400"
+
+# Fonts and other immutable public assets.
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Generated SEO metadata. Cheap to regenerate and expected to change whenever
+# work is published, so it is revalidated rather than held.
+[[headers]]
+  for = "/sitemap.xml"
+  [headers.values]
+    Cache-Control = "public, max-age=0, s-maxage=3600, must-revalidate"
+
+[[headers]]
+  for = "/robots.txt"
+  [headers.values]
+    Cache-Control = "public, max-age=0, s-maxage=3600, must-revalidate"
+
+# The admin area is private and must never be held by a shared cache. The
+# application already sends this on every admin response; stating it at the
+# edge as well means a misconfigured CDN rule cannot expose it.
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    Cache-Control = "private, no-store"
