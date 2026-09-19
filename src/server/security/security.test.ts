@@ -5,6 +5,12 @@ import { isSafeInternalPath } from "@/lib/admin-routes";
 import { securityHeaders } from "@/lib/security-headers";
 import { pseudonymousKey } from "@/lib/security/rate-limit";
 import { verifyTurnstile } from "@/server/security/turnstile";
+import {
+  TURNSTILE_ACTION,
+  TURNSTILE_RESPONSE_FIELD,
+  TURNSTILE_SCRIPT_URL,
+  turnstileRenderOptions,
+} from "@/lib/security/turnstile-widget";
 import { hasAllDeliveryClaims } from "@/lib/email/delivery-claims";
 import { EMAIL_DELIVERY_TYPES } from "@/lib/validation/crm";
 
@@ -171,5 +177,40 @@ describe("committed-submission replay cost", () => {
 
   it("ignores duplicate or unexpected rows rather than miscounting", () => {
     assert.equal(hasAllDeliveryClaims([{ type: ADMIN }, { type: ADMIN }]), false);
+  });
+});
+
+describe("Turnstile browser contract", () => {
+  // Phase 10A: the deployed widget was invisible and no response field was
+  // ever submitted, because implicit rendering raced React hydration. These
+  // assert the contract that removes the race, and that the field and action
+  // the browser produces are the ones the server verifies.
+  it("loads the provider script in explicit-render mode", () => {
+    assert.match(TURNSTILE_SCRIPT_URL, /^https:\/\/challenges\.cloudflare\.com\/turnstile\/v0\/api\.js\?/);
+    assert.match(TURNSTILE_SCRIPT_URL, /[?&]render=explicit(&|$)/, "implicit mode scans the DOM and loses the race with hydration");
+  });
+
+  it("renders with the action the server asserts, and no provider-owned response field", () => {
+    const options = turnstileRenderOptions("1x00000000000000000000AA", {
+      onToken: () => {},
+      onExpired: () => {},
+      onError: () => {},
+    });
+    assert.equal(options.action, "inquiry");
+    assert.equal(TURNSTILE_ACTION, "inquiry");
+    assert.equal(options["response-field"], false);
+    assert.equal(options.sitekey, "1x00000000000000000000AA");
+    assert.equal(options.theme, "dark");
+  });
+
+  it("names the response field the server action reads", () => {
+    assert.equal(TURNSTILE_RESPONSE_FIELD, "cf-turnstile-response");
+  });
+
+  it("keeps the server authoritative over the action the browser claims", async () => {
+    const env = { NODE_ENV: "production", TURNSTILE_SITE_KEY: "site", TURNSTILE_SECRET_KEY: "secret" };
+    const body = (action: string) => async () => ({ ok: true, json: async () => ({ success: true, action }) }) as Response;
+    assert.equal((await verifyTurnstile({ token: "t" }, { env, fetcher: body(TURNSTILE_ACTION) })).ok, true);
+    assert.equal((await verifyTurnstile({ token: "t" }, { env, fetcher: body("something-else") })).ok, false);
   });
 });

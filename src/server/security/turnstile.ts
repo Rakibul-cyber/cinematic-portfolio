@@ -1,5 +1,7 @@
 import "server-only";
 
+import { TURNSTILE_ACTION } from "@/lib/security/turnstile-widget";
+
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const VERIFY_TIMEOUT_MS = 5_000;
 let warnedMissingConfiguration = false;
@@ -57,7 +59,7 @@ export async function verifyTurnstile(input: {
     if (
       !data.success ||
       (expectedHostname && data.hostname !== expectedHostname) ||
-      (data.action && data.action !== "inquiry") ||
+      (data.action && data.action !== TURNSTILE_ACTION) ||
       (data.challenge_ts && (!Number.isFinite(challengedAt) || challengedAt > Date.now() + 60_000 || challengedAt < Date.now() - 5 * 60_000))
     ) {
       return { ok: false, reason: "invalid" };

@@ -7,6 +7,7 @@ import { prisma } from "@/server/db/prisma";
 import { hasAllDeliveryClaims } from "@/lib/email/delivery-claims";
 import { deliverInquiryEmails } from "@/server/email/service";
 import { consumeInquiryLimit } from "@/server/security/rate-limit";
+import { TURNSTILE_RESPONSE_FIELD } from "@/lib/security/turnstile-widget";
 import { verifyTurnstile } from "@/server/security/turnstile";
 
 export type InquiryFormState = { success: boolean; message?: string; errors?: Record<string, string[]> };
@@ -49,7 +50,7 @@ export async function submitInquiry(_: InquiryFormState, form: FormData): Promis
     }
 
     const challenge = await verifyTurnstile({
-      token: String(form.get("cf-turnstile-response") ?? ""),
+      token: String(form.get(TURNSTILE_RESPONSE_FIELD) ?? ""),
       ...(trustedClientIp ? { remoteIp: trustedClientIp } : {}),
     });
     if (!challenge.ok) {
