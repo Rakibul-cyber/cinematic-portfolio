@@ -344,19 +344,32 @@ rather than a description.
 
 ## Deployment
 
-`netlify.toml` is the committed production configuration. It publishes the
-Next.js build output through `@netlify/plugin-nextjs`, so server rendering, ISR,
-on-demand revalidation, and the admin area survive deployment. Production
-environment variables are set in the Netlify UI, never in the repository.
+`netlify.toml` is the committed deployment configuration, and it is deliberately
+minimal. Netlify provisions the Next.js (OpenNext) adapter automatically and
+recommends against pinning it, so the file declares no plugin and no publish
+directory — the adapter owns the build output, the serverless and edge
+functions, ISR, on-demand revalidation, and image handling. The Node.js version
+is pinned in `.node-version`, which is the highest-precedence mechanism Netlify
+reads. Production environment variables are set in the Netlify UI, never in the
+repository.
 
-Two things it deliberately does not declare: security headers, which stay owned
-by `securityHeaders()` so one source of truth applies to `next dev`, `next
-start`, and Netlify alike; and cache rules for rendered routes, because
-`Cache-Control` on those belongs to the Next.js runtime and a blanket CDN rule
-would freeze stale pages. `npm run deploy:verify` fails if either appears.
+Three things it deliberately does not declare: security headers, which stay
+owned by `securityHeaders()` so one source of truth applies to `next dev`, `next
+start`, and Netlify alike; a publish directory, because naming one freezes an
+assumption about adapter internals whose failure mode is a green deploy serving
+404s; and cache rules for anything Next.js renders — including `/sitemap.xml`,
+`/robots.txt`, and `/opengraph-image`, which are metadata routes with their own
+`revalidate`, not files. Only content-hashed build output and the private admin
+area carry cache rules. `npm run deploy:verify` fails if any of that drifts.
 
-Opening the Netlify, Umami, and Sentry accounts, connecting DNS, and running
-production smoke tests belong to Phase 10.
+Note that a deployment runs with `NODE_ENV=production`, which makes the Phase 8
+abuse controls fail closed: without `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`,
+and a 32+ character `RATE_LIMIT_HMAC_SECRET`, every inquiry submission is
+rejected. That is deliberate, and no preview bypass exists.
+
+See [ADR 0010](docs/DECISIONS/0010-netlify-deployment-foundation.md) for the
+deployment decisions. Opening the Netlify, Umami, and Sentry accounts,
+connecting DNS, and running production smoke tests belong to Phase 10B.
 
 ## Database workflow
 

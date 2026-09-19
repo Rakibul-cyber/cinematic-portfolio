@@ -107,29 +107,57 @@ async function main(): Promise<void> {
   const source = await readFile(CONFIG, "utf8");
   const { tables, headers, plugins } = parse(source);
 
-  section("netlify config");
+  section("zero-configuration adapter");
 
-  assert.equal(tables.build?.command, "npm run build", "the production build runs");
+  // Netlify provisions the Next.js (OpenNext) adapter automatically and
+  // recommends against pinning it. Declaring the plugin IS the pinning
+  // pattern, so its absence is the correct state, not an omission.
+  assert.deepEqual(
+    plugins,
+    [],
+    "the Next.js adapter must not be pinned: Netlify provisions and updates it",
+  );
+
+  // The adapter owns the build output location. Naming one here freezes an
+  // assumption about its internals whose failure mode is a green deploy that
+  // serves 404s.
   assert.equal(
     tables.build?.publish,
-    ".next",
-    "the Next.js build output is published, not a static export",
+    undefined,
+    "no publish directory is pinned: the adapter decides where output lives",
   );
   assert.ok(
     !source.includes('publish = "out"'),
     "a static export would drop server rendering, ISR, and the admin area",
   );
+  assert.equal(tables.build?.command, "npm run build", "the production build runs");
   assert.ok(
     tables["build.environment"]?.NPM_FLAGS?.includes("--include=dev"),
     "dev dependencies are installed: Prisma, TypeScript, and Tailwind run at build time",
   );
 
-  section("ISR compatibility");
+  section("node version");
 
-  assert.ok(
-    plugins.includes("@netlify/plugin-nextjs"),
-    "the Next.js Runtime provides server rendering, ISR, and on-demand revalidation",
+  // `.node-version` is the highest-precedence mechanism Netlify reads, and
+  // unlike NODE_VERSION in netlify.toml it is visible to every other tool.
+  // Netlify does not read package.json `engines`.
+  const nodeVersion = (await readFile(".node-version", "utf8")).trim();
+  assert.match(
+    nodeVersion,
+    /^\d+(\.\d+){0,2}$/,
+    ".node-version pins an explicit Node.js major",
   );
+  assert.ok(
+    Number.parseInt(nodeVersion, 10) >= 20,
+    "the pinned Node.js version is current enough for Next.js 15 and Prisma 7",
+  );
+  assert.equal(
+    tables["build.environment"]?.NODE_VERSION,
+    undefined,
+    "the Node version is declared once, in .node-version, not also here",
+  );
+
+  section("ISR compatibility");
 
   const blanket = headers.filter(
     (rule) =>
@@ -142,17 +170,29 @@ async function main(): Promise<void> {
       "on-demand revalidation invisible to visitors",
   );
 
+  // Everything Next.js renders is the runtime's to cache -- including the
+  // metadata routes, which carry their own `revalidate` and are not files.
+  const RENDERED_ROUTES = [
+    "/sitemap.xml",
+    "/robots.txt",
+    "/opengraph-image",
+    "/work",
+    "/contact",
+    "/",
+  ];
+
   for (const rule of headers) {
     if (!("Cache-Control" in rule.values)) continue;
 
     assert.ok(
-      rule.for.startsWith("/_next/") ||
-        rule.for.startsWith("/fonts/") ||
-        rule.for.startsWith("/admin") ||
-        rule.for === "/sitemap.xml" ||
-        rule.for === "/robots.txt",
-      `${rule.for} must not be given a cache rule: rendered routes are the ` +
-        "Next.js runtime's to control",
+      !RENDERED_ROUTES.includes(rule.for),
+      `${rule.for} is rendered by Next.js with its own revalidate; a CDN rule ` +
+        "would freeze it and hide on-demand revalidation",
+    );
+    assert.ok(
+      rule.for.startsWith("/_next/static/") || rule.for.startsWith("/admin"),
+      `${rule.for} must not be given a cache rule: only content-hashed build ` +
+        "output and the private admin area are the CDN's to control",
     );
   }
 
@@ -169,12 +209,16 @@ async function main(): Promise<void> {
     "hashed assets are cached for a year",
   );
 
-  const image = headers.find((rule) => rule.for.startsWith("/_next/image"));
-  assert.ok(image, "image handler output is cached");
-  assert.ok(
-    image!.values["Cache-Control"].includes("s-maxage="),
-    "images are held by the shared cache rather than only by the browser",
-  );
+  // `immutable` is a promise that a URL's bytes can never change. Only
+  // content-hashed paths can keep it.
+  for (const rule of headers) {
+    if (!rule.values["Cache-Control"]?.includes("immutable")) continue;
+
+    assert.ok(
+      rule.for.startsWith("/_next/static/"),
+      `${rule.for} is marked immutable but is not content-addressed`,
+    );
+  }
 
   const admin = headers.find((rule) => rule.for.startsWith("/admin"));
   assert.equal(
@@ -183,12 +227,13 @@ async function main(): Promise<void> {
     "the private workspace is never held by a shared cache",
   );
 
-  for (const path of ["/sitemap.xml", "/robots.txt"]) {
-    const rule = headers.find((entry) => entry.for === path);
-    assert.ok(rule, `${path} has a cache rule`);
+  // No rule may reference a path the deployment does not produce. `next/image`
+  // is unused (ADR 0005 serves R2 variants directly) and there is no public/
+  // directory, so rules for those paths would be misleading dead configuration.
+  for (const rule of headers) {
     assert.ok(
-      rule!.values["Cache-Control"].includes("must-revalidate"),
-      `${path} is revalidated: it changes whenever work is published`,
+      !rule.for.startsWith("/_next/image") && !rule.for.startsWith("/fonts/"),
+      `${rule.for} matches nothing this application deploys`,
     );
   }
 
@@ -233,10 +278,12 @@ async function main(): Promise<void> {
   );
 
   console.log(
-    "Deployment verification passed: Next.js runtime output with the ISR-capable " +
-      "plugin, immutable caching for hashed assets, no cache rule shadowing " +
-      "rendered routes, a private admin area, security headers owned solely by " +
-      "the application, and no credentials in the repository.",
+    "Deployment verification passed: zero-configuration adapter with nothing " +
+      "pinned, an explicit Node version in .node-version, immutable caching " +
+      "confined to content-addressed output, no cache rule shadowing a rendered " +
+      "route, no rule matching a path the app does not deploy, a private admin " +
+      "area, security headers owned solely by the application, and no " +
+      "credentials in the repository.",
   );
 }
 

@@ -81,14 +81,15 @@ SDK's tracing and replay tree-shaking options.
 
 The architecture is the SDK's current one for the Next.js 15 App Router, taken
 from the package and its documentation rather than from an older tutorial:
-`src/instrumentation.ts` initializes the Node and Edge runtimes through
-`register()` and exports `Sentry.captureRequestError` as `onRequestError`;
+`src/instrumentation.ts` initializes the Node runtime through `register()` and
+exports `Sentry.captureRequestError` as `onRequestError`;
 `src/instrumentation-client.ts` — not the obsolete `sentry.client.config.ts` —
-initializes the browser; `sentry.server.config.ts` and `sentry.edge.config.ts`
-hold the per-runtime `Sentry.init` calls; and `next.config.ts` is wrapped in
-`withSentryConfig`. All three `init` calls spread one option object built by
+initializes the browser; `sentry.server.config.ts` holds the server
+`Sentry.init` call; and `next.config.ts` is wrapped in `withSentryConfig`. Both
+`init` calls spread one option object built by
 `src/lib/monitoring/options.ts`, so a privacy decision cannot end up applying to
-two runtimes out of three.
+one runtime and not the other. (Phase 10A removed the Edge runtime
+initialization on measured evidence; see ADR 0010.)
 
 Reporting is production-only and DSN-gated. When it is off, `Sentry.init` is not
 called at all — rather than called with an empty DSN — so no handler is
@@ -193,27 +194,10 @@ node is published at all. The share-image fallback is typographic, not
 photographic. The Sentry SDK costs roughly 34 kB of shared First Load JS even
 when no DSN is set, which is a measured regression on an image-led site.
 
-The Edge cost is larger and worth revisiting. The middleware entry now loads
-`edge-instrumentation.js` (~179 kB built) on every cold start, purely to
-initialize Sentry for a twenty-line cookie-presence check that performs no I/O;
-`middleware.js` itself contains essentially no Sentry code. Dropping
-`sentry.edge.config.ts` and the Edge branch of `register()` would remove that
-cost while leaving Node and browser monitoring untouched, at the price of losing
-middleware error reports — whose diagnostic value is near zero, because the real
-authorization work happens in the Node runtime and is already covered. This is
-recorded rather than done, because it changes monitoring coverage and should be
-decided against a measured cold start in Phase 10.
-
-`netlify.toml` declares `@netlify/plugin-nextjs` and `publish = ".next"`. Current
-Netlify guidance is that the Next.js adapter is auto-provisioned and should not
-be pinned or declared, and that the publish directory is handled by the adapter.
-Both are retained because they cannot be validated without a real deploy, and
-`npm run deploy:verify` currently *asserts* this shape — so Phase 10 must
-re-validate the file against the live runtime and relax that assertion if the
-adapter declaration is dropped. Netlify applies `X-Robots-Tag: noindex` to
-Deploy Previews and branch deploys itself, so preview indexing needs no
-application change; Phase 10 should confirm that on the first preview rather
-than assume it.
+The Edge cost flagged here was measured and acted on in Phase 10A: Edge Sentry
+initialization is removed, cutting the reported middleware bundle from 96.9 kB
+to 41.5 kB with the client bundle unchanged. The `netlify.toml` question raised
+here is likewise resolved there. Both supersessions are recorded in ADR 0010.
 
 Tracing, session tracking, and
 Session Replay are off, so there is no performance data and no user journey to

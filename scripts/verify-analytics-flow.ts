@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -370,9 +371,23 @@ async function verifyWiring(): Promise<void> {
     "server errors are reported through the framework's onRequestError hook",
   );
   assert.ok(
-    instrumentation.includes("./sentry.server.config") &&
-      instrumentation.includes("./sentry.edge.config"),
-    "both server runtimes are initialized",
+    instrumentation.includes("./sentry.server.config"),
+    "the Node.js runtime is initialized",
+  );
+
+  // The Edge runtime is deliberately not instrumented. Monitoring a
+  // twenty-line cookie check cost 167 kB of generated edge instrumentation on
+  // every cold start -- 96.9 kB to 41.5 kB of reported middleware bundle -- and
+  // the authorization it fronts runs in the Node runtime, which is covered.
+  // See ADR 0010.
+  assert.ok(
+    !instrumentation.includes('NEXT_RUNTIME === "edge"'),
+    "the Edge runtime is not instrumented",
+  );
+  assert.equal(
+    existsSync("src/sentry.edge.config.ts"),
+    false,
+    "no Edge Sentry configuration is present",
   );
 
   const client = await readFile("src/instrumentation-client.ts", "utf8");
@@ -383,7 +398,6 @@ async function verifyWiring(): Promise<void> {
 
   for (const file of [
     "src/sentry.server.config.ts",
-    "src/sentry.edge.config.ts",
     "src/instrumentation-client.ts",
   ]) {
     const source = await readFile(file, "utf8");

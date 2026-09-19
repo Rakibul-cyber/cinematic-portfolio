@@ -136,11 +136,15 @@ configured. Umami is cookieless, mounted once in the public layout, and never
 loaded in the admin area.
 
 Error monitoring is the official `@sentry/nextjs` SDK in its current Next.js 15
-App Router shape: `src/instrumentation.ts` initializes the Node and Edge
-runtimes and exports `Sentry.captureRequestError` as `onRequestError`,
+App Router shape: `src/instrumentation.ts` initializes the Node.js runtime and
+exports `Sentry.captureRequestError` as `onRequestError`,
 `src/instrumentation-client.ts` initializes the browser, and `next.config.ts` is
-wrapped in `withSentryConfig`. All three `Sentry.init` calls spread one option
-object, so a privacy decision cannot apply to some runtimes and not others.
+wrapped in `withSentryConfig`. Both `Sentry.init` calls spread one option
+object, so a privacy decision cannot apply to one runtime and not the other. The
+Edge runtime is deliberately uninstrumented: it runs only the admin routing
+middleware, and monitoring it cost 57% of the edge bundle on every cold start
+for near-zero diagnostic value (ADR 0010).
+
 Reporting is production-only and DSN-gated; with no DSN, `Sentry.init` is never
 called. Tracing, session tracking, and Session Replay are off, every
 `dataCollection` switch is at its narrowest value, and a `beforeSend` pass
@@ -231,15 +235,18 @@ Neon and the external services above. Production environment variables are
 configured in the deployment platform, never committed. DNS, HTTPS, backups,
 monitoring accounts, and final smoke tests belong to Phase 10.
 
-`netlify.toml` publishes the Next.js build output through `@netlify/plugin-nextjs`
-rather than a static export, so server rendering, ISR, on-demand revalidation by
-tag, and the admin area all survive deployment. It deliberately declares no
-security header — those stay owned by `securityHeaders()`, so one source of truth
-applies identically to `next dev`, `next start`, and Netlify — and no cache rule
-for a rendered route, because `Cache-Control` on rendered pages belongs to the
-Next.js runtime and a blanket CDN rule would make on-demand revalidation
-invisible. Only content-hashed output, image-handler output, fonts, generated
-metadata files, and the private admin area carry cache rules.
+`netlify.toml` is deliberately minimal, because Netlify provisions the Next.js
+(OpenNext) adapter automatically and recommends against pinning it. The file
+declares no plugin and no publish directory — the adapter owns the build output
+— and the Node.js version lives in `.node-version`. It declares no security
+header, because those stay owned by `securityHeaders()` so one source of truth
+applies identically to `next dev`, `next start`, and Netlify. It declares no
+cache rule for anything Next.js renders, including the `/sitemap.xml`,
+`/robots.txt`, and `/opengraph-image` metadata routes, which carry their own
+`revalidate`; a CDN rule on those would freeze them and hide on-demand
+revalidation. Only content-hashed build output (`immutable`) and the private
+admin area (`private, no-store`) carry cache rules. See
+[ADR 0010](DECISIONS/0010-netlify-deployment-foundation.md).
 
 ## Internationalization readiness
 
