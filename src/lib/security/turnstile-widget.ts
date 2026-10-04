@@ -57,7 +57,6 @@ export type TurnstileApi = {
   render(container: HTMLElement, options: TurnstileRenderOptions): string | undefined;
   reset(widgetId?: string): void;
   remove(widgetId: string): void;
-  ready(callback: () => void): void;
 };
 
 declare global {
@@ -105,12 +104,11 @@ export function loadTurnstile(): Promise<TurnstileApi> {
     const script = document.createElement("script");
     script.src = TURNSTILE_SCRIPT_URL;
     script.async = true;
-    script.defer = true;
     script.addEventListener(
       "load",
       () => {
         const api = getTurnstile();
-        if (api) api.ready(() => resolve(api));
+        if (api) resolve(api);
         else {
           loading = null;
           reject(new Error("Turnstile loaded without exposing its API"));
