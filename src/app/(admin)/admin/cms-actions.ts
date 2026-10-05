@@ -132,7 +132,7 @@ export async function saveSettingsAction(form: FormData) {
   );
 }
 export async function saveSocialAction(form: FormData) {
-  const actor = await requireUser("/admin/settings");
+  const actor = await requireAdmin("/admin/settings");
   const raw = values(form);
   await run(
     "/admin/settings",
