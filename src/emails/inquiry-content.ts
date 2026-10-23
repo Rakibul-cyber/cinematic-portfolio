@@ -145,26 +145,13 @@ export function buildAdminNotification(
 /**
  * Customer acknowledgment.
  *
- * Confirms receipt and repeats back a short summary so the visitor can see what
- * arrived. It deliberately promises nothing about response times, next steps, or
- * onward notifications: no such commitment is configured anywhere in the system,
- * and inventing one here would be a promise the studio never made.
+ * Confirms receipt without repeating visitor-supplied content. It deliberately
+ * promises nothing about response times, next steps, or onward notifications.
  */
 export function buildCustomerAcknowledgment(
-  inquiry: InquirySnapshot,
+  _inquiry: InquirySnapshot,
   options: { studioName: string },
 ): EmailModel {
-  const summary = fields([
-    ["Project type", inquiry.projectType],
-    ["Service", inquiry.serviceNameSnapshot],
-    [
-      "Preferred date",
-      inquiry.projectDate ? formatProjectDate(inquiry.projectDate) : null,
-    ],
-    ["Location", inquiry.location],
-    ["Sent", formatSubmittedAt(inquiry.createdAt)],
-  ]);
-
   return {
     subject: sanitizeSubject("We received your inquiry"),
     preview: sanitizeSubject(
@@ -172,14 +159,10 @@ export function buildCustomerAcknowledgment(
     ),
     heading: "Thank you for getting in touch",
     intro: [
-      `Hello ${inquiry.nameSnapshot.trim()},`,
-      `Your inquiry has reached ${options.studioName} and will be reviewed. There is nothing further you need to do.`,
+      `Your inquiry has reached ${options.studioName}. This email only confirms receipt.`,
     ],
-    groups: summary.length
-      ? [{ title: "What you sent", fields: summary }]
-      : [],
-    message: { title: "Your message", body: inquiry.message },
-    footNote: "If any detail above looks wrong, simply reply to this email.",
+    groups: [],
+    footNote: "You do not need to send the inquiry again.",
   };
 }
 

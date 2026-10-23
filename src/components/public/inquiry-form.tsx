@@ -31,6 +31,7 @@ export function InquiryForm({ services, turnstileSiteKey }: { services: PublicSe
     <label className="grid gap-2 text-sm">Service<select className="min-h-12 border border-border bg-background px-4" name="serviceSlug"><option value="">Not sure yet</option>{services.map((s)=><option key={s.slug} value={s.slug}>{s.name}</option>)}</select>{error("serviceSlug") ? <span className="text-red-300">{error("serviceSlug")}</span> : null}</label>
     <label className="grid gap-2 text-sm">Message *<textarea aria-invalid={Boolean(error("message"))} className="min-h-40 border border-border bg-background p-4" name="message" required/>{error("message") ? <span className="text-red-300">{error("message")}</span> : null}</label>
     {turnstileSiteKey ? <TurnstileWidget resetSignal={resetSignal} siteKey={turnstileSiteKey}/> : null}
+    <p className="text-xs leading-5 text-muted-foreground">We use your details to handle your inquiry. See our <a className="underline underline-offset-4 hover:text-foreground" href="/privacy">privacy notice</a>.</p>
     <button className="min-h-12 bg-accent px-6 font-semibold text-accent-foreground disabled:opacity-60" disabled={pending || !submissionToken}>{pending ? "Sending…" : "Send inquiry"}</button>
   </form>;
 }

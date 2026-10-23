@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { SocialLinks } from "@/components/public/social-links";
 import { Container } from "@/components/ui/container";
-import { FALLBACK_STUDIO_NAME, navigation } from "@/content/site";
+import { FALLBACK_STUDIO_NAME, legalNavigation, navigation } from "@/content/site";
 import { getActiveSocialLinks, getPublicSiteSettings } from "@/server/public/queries";
 
 /**
@@ -10,8 +10,8 @@ import { getActiveSocialLinks, getPublicSiteSettings } from "@/server/public/que
  *
  * Every fact shown here comes from site settings or active social links; no
  * company, legal, or contact detail is invented. Sections with no data are
- * omitted rather than filled. Legal pages belong to the later GDPR phase and
- * are deliberately not linked yet.
+ * omitted rather than filled. Legal links remain separate from the primary
+ * navigation so they are available without changing the site's main IA.
  */
 export async function SiteFooter() {
   const [settings, socialLinks] = await Promise.all([
@@ -75,6 +75,20 @@ export async function SiteFooter() {
               `© ${new Date().getFullYear()} ${studioName}`}
           </p>
         </div>
+        <nav aria-label="Legal" className="mt-8 border-t border-border pt-6">
+          <ul className="flex flex-wrap gap-x-6 gap-y-2">
+            {legalNavigation.map((item) => (
+              <li key={item.href}>
+                <Link
+                  className="inline-flex min-h-11 items-center text-[0.625rem] tracking-[0.12em] text-muted-foreground uppercase transition-colors hover:text-foreground"
+                  href={item.href}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </Container>
     </footer>
   );

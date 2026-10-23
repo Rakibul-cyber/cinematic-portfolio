@@ -9,9 +9,8 @@ import {
 /**
  * Customer acknowledgment.
  *
- * Confirms receipt and echoes the submission back. It makes no commitment about
- * response time or next steps, because none is configured anywhere in the
- * system and the studio has not made one.
+ * Confirms receipt without repeating visitor-supplied inquiry data. It makes
+ * no commitment about response time or next steps.
  */
 export function InquiryCustomerEmail({
   inquiry,

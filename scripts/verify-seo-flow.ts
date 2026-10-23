@@ -48,6 +48,10 @@ const PAGE_FILES: { file: string; path: string }[] = [
   { file: "src/app/(public)/services/page.tsx", path: "/services" },
   { file: "src/app/(public)/about/page.tsx", path: "/about" },
   { file: "src/app/(public)/contact/page.tsx", path: "/contact" },
+  { file: "src/app/(public)/impressum/page.tsx", path: "/impressum" },
+  { file: "src/app/(public)/legal-notice/page.tsx", path: "/legal-notice" },
+  { file: "src/app/(public)/datenschutz/page.tsx", path: "/datenschutz" },
+  { file: "src/app/(public)/privacy/page.tsx", path: "/privacy" },
 ];
 
 function section(name: string): void {

@@ -20,6 +20,14 @@ export const navigation: readonly NavigationItem[] = [
   { label: "Contact", href: "/contact" },
 ];
 
+/** Legal routes stay in the footer and never enter the primary navigation. */
+export const legalNavigation: readonly NavigationItem[] = [
+  { label: "Impressum", href: "/impressum" },
+  { label: "Legal notice", href: "/legal-notice" },
+  { label: "Datenschutz", href: "/datenschutz" },
+  { label: "Privacy", href: "/privacy" },
+];
+
 /**
  * Used only until an administrator saves the studio name in site settings. It
  * is intentionally generic rather than a plausible-looking studio identity.

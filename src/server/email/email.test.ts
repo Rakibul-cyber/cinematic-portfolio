@@ -251,15 +251,24 @@ describe("email content", () => {
     assert.ok(!text.includes("Location:"));
   });
 
-  it("acknowledges the customer without promising a response time", () => {
+  it("acknowledges receipt without repeating inquiry data or promising a response time", () => {
     const model = buildCustomerAcknowledgment(inquiry, {
       studioName: "Example Studio",
     });
     const text = toPlainText(model);
 
     assert.equal(model.subject, "We received your inquiry");
-    assert.ok(text.includes("Hello Jane Smith,"));
     assert.ok(text.includes("Example Studio"));
+    for (const supplied of [
+      inquiry.nameSnapshot,
+      inquiry.emailSnapshot,
+      inquiry.phoneSnapshot!,
+      inquiry.projectType,
+      inquiry.location!,
+      inquiry.message,
+    ]) {
+      assert.ok(!text.includes(supplied), `receipt repeated ${supplied}`);
+    }
     // No commitment the business has not actually made.
     assert.ok(!/24 hours|business day|within \d/i.test(text));
     // No internal CRM vocabulary leaks to the visitor.
@@ -300,8 +309,9 @@ describe("email content", () => {
     const text = toPlainText(
       buildCustomerAcknowledgment(inquiry, { studioName: "Example Studio" }),
     );
-    assert.ok(text.includes("WHAT YOU SENT"));
-    assert.ok(text.includes("YOUR MESSAGE"));
+    assert.ok(text.includes("Thank you for getting in touch"));
+    assert.ok(text.includes("This email only confirms receipt."));
+    assert.ok(text.includes("You do not need to send the inquiry again."));
     assert.ok(text.trim().length > 80);
   });
 });

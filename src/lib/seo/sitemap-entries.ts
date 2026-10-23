@@ -44,6 +44,10 @@ const STATIC_ROUTE_HINTS: Record<
   "/services": { changeFrequency: "monthly", priority: 0.7 },
   "/about": { changeFrequency: "monthly", priority: 0.6 },
   "/contact": { changeFrequency: "yearly", priority: 0.5 },
+  "/impressum": { changeFrequency: "yearly", priority: 0.2 },
+  "/legal-notice": { changeFrequency: "yearly", priority: 0.2 },
+  "/datenschutz": { changeFrequency: "yearly", priority: 0.2 },
+  "/privacy": { changeFrequency: "yearly", priority: 0.2 },
 };
 
 /**

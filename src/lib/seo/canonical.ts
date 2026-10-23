@@ -11,7 +11,17 @@
  */
 
 /** Paths the public site advertises. Kept here so sitemap and canonical agree. */
-export const PUBLIC_ROUTES = ["/", "/work", "/services", "/about", "/contact"] as const;
+export const PUBLIC_ROUTES = [
+  "/",
+  "/work",
+  "/services",
+  "/about",
+  "/contact",
+  "/impressum",
+  "/legal-notice",
+  "/datenschutz",
+  "/privacy",
+] as const;
 
 /** Absolute path of the generated fallback share image. */
 export const OG_FALLBACK_PATH = "/opengraph-image";

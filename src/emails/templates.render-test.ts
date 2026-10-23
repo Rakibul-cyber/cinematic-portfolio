@@ -79,7 +79,7 @@ describe("admin notification template", () => {
 });
 
 describe("customer acknowledgment template", () => {
-  it("renders an acknowledgment addressed to the visitor", async () => {
+  it("renders a generic receipt without visitor-supplied details", async () => {
     const element = React.createElement(InquiryCustomerEmail, {
       inquiry: { ...hostile, nameSnapshot: "Jane Smith" },
       studioName: "Example Studio",
@@ -88,9 +88,18 @@ describe("customer acknowledgment template", () => {
     const text = await render(element, { plainText: true });
 
     assert.ok(html.includes("Thank you for getting in touch"));
-    assert.ok(html.includes("Jane Smith"));
     assert.ok(html.includes("Example Studio"));
-    assert.ok(text.includes("Hello Jane Smith,"));
+    for (const supplied of [
+      "Jane Smith",
+      hostile.emailSnapshot,
+      hostile.phoneSnapshot!,
+      hostile.projectType,
+      hostile.location!,
+      hostile.message,
+    ]) {
+      assert.ok(!html.includes(supplied), `HTML repeated ${supplied}`);
+      assert.ok(!text.includes(supplied), `plain text repeated ${supplied}`);
+    }
   });
 
   it("carries no tracking pixel, script, or remote font", async () => {
