@@ -11,6 +11,8 @@ import type {
   socialSchema,
   testimonialSchema,
 } from "@/lib/validation/cms";
+import { projectMediaRows } from "@/lib/cms/project-media";
+import { nextProjectVersion } from "@/lib/cms/project-version";
 import { AuditAction, recordAuditLog } from "@/server/audit/audit-log";
 import type { AdminUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
@@ -18,6 +20,7 @@ import { prisma } from "@/server/db/prisma";
 type Input<T extends z.ZodType> = z.infer<T>;
 export class SlugConflictError extends Error {}
 export class ReferencedCategoryError extends Error {}
+export class ProjectConflictError extends Error {}
 
 async function audit(
   actor: AdminUser,
@@ -162,23 +165,39 @@ export async function saveProject(
   actor: AdminUser,
 ) {
   try {
-    const { id, mediaIds, ...fields } = data;
+    const { id, expectedUpdatedAt, mediaIds, ...fields } = data;
     const publishedAt = fields.status === "PUBLISHED" ? new Date() : null;
     const row = await prisma.$transaction(async (tx) => {
-      const project = id
-        ? await tx.project.update({
-            where: { id },
-            data: { ...fields, publishedAt },
-          })
-        : await tx.project.create({ data: { ...fields, publishedAt } });
+      let project;
+
+      if (id) {
+        if (!expectedUpdatedAt) {
+          throw new ProjectConflictError("Reload the project before saving.");
+        }
+        const updated = await tx.project.updateMany({
+          where: { id, updatedAt: expectedUpdatedAt },
+          data: {
+            ...fields,
+            publishedAt,
+            updatedAt: nextProjectVersion(expectedUpdatedAt),
+          },
+        });
+        if (updated.count !== 1) {
+          throw new ProjectConflictError(
+            "This project changed in another session. Reload it before saving.",
+          );
+        }
+        project = await tx.project.findUniqueOrThrow({ where: { id } });
+      } else {
+        project = await tx.project.create({ data: { ...fields, publishedAt } });
+      }
+
       await tx.projectMedia.deleteMany({ where: { projectId: project.id } });
       if (mediaIds.length)
         await tx.projectMedia.createMany({
-          data: mediaIds.map((mediaId, index) => ({
+          data: projectMediaRows(mediaIds).map((item) => ({
             projectId: project.id,
-            mediaId,
-            sortOrder: index,
-            role: index === 0 ? "COVER" : "GALLERY",
+            ...item,
           })),
         });
       return project;

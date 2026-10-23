@@ -28,6 +28,7 @@ import {
   saveSettings,
   saveSocial,
   saveTestimonial,
+  ProjectConflictError,
   SlugConflictError,
 } from "@/server/cms/service";
 
@@ -38,6 +39,8 @@ function fail(path: string, error: unknown): never {
   const message =
     error instanceof SlugConflictError
       ? error.message
+      : error instanceof ProjectConflictError
+        ? error.message
       : error instanceof z.ZodError
         ? (error.issues[0]?.message ?? "Check the form fields.")
         : "The change could not be saved.";

@@ -156,6 +156,7 @@ export const socialSchema = z.object({
 });
 export const projectSchema = z.object({
   id: z.string().uuid().optional(),
+  expectedUpdatedAt: z.coerce.date().optional(),
   title: z.string().trim().min(1).max(160),
   slug,
   summary: z.string().trim().min(1).max(500),
@@ -175,6 +176,22 @@ export const projectSchema = z.object({
   videoId: videoIdentifier,
   videoTitle,
   mediaIds: z.array(z.string().uuid()).default([]),
-}).superRefine((value, ctx) =>
-  checkVideoPair(value.videoProvider, value.videoId, ctx, "videoId"),
-);
+}).superRefine((value, ctx) => {
+  checkVideoPair(value.videoProvider, value.videoId, ctx, "videoId");
+
+  if (value.id && !value.expectedUpdatedAt) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["expectedUpdatedAt"],
+      message: "Reload the project before saving.",
+    });
+  }
+
+  if (new Set(value.mediaIds).size !== value.mediaIds.length) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["mediaIds"],
+      message: "A media item can only be attached once.",
+    });
+  }
+});

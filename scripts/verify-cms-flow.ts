@@ -21,6 +21,7 @@ import {
   saveSettings,
   saveSocial,
   saveTestimonial,
+  ProjectConflictError,
   SlugConflictError,
 } from "@/server/cms/service";
 import { prisma } from "@/server/db/prisma";
@@ -44,6 +45,7 @@ async function main() {
   let categoryId = "",
     projectId = "",
     mediaId = "",
+    raceMediaId = "",
     serviceId = "",
     testimonialId = "",
     socialId = "";
@@ -106,29 +108,100 @@ async function main() {
       actor,
     );
     projectId = project.id;
-    await saveProject(
-      projectSchema.parse({
-        id: projectId,
-        title: "Updated project",
-        slug: `project-${token}`,
-        summary: "Summary",
-        description: "Description",
-        clientName: "",
-        location: "",
-        projectDate: "",
-        categoryId,
-        status: "PUBLISHED",
-        featured: true,
-        sortOrder: 1,
-        seoTitle: "",
-        seoDescription: "",
-        mediaIds: [mediaId],
-      }),
-      actor,
-    );
+    const projectUpdate = {
+      id: projectId,
+      expectedUpdatedAt: project.updatedAt,
+      title: "Updated project",
+      slug: `project-${token}`,
+      summary: "Summary",
+      description: "Description",
+      clientName: "",
+      location: "",
+      projectDate: "",
+      categoryId,
+      status: "PUBLISHED",
+      featured: true,
+      sortOrder: 1,
+      seoTitle: "",
+      seoDescription: "",
+      mediaIds: [mediaId],
+    };
+    await saveProject(projectSchema.parse(projectUpdate), actor);
     assert.equal(
       (await prisma.project.findUnique({ where: { id: projectId } }))?.status,
       "PUBLISHED",
+    );
+    // A media-only edit carrying the now-stale version must not land.
+    await assert.rejects(
+      () =>
+        saveProject(projectSchema.parse({ ...projectUpdate, mediaIds: [] }), actor),
+      ProjectConflictError,
+    );
+    assert.equal(
+      await prisma.projectMedia.count({ where: { projectId } }),
+      1,
+    );
+    // Two saves racing on one version: exactly one may land, whichever it is.
+    // Both keep `mediaId` attached so the in-use check below stays meaningful.
+    const raceMedia = await prisma.media.create({
+      data: {
+        originalName: "verification-race.webp",
+        mimeType: "image/webp",
+        sizeBytes: 1,
+        width: 1,
+        height: 1,
+        bucket: "verification",
+        objectKey: `verification/${token}-race.webp`,
+        createdByUserId: actor.id,
+      },
+    });
+    raceMediaId = raceMedia.id;
+    const { updatedAt: raceVersion } = await prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      select: { updatedAt: true },
+    });
+    const contenders = [
+      { title: "Race A", mediaIds: [mediaId, raceMediaId] },
+      { title: "Race B", mediaIds: [raceMediaId, mediaId] },
+    ];
+    const outcomes = await Promise.allSettled(
+      contenders.map((contender) =>
+        saveProject(
+          projectSchema.parse({
+            ...projectUpdate,
+            ...contender,
+            expectedUpdatedAt: raceVersion,
+          }),
+          actor,
+        ),
+      ),
+    );
+    const winners = outcomes.flatMap((outcome, index) =>
+      outcome.status === "fulfilled" ? [contenders[index]] : [],
+    );
+    const losers = outcomes.flatMap((outcome) =>
+      outcome.status === "rejected" ? [outcome.reason] : [],
+    );
+    assert.equal(winners.length, 1);
+    assert.equal(losers.length, 1);
+    assert.ok(losers[0] instanceof ProjectConflictError);
+    const raced = await prisma.project.findUniqueOrThrow({
+      where: { id: projectId },
+      include: { media: { orderBy: { sortOrder: "asc" } } },
+    });
+    assert.equal(raced.title, winners[0].title);
+    assert.ok(raced.updatedAt.getTime() > raceVersion.getTime());
+    assert.deepEqual(
+      raced.media.map(({ mediaId, sortOrder, role }) => ({
+        mediaId,
+        sortOrder,
+        role,
+      })),
+      winners[0].mediaIds.map((id, index) => ({
+        mediaId: id,
+        sortOrder: index,
+        role: index === 0 ? "COVER" : "GALLERY",
+      })),
     );
     await assert.rejects(() => deleteMedia(mediaId, actor), MediaInUseError);
     const service = await saveService(
@@ -242,6 +315,8 @@ async function main() {
     if (projectId)
       await prisma.project.deleteMany({ where: { id: projectId } });
     if (mediaId) await prisma.media.deleteMany({ where: { id: mediaId } });
+    if (raceMediaId)
+      await prisma.media.deleteMany({ where: { id: raceMediaId } });
     if (categoryId)
       await prisma.portfolioCategory.deleteMany({ where: { id: categoryId } });
     if (serviceId)

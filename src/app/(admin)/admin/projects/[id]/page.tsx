@@ -3,6 +3,7 @@ import { AdminShell, Notice } from "@/components/admin/admin-shell";
 import { ProjectForm } from "@/components/admin/project-form";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
+import { mergeProjectMediaOptions } from "@/lib/cms/project-media";
 export const dynamic = "force-dynamic";
 export default async function Page({
   params,
@@ -17,7 +18,15 @@ export default async function Page({
     prisma.project.findUnique({
       where: { id },
       include: {
-        media: { orderBy: { sortOrder: "asc" }, select: { mediaId: true } },
+        media: {
+          orderBy: { sortOrder: "asc" },
+          select: {
+            mediaId: true,
+            media: {
+              select: { id: true, originalName: true, altText: true },
+            },
+          },
+        },
       },
     }),
     prisma.portfolioCategory.findMany({
@@ -31,11 +40,19 @@ export default async function Page({
     }),
   ]);
   if (!project) notFound();
+  const mediaOptions = mergeProjectMediaOptions(
+    project.media.map((item) => item.media),
+    media,
+  );
   const { error } = await searchParams;
   return (
     <AdminShell user={user} title="Edit project">
       <Notice message={error} />
-      <ProjectForm project={project} categories={categories} media={media} />
+      <ProjectForm
+        project={project}
+        categories={categories}
+        media={mediaOptions}
+      />
     </AdminShell>
   );
 }

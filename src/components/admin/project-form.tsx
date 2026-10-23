@@ -4,6 +4,7 @@ import {
   buttonClass,
   inputClass,
 } from "@/components/admin/admin-shell";
+import { ProjectMediaPicker } from "@/components/admin/project-media-picker";
 type Category = { id: string; name: string };
 type Media = { id: string; originalName: string; altText: string | null };
 type Project = {
@@ -24,6 +25,7 @@ type Project = {
   videoProvider: "YOUTUBE" | "VIMEO" | "EXTERNAL" | null;
   videoId: string | null;
   videoTitle: string | null;
+  updatedAt: Date;
   media: { mediaId: string }[];
 };
 export function ProjectForm({
@@ -35,10 +37,17 @@ export function ProjectForm({
   categories: Category[];
   media: Media[];
 }) {
-  const selected = new Set(project?.media.map((m) => m.mediaId));
+  const selectedMediaIds = project?.media.map((item) => item.mediaId) ?? [];
   return (
     <form action={saveProjectAction} className="grid gap-4">
       {project && <input type="hidden" name="id" value={project.id} />}
+      {project && (
+        <input
+          type="hidden"
+          name="expectedUpdatedAt"
+          value={project.updatedAt.toISOString()}
+        />
+      )}
       <label>
         Title
         <input
@@ -201,29 +210,10 @@ export function ProjectForm({
           />
         </label>
       </fieldset>
-      <fieldset className="grid gap-2 border border-border p-4">
-        <legend>Project media</legend>
-        <p className="text-sm text-muted-foreground">
-          Selected media is ordered as shown; the first selection is the cover.
-        </p>
-        {media.length ? (
-          media.map((m) => (
-            <label key={m.id} className="flex gap-2">
-              <input
-                type="checkbox"
-                name="mediaIds"
-                value={m.id}
-                defaultChecked={selected.has(m.id)}
-              />
-              <span>
-                {m.originalName} · {m.altText || "alt text missing"}
-              </span>
-            </label>
-          ))
-        ) : (
-          <p>No media available. Upload media first.</p>
-        )}
-      </fieldset>
+      <ProjectMediaPicker
+        initialMediaIds={selectedMediaIds}
+        media={media}
+      />
       <button className={buttonClass}>Save project</button>
     </form>
   );
