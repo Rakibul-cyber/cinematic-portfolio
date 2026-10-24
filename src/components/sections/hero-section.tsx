@@ -14,6 +14,8 @@ type HeroSectionProps = {
   settings: PublicSiteSettings | null;
   /** Featured project supplying the hero image, when one exists. */
   hero: PublicProjectSummary | null;
+  /** False when the grid is empty, so the scroll link has no target. */
+  hasSelectedWork?: boolean;
 };
 
 /**
@@ -27,7 +29,11 @@ type HeroSectionProps = {
  * Wording comes from site settings. With no settings saved the section still
  * renders a composed, typographic hero rather than placeholder studio copy.
  */
-export function HeroSection({ hero, settings }: HeroSectionProps) {
+export function HeroSection({
+  hasSelectedWork = true,
+  hero,
+  settings,
+}: HeroSectionProps) {
   const studioName = settings?.studioName ?? FALLBACK_STUDIO_NAME;
   const headline = settings?.tagline ?? studioName;
 
@@ -85,13 +91,15 @@ export function HeroSection({ hero, settings }: HeroSectionProps) {
         ) : null}
 
         <p className="self-end lg:col-span-4 lg:row-start-2">
-          <a
-            className="hidden min-h-12 items-center gap-3 text-[0.625rem] tracking-[0.16em] text-muted-foreground uppercase transition-colors hover:text-foreground lg:inline-flex"
-            href="#selected-work"
-          >
-            <ArrowDown aria-hidden="true" size={15} strokeWidth={1.5} />
-            Scroll to selected work
-          </a>
+          {hasSelectedWork ? (
+            <a
+              className="hidden min-h-12 items-center gap-3 text-[0.625rem] tracking-[0.16em] text-muted-foreground uppercase transition-colors hover:text-foreground lg:inline-flex"
+              href="#selected-work"
+            >
+              <ArrowDown aria-hidden="true" size={15} strokeWidth={1.5} />
+              Scroll to selected work
+            </a>
+          ) : null}
         </p>
       </Container>
     </section>

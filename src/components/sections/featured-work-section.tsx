@@ -6,10 +6,18 @@ import { Container } from "@/components/ui/container";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { sectionLabels } from "@/content/site";
 import { cn } from "@/lib/utils";
+import {
+  featuredWorkTitle,
+  type HomepageWorkSource,
+} from "@/server/public/homepage";
 import type { PublicProjectSummary } from "@/server/public/view-models";
 
 type FeaturedWorkSectionProps = {
   projects: readonly PublicProjectSummary[];
+  /** Where the projects came from, so the heading can describe them. */
+  source: HomepageWorkSource;
+  /** True when the hero already shows the first selected project. */
+  heroShown: boolean;
 };
 
 /**
@@ -22,7 +30,11 @@ type FeaturedWorkSectionProps = {
  * The first card is wide and the rest alternate, which keeps the editorial
  * rhythm without any per-project layout field in the CMS.
  */
-export function FeaturedWorkSection({ projects }: FeaturedWorkSectionProps) {
+export function FeaturedWorkSection({
+  heroShown,
+  projects,
+  source,
+}: FeaturedWorkSectionProps) {
   if (projects.length === 0) return null;
 
   return (
@@ -37,7 +49,7 @@ export function FeaturedWorkSection({ projects }: FeaturedWorkSectionProps) {
             <SectionHeading
               className="lg:col-span-8"
               eyebrow={sectionLabels.selectedWork}
-              title="Recent projects"
+              title={featuredWorkTitle(source, heroShown)}
               titleId="featured-work-title"
             />
             <Link

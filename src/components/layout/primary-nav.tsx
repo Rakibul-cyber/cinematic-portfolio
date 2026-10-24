@@ -4,12 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { navigation } from "@/content/site";
+import { isCurrentSection } from "@/lib/public/navigation";
 import { cn } from "@/lib/utils";
-
-/** True for the section's own page and anything nested under it. */
-export function isCurrentSection(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
 
 /**
  * Desktop primary navigation.

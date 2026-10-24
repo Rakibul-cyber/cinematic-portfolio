@@ -1,5 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 
+import type { UnconfirmedCause } from "@/lib/public/inquiry-form";
+
 /**
  * The application's reporting call site for React error boundaries.
  *
@@ -27,4 +29,21 @@ export function reportBoundaryError(
   if (error.digest) return;
 
   Sentry.captureException(error, { tags: { boundary } });
+}
+
+/**
+ * The reporting call site for an inquiry submission the browser could not
+ * confirm (see `withUnconfirmedRecovery`). The visitor is shown recovery
+ * copy, never this error; it goes to the console and the error tracker only.
+ *
+ * Logged by message or digest, as the boundaries do, never with the form or
+ * its values. The digest rule is the same: a server error the browser sees
+ * with a digest was already captured by `onRequestError`.
+ */
+export function reportUnconfirmedSubmission(error: unknown, cause: UnconfirmedCause): void {
+  const digest = error instanceof Error && "digest" in error && typeof error.digest === "string" ? error.digest : undefined;
+  console.error(`[inquiry] Submission unconfirmed (${cause}):`, digest ?? (error instanceof Error ? error.message : String(error)));
+  if (digest) return;
+
+  Sentry.captureException(error, { tags: { boundary: "inquiry", cause } });
 }

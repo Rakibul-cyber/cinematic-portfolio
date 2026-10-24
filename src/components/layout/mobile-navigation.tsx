@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 
 import { navigation } from "@/content/site";
+import { isCurrentSection } from "@/lib/public/navigation";
+import { cn } from "@/lib/utils";
 
 /**
  * Mobile primary navigation.
@@ -92,25 +94,32 @@ export function MobileNavigation({ tagline }: { tagline: string | null }) {
             className="flex h-full flex-col justify-between px-5 py-10 sm:px-8"
           >
             <ul className="space-y-1">
-              {navigation.map((item, index) => (
-                <li key={item.href}>
-                  <Link
-                    aria-current={pathname === item.href ? "page" : undefined}
-                    className="flex min-h-16 items-center justify-between border-b border-border font-display text-4xl tracking-[-0.02em] transition-colors hover:text-accent"
-                    href={item.href}
-                    onClick={() => setIsOpen(false)}
-                    ref={index === 0 ? firstLinkRef : undefined}
-                  >
-                    {item.label}
-                    <span
-                      aria-hidden="true"
-                      className="font-sans text-[0.625rem] tracking-[0.16em] text-muted-foreground"
+              {navigation.map((item, index) => {
+                const isCurrent = isCurrentSection(pathname, item.href);
+
+                return (
+                  <li key={item.href}>
+                    <Link
+                      aria-current={isCurrent ? "page" : undefined}
+                      className={cn(
+                        "flex min-h-16 items-center justify-between border-b border-border font-display text-4xl tracking-[-0.02em] transition-colors hover:text-accent",
+                        isCurrent && "text-accent",
+                      )}
+                      href={item.href}
+                      onClick={() => setIsOpen(false)}
+                      ref={index === 0 ? firstLinkRef : undefined}
                     >
-                      0{index + 1}
-                    </span>
-                  </Link>
-                </li>
-              ))}
+                      {item.label}
+                      <span
+                        aria-hidden="true"
+                        className="font-sans text-[0.625rem] tracking-[0.16em] text-muted-foreground"
+                      >
+                        0{index + 1}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
             {tagline ? (
               <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase">

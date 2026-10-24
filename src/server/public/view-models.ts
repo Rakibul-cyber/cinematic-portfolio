@@ -1,5 +1,6 @@
 import type { PublicImage } from "@/lib/public/image-source";
 import type { VideoRef } from "@/lib/video";
+import type { HomepageWorkSource } from "@/server/public/homepage";
 
 /**
  * Public view models.
@@ -86,7 +87,12 @@ export type PublicPageContent = {
 export type HomepageContent = {
   settings: PublicSiteSettings | null;
   hero: PublicProjectSummary | null;
+  /** Grid projects, never repeating the project the hero displays. */
   featured: PublicProjectSummary[];
+  /** True when the hero displays a project, so the grid continues from it. */
+  heroShown: boolean;
+  /** Whether the grid holds flagged featured work or the published fallback. */
+  workSource: HomepageWorkSource;
   services: PublicService[];
   testimonials: PublicTestimonial[];
   about: PublicPageContent | null;

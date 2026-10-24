@@ -9,6 +9,8 @@
   --surface: #171715;
   --surface-strong: #1d1c19;
   --border: #34322e;
+  /* Form control boundary: 3.6:1 on --background (WCAG 1.4.11). */
+  --input: #706b62;
   --accent: #a58a69;
   --accent-foreground: #0f0f0e;
   --visual-ink: #151719;
@@ -27,6 +29,7 @@
   --color-surface: var(--surface);
   --color-surface-strong: var(--surface-strong);
   --color-border: var(--border);
+  --color-input: var(--input);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --font-sans: var(--font-sans-source);

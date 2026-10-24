@@ -6,6 +6,11 @@ import { prisma } from "@/server/db/prisma";
 import { isPublicMediaConfigured, publicMediaUrl } from "@/server/media/delivery";
 import { ALL_PUBLIC_TAGS, PUBLIC_REVALIDATE_SECONDS, PublicTag } from "@/server/public/cache-tags";
 import {
+  arrangeHomepageWork,
+  HOMEPAGE_FALLBACK_LIMIT,
+  HOMEPAGE_GRID_LIMIT,
+} from "@/server/public/homepage";
+import {
   toProjectDetail,
   toProjectSummary,
   toPublicPage,
@@ -338,7 +343,10 @@ export const getHomepageContent = unstable_cache(
     const [settings, featured, services, testimonials, about] =
       await Promise.all([
         getPublicSiteSettings(),
-        getPublishedProjects({ featuredOnly: true, take: 6 }),
+        getPublishedProjects({
+          featuredOnly: true,
+          take: HOMEPAGE_GRID_LIMIT + 1,
+        }),
         getActiveServices({ take: 4 }),
         getActiveTestimonials({ take: 2 }),
         getPublicPage("about"),
@@ -346,14 +354,22 @@ export const getHomepageContent = unstable_cache(
 
     // Fall back to the newest published work when nothing is flagged featured,
     // so a populated CMS never renders an empty homepage.
-    const selected = featured.length
-      ? featured
-      : await getPublishedProjects({ take: 3 });
+    // One extra project is fetched in each case so that, once the hero takes
+    // the first, the grid still holds its full count.
+    const work = featured.length
+      ? arrangeHomepageWork(featured, "featured", HOMEPAGE_GRID_LIMIT)
+      : arrangeHomepageWork(
+          await getPublishedProjects({ take: HOMEPAGE_FALLBACK_LIMIT + 1 }),
+          "published",
+          HOMEPAGE_FALLBACK_LIMIT,
+        );
 
     return {
       settings,
-      hero: selected.at(0) ?? null,
-      featured: selected,
+      hero: work.hero,
+      featured: work.featured,
+      heroShown: work.heroShown,
+      workSource: work.source,
       services,
       testimonials,
       about,

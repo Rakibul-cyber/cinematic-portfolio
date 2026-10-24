@@ -31,13 +31,29 @@ export function generateMetadata(): Promise<Metadata> {
  * do not each become a separate uncached round trip.
  */
 export default async function HomePage() {
-  const { about, featured, hero, services, settings, testimonials } =
-    await getHomepageContent();
+  const {
+    about,
+    featured,
+    hero,
+    heroShown,
+    services,
+    settings,
+    testimonials,
+    workSource,
+  } = await getHomepageContent();
 
   return (
     <main id="main-content">
-      <HeroSection hero={hero} settings={settings} />
-      <FeaturedWorkSection projects={featured} />
+      <HeroSection
+        hasSelectedWork={featured.length > 0}
+        hero={hero}
+        settings={settings}
+      />
+      <FeaturedWorkSection
+        heroShown={heroShown}
+        projects={featured}
+        source={workSource}
+      />
       <ShowreelSection
         showreel={settings?.showreel ?? null}
         studioName={settings?.studioName ?? FALLBACK_STUDIO_NAME}

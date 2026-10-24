@@ -87,11 +87,10 @@ describe("submission token issuance", () => {
 });
 
 describe("inquiry form token wiring", () => {
-  // The form itself cannot be rendered here: it imports the server action,
-  // which reaches `server-only` and refuses to load outside the react-server
-  // condition. These assert the three lines that connect it to the contract
-  // proven above.
-  const source = () => readFile("src/components/public/inquiry-form.tsx", "utf8");
+  // These assert the three lines that connect the form to the contract
+  // proven above. The form's body lives in `InquiryFormView`; the mounted
+  // form is exercised in `src/components/public/inquiry-form.render-test.ts`.
+  const source = () => readFile("src/components/public/inquiry-form-view.tsx", "utf8");
 
   it("never generates a token during rendering", async () => {
     const text = await source();
