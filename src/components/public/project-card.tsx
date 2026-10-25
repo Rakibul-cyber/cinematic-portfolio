@@ -10,6 +10,8 @@ type ProjectCardProps = {
   layout?: "wide" | "portrait";
   className?: string;
   priority?: boolean;
+  /** Outline level of the title: 3 under a section heading, 2 directly under the page h1. */
+  headingLevel?: 2 | 3;
 };
 
 const RATIO = {
@@ -25,10 +27,13 @@ const RATIO = {
  */
 export function ProjectCard({
   className,
+  headingLevel = 3,
   layout = "portrait",
   priority = false,
   project,
 }: ProjectCardProps) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
+
   return (
     <article className={cn("work-card group", className)}>
       <Link className="block focus-visible:outline-offset-8" href={`/work/${project.slug}`}>
@@ -53,9 +58,9 @@ export function ProjectCard({
 
         <div className="mt-5 flex items-start justify-between gap-6 border-t border-border pt-4">
           <div>
-            <h3 className="font-display text-2xl font-medium transition-colors group-hover:text-accent sm:text-3xl">
+            <Heading className="font-display text-2xl font-medium transition-colors group-hover:text-accent sm:text-3xl">
               {project.title}
-            </h3>
+            </Heading>
             <p className="mt-1 text-xs text-muted-foreground">
               {project.category.name}
             </p>

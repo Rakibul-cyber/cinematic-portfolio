@@ -33,13 +33,17 @@ export function securityHeaders(env: Record<string, string | undefined>) {
   const connectOrigins = [analyticsOrigin, monitoringOrigin].filter(
     (value): value is string => Boolean(value),
   );
+  // `next dev` only: React Refresh, webpack's eval source maps and React's dev
+  // call stacks evaluate strings, so without this no page hydrates locally.
+  // Production bundles never use eval and never receive it.
+  const devEval = env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
   const directives = [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    `script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${analyticsOrigin ? ` ${analyticsOrigin}` : ""}`,
+    `script-src 'self' 'unsafe-inline'${devEval} https://challenges.cloudflare.com${analyticsOrigin ? ` ${analyticsOrigin}` : ""}`,
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data:${imageOrigin ? ` ${imageOrigin}` : ""}`,
     "font-src 'self'",

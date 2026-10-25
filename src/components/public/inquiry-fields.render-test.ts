@@ -78,6 +78,10 @@ describe("inquiry field markup", () => {
     }
   });
 
+  it("keeps a field at its own height beside a taller neighbour", () => {
+    assert.match(render(React.createElement(InquiryInput, { field: emailField })), /^<div class="grid content-start /);
+  });
+
   it("gives invalid controls a visible boundary change", () => {
     const html = render(React.createElement(InquiryInput, { field: emailField }));
     assert.match(html, /border-input/);
@@ -199,5 +203,23 @@ describe("form control boundary contrast", () => {
     for (const surface of ["background", "surface", "surface-strong"]) {
       assert.ok(contrast(token("input"), token(surface)) >= 3, `--input on --${surface}`);
     }
+  });
+
+  // The token above only matters if `border-input` reaches the control. An
+  // unlayered element rule (such as `* { border-color }`) beats every Tailwind
+  // utility regardless of specificity, which once rendered these borders at
+  // 1.5:1 while this file still passed. Outside `@layer`, `@theme` and `@media`
+  // blocks, only `:root` and class selectors may appear.
+  it("keeps element defaults in a layer, so utilities can override them", () => {
+    let depth = 0;
+    let top = "";
+    for (const char of css.replace(/\/\*[\s\S]*?\*\//g, "")) {
+      if (char === "{") depth++;
+      if (depth === 0) top += char;
+      if (char === "}") { depth--; if (depth === 0) top += "{}"; }
+    }
+    const selectors = top.split("{}").map((part) => part.replace(/@import[^;]*;/g, "").trim()).filter(Boolean);
+    const offending = selectors.filter((selector) => !selector.startsWith("@") && selector.split(",").some((s) => { const t = s.trim(); return t !== ":root" && !t.startsWith("."); }));
+    assert.deepEqual(offending, []);
   });
 });

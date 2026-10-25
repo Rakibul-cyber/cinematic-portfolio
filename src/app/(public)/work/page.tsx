@@ -87,6 +87,7 @@ export default async function WorkPage({ searchParams }: WorkPageProps) {
                   key={project.slug}
                 >
                   <ProjectCard
+                    headingLevel={2}
                     layout={isWide ? "wide" : "portrait"}
                     priority={index === 0}
                     project={project}

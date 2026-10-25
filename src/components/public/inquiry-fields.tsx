@@ -55,11 +55,13 @@ function controlProps(name: string, error?: string) {
 
 /**
  * Label, control, and error kept as siblings: an error inside the `<label>`
- * would become part of the field's accessible name.
+ * would become part of the field's accessible name. `content-start` keeps the
+ * rows at their own height when a neighbouring column's error makes the grid
+ * row taller, instead of stretching this field's control to match.
  */
 function FieldShell({ children, error, field }: { children: ReactNode; error?: string; field: InquiryFieldConfig }) {
   return (
-    <div className="grid gap-2 text-sm">
+    <div className="grid content-start gap-2 text-sm">
       <label htmlFor={inquiryFieldId(field.name)}>
         {field.label}
         {field.required ? <span aria-hidden="true"> *</span> : null}

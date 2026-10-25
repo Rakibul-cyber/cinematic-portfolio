@@ -28,6 +28,15 @@ describe("security headers", () => {
     assert.ok(headers.some((header) => header.key === "Strict-Transport-Security"));
   });
 
+  it("allows eval only for the development server, which cannot hydrate without it", () => {
+    const scriptSrc = (env: Record<string, string | undefined>) =>
+      securityHeaders(env).find((header) => header.key === "Content-Security-Policy")!.value.split("; ").find((part) => part.startsWith("script-src"))!;
+    assert.equal(scriptSrc({ NODE_ENV: "development" }), "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com");
+    for (const env of [{ NODE_ENV: "production" }, { NODE_ENV: "test" }, {}]) {
+      assert.equal(scriptSrc(env), "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com", JSON.stringify(env));
+    }
+  });
+
   it("does not apply HSTS or insecure-request upgrades in development", () => {
     const headers = securityHeaders({ NODE_ENV: "development" });
     assert.ok(!headers.some((header) => header.key === "Strict-Transport-Security"));

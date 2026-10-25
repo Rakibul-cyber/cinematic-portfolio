@@ -36,49 +36,58 @@
   --font-display: var(--font-display-source);
 }
 
-* {
-  box-sizing: border-box;
-  border-color: var(--border);
-}
+/*
+ * Element defaults live in the base layer. Tailwind v4 emits utilities in
+ * `@layer utilities`, and any unlayered rule beats every layered one whatever
+ * its specificity, so these selectors left unlayered silently overrode
+ * utilities such as `border-input`, `text-accent-foreground` and
+ * `font-semibold`.
+ */
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
 
-html {
-  min-width: 20rem;
-  scroll-behavior: smooth;
-  background: var(--background);
-}
+  html {
+    min-width: 20rem;
+    scroll-behavior: smooth;
+    background: var(--background);
+  }
 
-body {
-  min-height: 100vh;
-  margin: 0;
-  overflow-x: hidden;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans-source), Arial, sans-serif;
-  text-rendering: optimizeLegibility;
-}
+  body {
+    min-height: 100vh;
+    margin: 0;
+    overflow-x: hidden;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans-source), Arial, sans-serif;
+    text-rendering: optimizeLegibility;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-button,
-a {
-  -webkit-tap-highlight-color: transparent;
-}
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
 
-button {
-  font: inherit;
-}
+  button {
+    font: inherit;
+  }
 
-::selection {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
 
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
 }
 
 .skip-link {

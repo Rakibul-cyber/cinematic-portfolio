@@ -32,13 +32,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Public contact page — presentation only.
+ * Public contact page.
  *
- * It shows the ways to reach the studio and nothing more. There is deliberately
- * no form: the inquiry model, validation, persistence, and email notification
- * belong to later phases, and a form that could not actually deliver a message
- * would be worse than none. Every detail comes from site settings, so no email
- * address, phone number, or location is invented.
+ * Shows the ways to reach the studio and the project inquiry form. Every
+ * contact detail comes from site settings, so no email address, phone number,
+ * or location is invented. The form submits to the `submitInquiry` server
+ * action in `./actions.ts`, which validates, applies abuse controls, stores
+ * the inquiry and sends notification email.
  */
 export default async function ContactPage() {
   const [page, settings, socialLinks, services, structuredData] =
