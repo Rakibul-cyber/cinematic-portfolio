@@ -1,6 +1,6 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/(admin)/admin/actions";
+import { AdminNavLink } from "@/components/admin/admin-nav-link";
 import type { AdminUser } from "@/server/auth/session";
 
 const links = [
@@ -36,13 +36,13 @@ export function AdminShell({
           className="mt-6 grid grid-cols-2 gap-1 md:grid-cols-1"
         >
           {links.map(([label, href]) => (
-            <Link
+            <AdminNavLink
               className="min-h-10 px-3 py-2 text-sm hover:bg-surface-strong"
               href={href}
               key={href}
             >
               {label}
-            </Link>
+            </AdminNavLink>
           ))}
         </nav>
         <form action={signOutAction} className="mt-6">
@@ -63,9 +63,4 @@ export function Notice({ message }: { message?: string }) {
     </p>
   ) : null;
 }
-export const inputClass =
-  "min-h-10 w-full border border-border bg-background px-3";
-export const areaClass =
-  "min-h-28 w-full border border-border bg-background p-3";
-export const buttonClass =
-  "min-h-10 border border-border px-4 text-xs font-semibold tracking-wider uppercase hover:border-foreground";
+export { areaClass, buttonClass, inputClass } from "@/components/admin/admin-styles";

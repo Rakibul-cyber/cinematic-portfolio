@@ -24,7 +24,7 @@ import type { UnconfirmedCause } from "@/lib/public/inquiry-form";
  */
 export function reportBoundaryError(
   error: Error & { digest?: string },
-  boundary: "public" | "global",
+  boundary: "public" | "admin" | "global",
 ): void {
   if (error.digest) return;
 
