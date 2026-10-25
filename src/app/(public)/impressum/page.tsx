@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 
 import { LegalDocument } from "@/components/public/legal-document";
-import { germanLegalNotice } from "@/content/legal";
+import { germanLegalNotice, isLegalDraft, legalMetadataTitle } from "@/content/legal";
 import { buildPublicMetadata } from "@/server/public/metadata";
 
 export function generateMetadata(): Promise<Metadata> {
   return buildPublicMetadata({
-    title: "Impressum – Entwurf",
+    title: legalMetadataTitle("impressum"),
     description: "Entwurf des Impressums von Munir Visuals, nicht zur Veröffentlichung freigegeben.",
     path: "/impressum",
+    indexable: !isLegalDraft("impressum"),
   });
 }
 
 export default function ImpressumPage() {
-  return <LegalDocument counterpartHref="/legal-notice" counterpartLabel="English legal notice" eyebrow="Rechtliche Informationen" language="de" sections={germanLegalNotice} title="Impressum" />;
+  return <LegalDocument counterpartHref="/legal-notice" counterpartLabel="English legal notice" draft={isLegalDraft("impressum")} eyebrow="Rechtliche Informationen" language="de" sections={germanLegalNotice} title="Impressum" />;
 }

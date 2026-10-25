@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { draftLegalPaths } from "@/content/legal";
 import { buildSitemapEntries } from "@/lib/seo/sitemap-entries";
 import { siteOrigin } from "@/server/public/metadata";
 import { getPublishedProjectSitemapRows } from "@/server/public/queries";
@@ -35,5 +36,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       slug: row.slug,
       updatedAt: new Date(row.updatedAt),
     })),
+    // Legal pages awaiting completion and approval are not advertised.
+    unpublishedRoutes: draftLegalPaths(),
   });
 }

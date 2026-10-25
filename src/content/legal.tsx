@@ -1,6 +1,7 @@
-import type { LegalSection } from "@/components/public/legal-document";
+import { type LegalSection, LegalTodo } from "@/components/public/legal-document";
+import { draftAwareTitle, type LegalApproval, legalDraftReasons } from "@/lib/legal/draft-status";
 
-const todo = (text: string) => <strong>[TODO: {text}]</strong>;
+const todo = (text: string) => <LegalTodo>{text}</LegalTodo>;
 
 export const germanLegalNotice: LegalSection[] = [
   {
@@ -225,3 +226,57 @@ export const englishPrivacy: LegalSection[] = [
     content: <p>Draft dated 23 October 2026. {todo("insert the date of the legally approved version and define the update process")}</p>,
   },
 ];
+
+/**
+ * Publication state of each legal document.
+ *
+ * `approval` stays `null` until the responsible person has completed every
+ * TODO and a qualified reviewer has approved the final text; record it then as
+ * `{ approvedOn: "YYYY-MM-DD", approvedBy: "<name or firm>" }`. Until both are
+ * true the page shows its draft warning, is `noindex`, is left out of the
+ * sitemap, and `npm run deploy:verify` fails.
+ */
+export const legalDocuments = {
+  impressum: { path: "/impressum", file: "src/content/legal.tsx (germanLegalNotice)", sections: germanLegalNotice, metadataTitle: "Impressum", language: "de", approval: null as LegalApproval | null },
+  legalNotice: { path: "/legal-notice", file: "src/content/legal.tsx (englishLegalNotice)", sections: englishLegalNotice, metadataTitle: "Legal notice", language: "en", approval: null as LegalApproval | null },
+  datenschutz: { path: "/datenschutz", file: "src/content/legal.tsx (germanPrivacy)", sections: germanPrivacy, metadataTitle: "Datenschutz", language: "de", approval: null as LegalApproval | null },
+  privacy: { path: "/privacy", file: "src/content/legal.tsx (englishPrivacy)", sections: englishPrivacy, metadataTitle: "Privacy notice", language: "en", approval: null as LegalApproval | null },
+} as const;
+
+export type LegalDocumentKey = keyof typeof legalDocuments;
+
+/** Why a document may not be published yet; empty only when it may. */
+export function legalDocumentDraftReasons(key: LegalDocumentKey): string[] {
+  const document = legalDocuments[key];
+  return legalDraftReasons({ content: document.sections.map((section) => section.content), approval: document.approval, todoMarker: LegalTodo });
+}
+
+export function isLegalDraft(key: LegalDocumentKey): boolean {
+  return legalDocumentDraftReasons(key).length > 0;
+}
+
+/**
+ * The page's metadata title, marked as a draft until the document is approved.
+ * `draft` defaults to the document's real status; it is a parameter only so
+ * tests can show the approved title without recording a fictitious approval.
+ */
+export function legalMetadataTitle(key: LegalDocumentKey, draft: boolean = isLegalDraft(key)): string {
+  const document = legalDocuments[key];
+  return draftAwareTitle(document.metadataTitle, document.language, draft);
+}
+
+/** Paths of legal documents that must not be indexed or advertised yet. */
+export function draftLegalPaths(): string[] {
+  return (Object.keys(legalDocuments) as LegalDocumentKey[]).filter(isLegalDraft).map((key) => legalDocuments[key].path);
+}
+
+/**
+ * One actionable line per unpublishable document, for `deploy:verify`.
+ * Empty when every legal document is complete and approved.
+ */
+export function legalLaunchProblems(): string[] {
+  return (Object.keys(legalDocuments) as LegalDocumentKey[]).flatMap((key) => {
+    const reasons = legalDocumentDraftReasons(key);
+    return reasons.length ? [`${legalDocuments[key].path} — ${reasons.join("; ")} — edit ${legalDocuments[key].file}`] : [];
+  });
+}

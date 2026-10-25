@@ -8,6 +8,15 @@ export type LegalSection = {
   content: ReactNode;
 };
 
+/**
+ * A missing legal fact. A component of its own, rather than inline markup, so
+ * `legalTodoCount` can find every one structurally and a draft can never pass
+ * for approved text.
+ */
+export function LegalTodo({ children }: { children: string }) {
+  return <strong>[TODO: {children}]</strong>;
+}
+
 export function LegalDocument({
   eyebrow,
   title,
@@ -15,6 +24,7 @@ export function LegalDocument({
   counterpartHref,
   counterpartLabel,
   sections,
+  draft,
 }: {
   eyebrow: string;
   title: string;
@@ -22,24 +32,28 @@ export function LegalDocument({
   counterpartHref: string;
   counterpartLabel: string;
   sections: LegalSection[];
+  /** From `isLegalDraft`: shows the draft warning until the text is approved. */
+  draft: boolean;
 }) {
   return (
     <main id="main-content" lang={language}>
       <PageIntro eyebrow={eyebrow} title={title} />
       <Container className="pb-24 sm:pb-32">
         <div className="max-w-3xl border-t border-border pt-10">
-          <div className="border border-red-400/70 p-5" role="note">
-            <p className="font-semibold tracking-[0.08em] uppercase">
-              {language === "de"
-                ? "Entwurf – nicht zur Veröffentlichung freigegeben"
-                : "Draft – not approved for publication"}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {language === "de"
-                ? "Alle TODO-Angaben müssen durch die verantwortliche Person ergänzt und der vollständige Text rechtlich geprüft werden."
-                : "The responsible person must complete every TODO and obtain legal review of the full text."}
-            </p>
-          </div>
+          {draft ? (
+            <div className="border border-red-400/70 p-5" role="note">
+              <p className="font-semibold tracking-[0.08em] uppercase">
+                {language === "de"
+                  ? "Entwurf – nicht zur Veröffentlichung freigegeben"
+                  : "Draft – not approved for publication"}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {language === "de"
+                  ? "Alle TODO-Angaben müssen durch die verantwortliche Person ergänzt und der vollständige Text rechtlich geprüft werden."
+                  : "The responsible person must complete every TODO and obtain legal review of the full text."}
+              </p>
+            </div>
+          ) : null}
           <p className="mt-6 text-sm">
             <a className="underline underline-offset-4" href={counterpartHref}>
               {counterpartLabel}

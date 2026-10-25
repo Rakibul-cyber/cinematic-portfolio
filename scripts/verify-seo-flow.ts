@@ -138,12 +138,19 @@ async function verifySitemap(): Promise<void> {
     { slug: "atelier", updatedAt: new Date("2026-09-01T10:00:00.000Z") },
   ];
 
-  const entries = buildSitemapEntries({ origin: ORIGIN, projects });
+  const entries = buildSitemapEntries({ origin: ORIGIN, projects, unpublishedRoutes: [] });
   const urls = entries.map((entry) => entry.url);
 
   for (const route of PUBLIC_ROUTES) {
     assert.ok(urls.includes(absoluteUrl(ORIGIN, route)!), `${route} listed`);
   }
+
+  const withDrafts = buildSitemapEntries({ origin: ORIGIN, projects, unpublishedRoutes: ["/impressum", "/privacy"] }).map((entry) => entry.url);
+  assert.ok(
+    !withDrafts.includes(`${ORIGIN}/impressum`) && !withDrafts.includes(`${ORIGIN}/privacy`),
+    "a route awaiting approval is not advertised",
+  );
+  assert.equal(withDrafts.length, urls.length - 2, "only the unpublished routes are withheld");
 
   assert.ok(urls.includes(`${ORIGIN}/work/harbour-light`), "published work listed");
   assert.equal(new Set(urls).size, urls.length, "no URL is advertised twice");
@@ -181,18 +188,22 @@ async function verifySitemap(): Promise<void> {
   );
 
   assert.deepEqual(
-    buildSitemapEntries({ origin: null, projects }),
+    buildSitemapEntries({ origin: null, projects, unpublishedRoutes: [] }),
     [],
     "no origin yields an empty sitemap rather than relative URLs",
   );
   assert.equal(
-    buildSitemapEntries({ origin: ORIGIN, projects: [] }).length,
+    buildSitemapEntries({ origin: ORIGIN, projects: [], unpublishedRoutes: [] }).length,
     PUBLIC_ROUTES.length,
     "an empty portfolio still advertises its static pages",
   );
 
   const source = await readFile("src/app/sitemap.ts", "utf8");
   assert.ok(source.includes("buildSitemapEntries"), "the route uses the builder");
+  assert.ok(
+    /unpublishedRoutes:\s*draftLegalPaths\(\)/.test(source),
+    "the route withholds legal pages that are still drafts",
+  );
 }
 
 async function verifyMetadata(): Promise<void> {

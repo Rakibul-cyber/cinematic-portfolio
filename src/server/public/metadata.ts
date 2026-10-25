@@ -40,6 +40,8 @@ export type PublicMetadataInput = {
   /** Absolute path of this page, used as the canonical URL. */
   path: string;
   imageUrl?: string | null;
+  /** False keeps the page out of search results (`noindex, nofollow`). */
+  indexable?: boolean;
 };
 
 export async function buildPublicMetadata(
@@ -52,6 +54,7 @@ export async function buildPublicMetadata(
     description: input.description,
     path: input.path,
     imageUrl: input.imageUrl,
+    indexable: input.indexable,
     studioName: settings?.studioName ?? FALLBACK_STUDIO_NAME,
     defaultTitle: settings?.defaultSeoTitle,
     defaultDescription: settings?.defaultSeoDescription,

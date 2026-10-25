@@ -81,7 +81,7 @@ describe("sitemap", () => {
   ];
 
   it("advertises every public route and every published project", () => {
-    const urls = buildSitemapEntries({ origin: ORIGIN, projects }).map(
+    const urls = buildSitemapEntries({ origin: ORIGIN, projects, unpublishedRoutes: [] }).map(
       (entry) => entry.url,
     );
 
@@ -91,14 +91,25 @@ describe("sitemap", () => {
     assert.equal(new Set(urls).size, urls.length);
   });
 
+  it("withholds unpublished routes, such as legal pages awaiting approval", () => {
+    const legal = ["/impressum", "/legal-notice", "/datenschutz", "/privacy"];
+    const urls = buildSitemapEntries({ origin: ORIGIN, projects, unpublishedRoutes: legal }).map(
+      (entry) => entry.url,
+    );
+
+    for (const route of legal) assert.ok(!urls.includes(`${ORIGIN}${route}`), `${route} withheld`);
+    assert.equal(urls.length, PUBLIC_ROUTES.length - legal.length + projects.length);
+    assert.ok(urls.includes(`${ORIGIN}/contact`), "other static routes stay listed");
+  });
+
   it("dates static routes from the newest published work", () => {
-    const entries = buildSitemapEntries({ origin: ORIGIN, projects });
+    const entries = buildSitemapEntries({ origin: ORIGIN, projects, unpublishedRoutes: [] });
 
     assert.deepEqual(entries[0].lastModified, projects[1].updatedAt);
   });
 
   it("is empty without an origin rather than relative", () => {
-    assert.deepEqual(buildSitemapEntries({ origin: null, projects }), []);
+    assert.deepEqual(buildSitemapEntries({ origin: null, projects, unpublishedRoutes: [] }), []);
   });
 
   it("drops a URL that would break the XML, keeping the rest", () => {
@@ -107,6 +118,7 @@ describe("sitemap", () => {
     // unreachable today; the guard is for the day it is relaxed.
     const entries = buildSitemapEntries({
       origin: ORIGIN,
+      unpublishedRoutes: [],
       projects: [
         { slug: "safe-one", updatedAt: new Date("2026-08-01T00:00:00.000Z") },
         { slug: 'a&b<c>"d', updatedAt: new Date("2026-08-01T00:00:00.000Z") },

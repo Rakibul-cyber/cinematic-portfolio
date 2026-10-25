@@ -78,10 +78,17 @@ function isXmlSafe(url: string): boolean {
 export function buildSitemapEntries(input: {
   origin: string | null | undefined;
   projects: readonly SitemapProject[];
+  /**
+   * Static routes that exist but must not be advertised yet, such as legal
+   * pages still awaiting approval (`draftLegalPaths()`). Required rather than
+   * defaulted, so no caller can forget the question.
+   */
+  unpublishedRoutes: readonly string[];
   /** Injected so the static-route timestamp is deterministic in tests. */
   now?: Date;
 }): SitemapEntry[] {
   const { origin, projects } = input;
+  const unpublished = new Set(input.unpublishedRoutes);
 
   if (!absoluteUrl(origin, "/")) return [];
 
@@ -92,8 +99,8 @@ export function buildSitemapEntries(input: {
 
   const lastModified = newestProject ?? input.now ?? new Date();
 
-  const staticEntries = PUBLIC_ROUTES.filter((route) =>
-    isXmlSafe(absoluteUrl(origin, route) as string),
+  const staticEntries = PUBLIC_ROUTES.filter(
+    (route) => !unpublished.has(route) && isXmlSafe(absoluteUrl(origin, route) as string),
   ).map((route) => ({
     url: absoluteUrl(origin, route) as string,
     lastModified,

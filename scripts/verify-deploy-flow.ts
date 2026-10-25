@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
+import React from "react";
+
 import { securityHeaders } from "@/lib/security-headers";
 
 /**
@@ -277,13 +279,36 @@ async function main(): Promise<void> {
     "netlify.toml declares no credentials: production values belong in the Netlify UI",
   );
 
+  // Last, so every configuration check above still reports while legal text is
+  // pending. Draft pages are already noindex and absent from the sitemap; this
+  // stops a launch with them. It is released by completing and approving the
+  // text, never by editing this check.
+  section("legal pages");
+
+  // The legal content is JSX evaluated at import. Next.js owns the JSX
+  // transform (`"jsx": "preserve"`), so under tsx it compiles to bare
+  // `React.createElement` calls; provide `React` before loading the module.
+  (globalThis as typeof globalThis & { React?: typeof React }).React = React;
+  const { legalLaunchProblems } = await import("@/content/legal");
+  const legalProblems = legalLaunchProblems();
+  if (legalProblems.length > 0) {
+    throw new Error(
+      "Legal pages are not ready for a public launch:\n" +
+        legalProblems.map((problem) => `    - ${problem}`).join("\n") +
+        "\n  Complete every TODO with the responsible person's details, have the " +
+        "full text legally reviewed, then record each document's `approval` " +
+        "({ approvedOn: \"YYYY-MM-DD\", approvedBy }) in `legalDocuments` in " +
+        "src/content/legal.tsx.",
+    );
+  }
+
   console.log(
     "Deployment verification passed: zero-configuration adapter with nothing " +
       "pinned, an explicit Node version in .node-version, immutable caching " +
       "confined to content-addressed output, no cache rule shadowing a rendered " +
       "route, no rule matching a path the app does not deploy, a private admin " +
-      "area, security headers owned solely by the application, and no " +
-      "credentials in the repository.",
+      "area, security headers owned solely by the application, no " +
+      "credentials in the repository, and complete, approved legal pages.",
   );
 }
 
