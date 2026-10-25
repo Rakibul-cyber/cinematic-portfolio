@@ -12,6 +12,7 @@ import { UnrecognizedActionError } from "next/dist/client/components/unrecognize
 import type { InquiryFormState } from "@/app/(public)/contact/actions";
 import type { InquiryFormView as InquiryFormViewType } from "@/components/public/inquiry-form-view";
 import {
+  focusAnswer,
   OUTDATED_AFTER_UNCONFIRMED_HEADING,
   OUTDATED_AFTER_UNCONFIRMED_MESSAGE,
   OUTDATED_COPY_FAILURE,
@@ -90,6 +91,8 @@ function harness() {
 
 let turnstile: { options: TurnstileRenderOptions[]; resets: string[] };
 let randomUUID: ReturnType<typeof mock.method>;
+// jsdom has no layout, so it does not implement scrollIntoView; record the calls instead.
+let scrolls: { id: string; tag: string; options: unknown }[];
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 
@@ -104,6 +107,10 @@ beforeEach(() => {
     remove: () => {},
   };
   randomUUID = mock.method(globalThis.crypto, "randomUUID", () => TOKEN);
+  scrolls = [];
+  dom.window.HTMLElement.prototype.scrollIntoView = function (this: HTMLElement, options?: unknown) {
+    scrolls.push({ id: this.id, tag: this.tagName, options });
+  } as typeof HTMLElement.prototype.scrollIntoView;
   container = dom.window.document.createElement("div");
   dom.window.document.body.append(container);
   root = createRoot(container);
@@ -113,6 +120,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
   randomUUID.mock.restore();
+  delete (dom.window.HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
 });
 
 async function mount(submitAction: ReturnType<typeof harness>["submitAction"]) {
@@ -172,6 +180,7 @@ describe("mounted inquiry form", () => {
     const summary = container.querySelector("#inquiry-error-summary");
     assert.ok(summary);
     assert.equal(focused(), summary);
+    assert.deepEqual(scrolls, [{ id: "inquiry-error-summary", tag: "DIV", options: { block: "start" } }], "the summary is placed below the header, once");
     assert.match(summary.textContent ?? "", /Please check the highlighted fields\./);
     assert.equal(field("email").getAttribute("aria-invalid"), "true");
     assert.equal(field(SUBMISSION_TOKEN_FIELD).value, TOKEN);
@@ -219,6 +228,7 @@ describe("mounted inquiry form", () => {
     const summary = container.querySelector("#inquiry-unconfirmed-summary");
     assert.ok(summary);
     assert.equal(focused(), summary);
+    assert.deepEqual(scrolls.map((s) => s.id), ["inquiry-unconfirmed-summary"]);
     assert.match(summary.textContent ?? "", new RegExp(UNCONFIRMED_HEADING));
     assert.doesNotMatch(summary.textContent ?? "", /Failed to fetch/, "no technical detail reaches the visitor");
     assert.equal(container.querySelector("#inquiry-outdated-summary"), null, "an indeterminate failure is not an outdated action");
@@ -248,9 +258,25 @@ describe("mounted inquiry form", () => {
     const heading = container.querySelector("h2");
     assert.equal(heading?.textContent, "Inquiry received");
     assert.equal(focused(), heading);
+    assert.deepEqual(scrolls.map((s) => s.tag), ["DIV", "H2"], "the confirmation is placed like the summary was");
     assert.match(container.textContent ?? "", /Your inquiry has been received\./);
     assert.equal(h.calls.length, 2);
     assert.equal(h.reports.length, 1);
+  });
+});
+
+describe("focusing an answer", () => {
+  it("focuses without the browser's own scroll, then aligns the target below the header", () => {
+    const calls: unknown[][] = [];
+    focusAnswer({ focus: (options) => calls.push(["focus", options]), scrollIntoView: (options) => calls.push(["scrollIntoView", options]) });
+    // preventScroll keeps a centring focus scroll from starting; block "start" honours scroll-margin-top
+    // and replaces any smooth scroll still running from an earlier field focus. No behaviour is forced,
+    // so the stylesheet decides between smooth and instant (reduced motion).
+    assert.deepEqual(calls, [["focus", { preventScroll: true }], ["scrollIntoView", { block: "start" }]]);
+  });
+
+  it("does nothing without a target", () => {
+    assert.doesNotThrow(() => focusAnswer(null));
   });
 });
 

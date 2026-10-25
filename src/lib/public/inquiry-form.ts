@@ -235,6 +235,28 @@ export function settleInquirySubmission(
   return state.message ? "failure" : "idle";
 }
 
+type FocusTarget = { focus(options?: FocusOptions): void; scrollIntoView(options?: ScrollIntoViewOptions): void };
+
+/**
+ * Moves focus to an answer the form shows (a summary or the confirmation) and
+ * places it just below the sticky header.
+ *
+ * A plain `focus()` is not enough on this smooth-scrolling site. Focusing a
+ * field starts a smooth scroll towards it; if the action answers before that
+ * animation ends, the target is focused while it still looks visible, so
+ * focus asks for no scroll of its own, and the earlier animation carries on
+ * and leaves the focused target off-screen. When focus does scroll, Chromium
+ * centres the target rather than honouring its header offset. An explicit
+ * `scrollIntoView` replaces any animation in progress and aligns the target's
+ * top to its `scroll-margin-top`. Its default behaviour follows the
+ * stylesheet, so it is smooth normally and instant under reduced motion.
+ */
+export function focusAnswer(target: FocusTarget | null): void {
+  if (!target) return;
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({ block: "start" });
+}
+
 /**
  * The visitor's entries as readable text, for copying before a refresh.
  *

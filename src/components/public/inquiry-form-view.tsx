@@ -1,7 +1,7 @@
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { InquiryConfirmation, InquiryErrorSummary, InquiryInput, InquiryOutdatedSummary, InquirySelect, InquiryTextarea, InquiryUnconfirmedSummary } from "@/components/public/inquiry-fields";
 import { TurnstileWidget } from "@/components/public/turnstile-widget";
-import { type ClientInquiryState, createInquirySubmitHandler, INQUIRY_INPUT_FIELDS, INQUIRY_MESSAGE_FIELD, INQUIRY_SERVICE_FIELD, settleInquirySubmission } from "@/lib/public/inquiry-form";
+import { type ClientInquiryState, createInquirySubmitHandler, focusAnswer, INQUIRY_INPUT_FIELDS, INQUIRY_MESSAGE_FIELD, INQUIRY_SERVICE_FIELD, settleInquirySubmission } from "@/lib/public/inquiry-form";
 import { SUBMISSION_TOKEN_FIELD, useSubmissionToken } from "@/lib/security/submission-token";
 import type { PublicService } from "@/server/public/view-models";
 
@@ -37,9 +37,9 @@ export function InquiryFormView({ services, submitAction, turnstileSiteKey }: { 
     const outcome = settleInquirySubmission(state, inFlight);
     if (outcome === "failure" || outcome === "unconfirmed" || outcome === "outdated") {
       setResetSignal((count) => count + 1);
-      summaryRef.current?.focus();
+      focusAnswer(summaryRef.current);
     } else if (outcome === "success") {
-      confirmationRef.current?.focus();
+      focusAnswer(confirmationRef.current);
     }
   }, [state]);
   if (state.success) return <InquiryConfirmation message={state.message} ref={confirmationRef}/>;
