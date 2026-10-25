@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>MV</title>
+  <rect width="64" height="64" fill="#0f0f0e"/>
+  <path fill="#f1ede4" d="M4 48V16h8l6 18 6-18h8v32h-8V30l-4 14h-4l-4-14v18z"/>
+  <path fill="#a58a69" d="M36 16h8l4 22 4-22h8l-10 32h-4z"/>
+</svg>
