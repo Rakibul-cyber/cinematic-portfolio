@@ -1,18 +1,46 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MEDIA_ACCEPT, MEDIA_MAX_BYTES, formatBytes } from "@/lib/media";
+
+type UploadNotice = { message: string; tone: "alert" | "status" };
+
+export function isLaterMediaOperation(
+  target: EventTarget | null,
+  uploadForm: HTMLFormElement | null,
+): boolean {
+  if (!(target instanceof Element)) return false;
+  const form = target instanceof HTMLFormElement ? target : target.closest("form");
+  return Boolean(
+    form && form !== uploadForm && form.closest("[data-media-library]"),
+  );
+}
 
 export function UploadForm() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [fileName, setFileName] = useState("");
-  const [message, setMessage] = useState("");
+  const [notice, setNotice] = useState<UploadNotice | null>(null);
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    const clearStaleNotice = (event: Event) => {
+      if (isLaterMediaOperation(event.target, formRef.current)) setNotice(null);
+    };
+    // `invalid` is captured because it does not bubble. This also clears the
+    // previous upload outcome when browser validation stops a later submit.
+    document.addEventListener("submit", clearStaleNotice, true);
+    document.addEventListener("invalid", clearStaleNotice, true);
+    return () => {
+      document.removeEventListener("submit", clearStaleNotice, true);
+      document.removeEventListener("invalid", clearStaleNotice, true);
+    };
+  }, []);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
-    setMessage("");
+    setNotice(null);
     try {
       const response = await fetch("/api/media", {
         method: "POST",
@@ -20,17 +48,25 @@ export function UploadForm() {
       });
       const result = (await response.json()) as { message?: string };
       if (!response.ok) {
-        setMessage(result.message ?? "Upload failed.");
+        setNotice({
+          message: result.message ?? "Upload failed.",
+          tone: "alert",
+        });
         return;
       }
       formRef.current?.reset();
       setFileName("");
-      setMessage("Image uploaded successfully.");
+      setNotice({
+        message: "Image uploaded successfully.",
+        tone: "status",
+      });
       router.refresh();
     } catch {
-      setMessage(
-        "The image could not be uploaded. Check your connection and try again.",
-      );
+      setNotice({
+        message:
+          "The image could not be uploaded. Check your connection and try again.",
+        tone: "alert",
+      });
     } finally {
       setPending(false);
     }
@@ -81,8 +117,12 @@ export function UploadForm() {
       >
         {pending ? "Uploading and processing…" : "Upload image"}
       </button>
-      <p role="status" aria-live="polite" className="min-h-5 text-sm">
-        {message}
+      <p
+        role={notice?.tone ?? "status"}
+        aria-live={notice?.tone === "alert" ? undefined : "polite"}
+        className="min-h-5 text-sm"
+      >
+        {notice?.message ?? ""}
       </p>
     </form>
   );

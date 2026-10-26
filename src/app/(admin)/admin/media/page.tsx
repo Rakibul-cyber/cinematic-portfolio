@@ -27,7 +27,11 @@ export default async function MediaPage() {
     // Inside the shared shell (predates it otherwise) for the same navigation, skip link and main region as every other admin page.
     <AdminShell user={user} title="Media library">
       <UploadForm />
-      <section className="mt-10" aria-labelledby="library-heading">
+      <section
+        className="mt-10"
+        aria-labelledby="library-heading"
+        data-media-library
+      >
         <h2 id="library-heading" className="mb-4 font-display text-2xl">
           Images ({media.length})
         </h2>
