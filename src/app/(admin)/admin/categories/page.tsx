@@ -82,10 +82,10 @@ export default async function Page({
                 {r.name} · {r.slug} · order {r.sortOrder} ·{" "}
                 {r.isActive ? "active" : "inactive"}
               </span>
-              <div className="flex gap-3"><Link className="underline" href={`/admin/categories?edit=${r.id}`}>Edit</Link>{canDelete ? (<form action={deleteAction}>
+              <div className="flex gap-3"><Link aria-label={`Edit category ${r.name} (${r.id})`} className="underline" href={`/admin/categories?edit=${r.id}`}>Edit</Link>{canDelete ? (<form action={deleteAction}>
                 <input type="hidden" name="kind" value="category" />
                 <input type="hidden" name="id" value={r.id} />
-                <DeleteButton />
+                <DeleteButton itemName={`category ${r.name} (${r.id})`} />
               </form>) : null}</div>
             </li>
           ))

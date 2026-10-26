@@ -31,7 +31,7 @@ export async function addCustomerNoteAction(_state: AdminFormState, form: FormDa
   if (!parsed.success) return describeValidationError(parsed.error);
   const data = parsed.data;
   const active = await prisma.customer.count({ where: { id: data.customerId, anonymizedAt: null } });
-  if (!active) redirect(`/admin/customers/${data.customerId}?saved=Customer+is+anonymized`);
+  if (!active) redirect(`/admin/customers/${data.customerId}?error=Customer+is+anonymized`);
   const note = await prisma.customerNote.create({ data: { customerId: data.customerId, body: data.body, authorUserId: actor.id } });
   await recordAuditLog({ action: "customer_note.created", entityType: "customer_note", entityId: note.id, actorUserId: actor.id, actorEmail: actor.email });
   revalidatePath(`/admin/customers/${data.customerId}`); redirect(`/admin/customers/${data.customerId}?saved=Note+added`);
@@ -76,17 +76,20 @@ export async function retryInquiryEmailAction(form: FormData) {
   const actor = await requireUser("/admin/inquiries");
   const data = retryEmailSchema.parse(values(form));
 
+  let outcome: "saved" | "info" | "error" = "saved";
   let notice = "Email retried";
   try {
-    const outcome = await retryInquiryEmail(data.inquiryId, data.type, actor);
+    const delivery = await retryInquiryEmail(data.inquiryId, data.type, actor);
     notice =
-      outcome.status === "ACCEPTED"
+      delivery.status === "ACCEPTED"
         ? "Email accepted by the provider"
-        : outcome.status === "SKIPPED"
+        : delivery.status === "SKIPPED"
           ? "Email is not configured, so nothing was sent"
           : "Email could not be sent";
+    outcome = delivery.status === "ACCEPTED" ? "saved" : delivery.status === "SKIPPED" ? "info" : "error";
   } catch (error) {
     // Provider detail is never surfaced to the admin UI.
+    outcome = "error";
     notice =
       error instanceof DeliveryNotRetryableError
         ? error.message
@@ -95,6 +98,6 @@ export async function retryInquiryEmailAction(form: FormData) {
 
   revalidatePath(`/admin/inquiries/${data.inquiryId}`);
   redirect(
-    `/admin/inquiries/${data.inquiryId}?saved=${encodeURIComponent(notice)}`,
+    `/admin/inquiries/${data.inquiryId}?${outcome}=${encodeURIComponent(notice)}`,
   );
 }

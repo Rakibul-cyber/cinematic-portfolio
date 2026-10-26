@@ -44,6 +44,7 @@ export default async function Page({
             >
               <div>
                 <Link
+                  aria-label={`Edit project ${r.title} (${r.id})`}
                   className="inline-block py-1 font-medium underline"
                   href={`/admin/projects/${r.id}`}
                 >
@@ -59,7 +60,7 @@ export default async function Page({
                 <form action={deleteAction}>
                   <input type="hidden" name="kind" value="project" />
                   <input type="hidden" name="id" value={r.id} />
-                  <DeleteButton />
+                  <DeleteButton itemName={`project ${r.title} (${r.id})`} />
                 </form>
               ) : null}
             </li>

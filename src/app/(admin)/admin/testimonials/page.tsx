@@ -83,13 +83,13 @@ export default async function Page({
               <span>
                 {r.authorName} · order {r.sortOrder} ·{" "}
                 {r.isActive ? "active" : "inactive"}
-                {" · "}<Link className="underline" href={`/admin/testimonials?edit=${r.id}`}>Edit</Link>
+                {" · "}<Link aria-label={`Edit testimonial from ${r.authorName} (${r.id})`} className="underline" href={`/admin/testimonials?edit=${r.id}`}>Edit</Link>
               </span>
               {canDelete ? (
                 <form action={deleteAction}>
                   <input type="hidden" name="kind" value="testimonial" />
                   <input type="hidden" name="id" value={r.id} />
-                  <DeleteButton />
+                  <DeleteButton itemName={`testimonial from ${r.authorName} (${r.id})`} />
                 </form>
               ) : null}
             </li>

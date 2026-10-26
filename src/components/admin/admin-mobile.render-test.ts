@@ -312,8 +312,55 @@ describe("notices: errors are alerts, ordinary outcomes are polite", () => {
     await m.unmount();
   });
 
-  it("success messages use the status tone; error redirects keep the alert", () => {
-    for (const file of ["customers/[id]/page.tsx", "inquiries/[id]/page.tsx"]) assert.match(read(`src/app/(admin)/admin/${file}`), /<Notice message=\{\(await searchParams\)\.saved\} tone="status"\/>/);
+  it("an informational outcome is polite and keeps redirect focus behavior", async () => {
+    const m = await mount(() => h(Notice, { message: "Email is not configured, so nothing was sent", tone: "status" }));
+    const notice = m.container.querySelector("[role=status]")!;
+    assert.equal(notice.getAttribute("aria-live"), "polite");
+    assert.equal(active(), notice);
+    await m.unmount();
+  });
+
+  it("uses explicit outcome channels instead of inferring severity from message wording", () => {
+    for (const file of ["customers/[id]/page.tsx", "inquiries/[id]/page.tsx"]) {
+      const source = read(`src/app/(admin)/admin/${file}`);
+      assert.match(source, /message=\{notice\.error\?\?notice\.info\?\?notice\.saved\}/);
+      assert.match(source, /tone=\{notice\.error\?"alert":"status"\}/);
+    }
     for (const file of ["categories/page.tsx", "projects/page.tsx", "services/page.tsx", "testimonials/page.tsx", "settings/page.tsx", "pages/page.tsx"]) assert.match(read(`src/app/(admin)/admin/${file}`), /<Notice message=\{error\} \/>/);
+  });
+
+  it("routes accepted, neutral, failed, and domain outcomes through the correct trusted channel", () => {
+    const actions = read("src/app/(admin)/admin/crm-actions.ts");
+    assert.match(actions, /delivery\.status === "ACCEPTED" \? "saved" : delivery\.status === "SKIPPED" \? "info" : "error"/);
+    assert.match(actions, /outcome = "error";[\s\S]*error instanceof DeliveryNotRetryableError/);
+    assert.match(actions, /\?\$\{outcome\}=\$\{encodeURIComponent\(notice\)\}/);
+    assert.match(actions, /\?error=Customer\+is\+anonymized/);
+    assert.doesNotMatch(actions, /provider[^\n]*(message|detail)[^\n]*notice/i);
+  });
+});
+
+describe("record-specific admin action names", () => {
+  const cases = [
+    ["categories/page.tsx", "category", "r.name"],
+    ["projects/page.tsx", "project", "r.title"],
+    ["services/page.tsx", "service", "r.name"],
+    ["testimonials/page.tsx", "testimonial from", "r.authorName"],
+  ] as const;
+
+  it("names every repeated Edit and Delete control after its record and stable id", () => {
+    for (const [file, kind, field] of cases) {
+      const source = read(`src/app/(admin)/admin/${file}`);
+      assert.ok(source.includes(`aria-label={\`Edit ${kind} \${${field}} (\${r.id})\`}`), file);
+      assert.ok(source.includes(`itemName={\`${kind} \${${field}} (\${r.id})\`}`), file);
+    }
+  });
+
+  it("keeps Delete controls role-gated and server authorization unchanged", () => {
+    for (const [file] of cases) {
+      const source = read(`src/app/(admin)/admin/${file}`);
+      assert.match(source, /const canDelete = isAdministrative\(user\.role\)/);
+      assert.match(source, /\{canDelete \? \(/);
+    }
+    assert.match(read("src/app/(admin)/admin/cms-actions.ts"), /export async function deleteAction[\s\S]*const actor = await requireAdmin\("\/admin"\)/);
   });
 });
