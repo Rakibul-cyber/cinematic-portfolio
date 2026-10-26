@@ -3,6 +3,7 @@ import {
   saveSettingsAction,
   saveSocialAction,
 } from "@/app/(admin)/admin/cms-actions";
+import { AdminForm } from "@/components/admin/admin-form";
 import Link from "next/link";
 import { DeleteButton } from "@/components/admin/delete-button";
 import {
@@ -32,7 +33,7 @@ export default async function Page({
   return (
     <AdminShell user={user} title="Settings">
       <Notice message={error} />
-      <form
+      <AdminForm
         action={saveSettingsAction}
         className="grid gap-3 border border-border p-5 sm:grid-cols-2"
       >
@@ -147,10 +148,10 @@ export default async function Page({
           </label>
         </fieldset>
         <button className={buttonClass}>Save settings</button>
-      </form>
+      </AdminForm>
       <h2 className="mt-10 font-display text-2xl">Social links</h2>
       {/* Keyed per link: `?editSocial=` navigation re-renders without remounting, and uncontrolled fields would keep the previous link's values. */}
-      <form
+      <AdminForm
         action={saveSocialAction}
         className="mt-3 grid gap-3 border border-border p-5 sm:grid-cols-2"
         key={currentSocial?.id ?? "new"}
@@ -181,7 +182,7 @@ export default async function Page({
           <input type="checkbox" name="isActive" defaultChecked={currentSocial?.isActive ?? true} /> Active
         </label>
         <button className={buttonClass}>{currentSocial ? "Save social link" : "Add social link"}</button>
-      </form>
+      </AdminForm>
       <ul className="mt-5 grid gap-2">
         {links.map((l) => (
           <li

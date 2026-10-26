@@ -1,4 +1,5 @@
 import { savePageAction } from "@/app/(admin)/admin/cms-actions";
+import { AdminForm } from "@/components/admin/admin-form";
 import {
   AdminShell,
   Notice,
@@ -25,7 +26,7 @@ export default async function Page({
         {keys.map((key) => {
           const row = rows.find((r) => r.key === key);
           return (
-            <form
+            <AdminForm
               action={savePageAction}
               className="grid gap-3 border border-border p-5"
               key={key}
@@ -75,7 +76,7 @@ export default async function Page({
                 />
               </label>
               <button className={buttonClass}>Save {key}</button>
-            </form>
+            </AdminForm>
           );
         })}
       </div>

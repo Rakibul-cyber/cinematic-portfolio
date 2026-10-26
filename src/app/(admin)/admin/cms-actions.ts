@@ -12,6 +12,7 @@ import {
   socialSchema,
   testimonialSchema,
 } from "@/lib/validation/cms";
+import { describeValidationError, type AdminFormState } from "@/lib/admin/form-state";
 import { requireAdmin, requireUser } from "@/server/auth/session";
 import {
   revalidatePublicContent,
@@ -35,16 +36,38 @@ import {
 function values(form: FormData) {
   return Object.fromEntries(form.entries());
 }
+function failure(error: unknown): NonNullable<AdminFormState> {
+  if (error instanceof SlugConflictError) return { error: error.message, field: "slug" };
+  if (error instanceof ProjectConflictError) return { error: error.message };
+  if (error instanceof z.ZodError) return describeValidationError(error);
+  return { error: "The change could not be saved." };
+}
 function fail(path: string, error: unknown): never {
-  const message =
-    error instanceof SlugConflictError
-      ? error.message
-      : error instanceof ProjectConflictError
-        ? error.message
-      : error instanceof z.ZodError
-        ? (error.issues[0]?.message ?? "Check the form fields.")
-        : "The change could not be saved.";
-  redirect(`${path}?error=${encodeURIComponent(message)}`);
+  redirect(`${path}?error=${encodeURIComponent(failure(error).error)}`);
+}
+/**
+ * Runs one CMS save submitted through `AdminForm`.
+ *
+ * A failure is returned as form state rather than redirected, so the editor's
+ * input survives in the browser. Success refreshes the admin page and the
+ * public site and redirects, exactly as `run` does.
+ */
+async function save(
+  path: string,
+  work: () => Promise<string | void>,
+  publish?: { kind: PublicContentKind; slug?: string | null },
+): Promise<AdminFormState> {
+  let target = path;
+
+  try {
+    target = (await work()) ?? path;
+  } catch (error) {
+    return failure(error);
+  }
+
+  revalidatePath(path);
+  if (publish) revalidatePublicContent(publish.kind, { slug: publish.slug });
+  redirect(target);
 }
 /**
  * Runs one CMS mutation, then refreshes both the admin page and the public
@@ -72,10 +95,13 @@ async function run(
   redirect(target);
 }
 
-export async function saveCategoryAction(form: FormData) {
+export async function saveCategoryAction(
+  _state: AdminFormState,
+  form: FormData,
+): Promise<AdminFormState> {
   const actor = await requireUser("/admin/categories");
   const raw = values(form);
-  await run(
+  return save(
     "/admin/categories",
     async () => {
       await saveCategory(
@@ -86,10 +112,13 @@ export async function saveCategoryAction(form: FormData) {
     { kind: "category" },
   );
 }
-export async function saveServiceAction(form: FormData) {
+export async function saveServiceAction(
+  _state: AdminFormState,
+  form: FormData,
+): Promise<AdminFormState> {
   const actor = await requireUser("/admin/services");
   const raw = values(form);
-  await run(
+  return save(
     "/admin/services",
     async () => {
       await saveService(
@@ -100,10 +129,13 @@ export async function saveServiceAction(form: FormData) {
     { kind: "service" },
   );
 }
-export async function saveTestimonialAction(form: FormData) {
+export async function saveTestimonialAction(
+  _state: AdminFormState,
+  form: FormData,
+): Promise<AdminFormState> {
   const actor = await requireUser("/admin/testimonials");
   const raw = values(form);
-  await run(
+  return save(
     "/admin/testimonials",
     async () => {
       await saveTestimonial(
@@ -114,9 +146,12 @@ export async function saveTestimonialAction(form: FormData) {
     { kind: "testimonial" },
   );
 }
-export async function savePageAction(form: FormData) {
+export async function savePageAction(
+  _state: AdminFormState,
+  form: FormData,
+): Promise<AdminFormState> {
   const actor = await requireUser("/admin/pages");
-  await run(
+  return save(
     "/admin/pages",
     async () => {
       await savePage(pageSchema.parse(values(form)), actor);
@@ -124,9 +159,12 @@ export async function savePageAction(form: FormData) {
     { kind: "page" },
   );
 }
-export async function saveSettingsAction(form: FormData) {
+export async function saveSettingsAction(
+  _state: AdminFormState,
+  form: FormData,
+): Promise<AdminFormState> {
   const actor = await requireAdmin("/admin/settings");
-  await run(
+  return save(
     "/admin/settings",
     async () => {
       await saveSettings(settingsSchema.parse(values(form)), actor);
@@ -134,10 +172,13 @@ export async function saveSettingsAction(form: FormData) {
     { kind: "settings" },
   );
 }
-export async function saveSocialAction(form: FormData) {
+export async function saveSocialAction(
+  _state: AdminFormState,
+  form: FormData,
+): Promise<AdminFormState> {
   const actor = await requireAdmin("/admin/settings");
   const raw = values(form);
-  await run(
+  return save(
     "/admin/settings",
     async () => {
       await saveSocial(
@@ -148,12 +189,15 @@ export async function saveSocialAction(form: FormData) {
     { kind: "settings" },
   );
 }
-export async function saveProjectAction(form: FormData) {
+export async function saveProjectAction(
+  _state: AdminFormState,
+  form: FormData,
+): Promise<AdminFormState> {
   const actor = await requireUser("/admin/projects");
   const raw = values(form);
   const id = typeof raw.id === "string" && raw.id ? raw.id : undefined;
   const path = id ? `/admin/projects/${id}` : "/admin/projects/new";
-  await run(
+  return save(
     path,
     async () => {
       const row = await saveProject(

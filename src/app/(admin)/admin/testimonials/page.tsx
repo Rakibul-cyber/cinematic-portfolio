@@ -3,6 +3,7 @@ import {
   deleteAction,
   saveTestimonialAction,
 } from "@/app/(admin)/admin/cms-actions";
+import { AdminForm } from "@/components/admin/admin-form";
 import { DeleteButton } from "@/components/admin/delete-button";
 import {
   AdminShell,
@@ -29,7 +30,7 @@ export default async function Page({
     <AdminShell user={user} title="Testimonials">
       <Notice message={error} />
       {/* Keyed per record: `?edit=` navigation re-renders without remounting, and uncontrolled fields would keep the previous record's values. */}
-      <form
+      <AdminForm
         action={saveTestimonialAction}
         className="grid gap-3 border border-border p-5 sm:grid-cols-2"
         key={current?.id ?? "new"}
@@ -68,7 +69,7 @@ export default async function Page({
           <input name="isActive" type="checkbox" defaultChecked={current?.isActive ?? true} /> Active
         </label>
         <button className={buttonClass}>{current ? "Save testimonial" : "Create testimonial"}</button>
-      </form>
+      </AdminForm>
       <ul className="mt-8 grid gap-3">
         {rows.length ? (
           rows.map((r) => (

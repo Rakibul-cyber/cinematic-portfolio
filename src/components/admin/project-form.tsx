@@ -1,4 +1,5 @@
 import { saveProjectAction } from "@/app/(admin)/admin/cms-actions";
+import { AdminForm } from "@/components/admin/admin-form";
 import {
   areaClass,
   buttonClass,
@@ -39,7 +40,7 @@ export function ProjectForm({
 }) {
   const selectedMediaIds = project?.media.map((item) => item.mediaId) ?? [];
   return (
-    <form action={saveProjectAction} className="grid gap-4">
+    <AdminForm action={saveProjectAction} className="grid gap-4">
       {project && <input type="hidden" name="id" value={project.id} />}
       {project && (
         <input
@@ -215,6 +216,6 @@ export function ProjectForm({
         media={media}
       />
       <button className={buttonClass}>Save project</button>
-    </form>
+    </AdminForm>
   );
 }

@@ -118,7 +118,8 @@ describe("admin forms selected by a query parameter", () => {
       const source = readFileSync(file, "utf8");
       const start = source.indexOf(`action={${action}}`);
       assert.ok(start > 0, `${action} form present`);
-      const tag = source.slice(source.lastIndexOf("<form", start), source.indexOf(">", start) + 1);
+      const open = Math.max(source.lastIndexOf("<form", start), source.lastIndexOf("<AdminForm", start));
+      const tag = source.slice(open, source.indexOf(">", start) + 1);
       assert.match(tag, new RegExp(`key=\\{${record}\\?\\.id \\?\\? "new"\\}`));
     });
   }
