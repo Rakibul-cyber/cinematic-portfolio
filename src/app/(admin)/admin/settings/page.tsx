@@ -149,9 +149,11 @@ export default async function Page({
         <button className={buttonClass}>Save settings</button>
       </form>
       <h2 className="mt-10 font-display text-2xl">Social links</h2>
+      {/* Keyed per link: `?editSocial=` navigation re-renders without remounting, and uncontrolled fields would keep the previous link's values. */}
       <form
         action={saveSocialAction}
         className="mt-3 grid gap-3 border border-border p-5 sm:grid-cols-2"
+        key={currentSocial?.id ?? "new"}
       >
         {currentSocial && <input type="hidden" name="id" value={currentSocial.id} />}
         <label>

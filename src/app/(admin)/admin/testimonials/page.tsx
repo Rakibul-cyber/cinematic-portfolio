@@ -28,9 +28,11 @@ export default async function Page({
   return (
     <AdminShell user={user} title="Testimonials">
       <Notice message={error} />
+      {/* Keyed per record: `?edit=` navigation re-renders without remounting, and uncontrolled fields would keep the previous record's values. */}
       <form
         action={saveTestimonialAction}
         className="grid gap-3 border border-border p-5 sm:grid-cols-2"
+        key={current?.id ?? "new"}
       >
         {current && <input type="hidden" name="id" value={current.id} />}
         <label className="sm:col-span-2">
