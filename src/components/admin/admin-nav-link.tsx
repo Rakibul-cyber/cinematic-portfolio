@@ -1,7 +1,19 @@
 "use client";
 
 import Link, { useLinkStatus } from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+
+/**
+ * How `href` relates to the page being shown: the page itself, a section it
+ * belongs to (an edit page under its list), or neither. The dashboard is only
+ * ever itself, since every admin path starts with `/admin`.
+ */
+export function navCurrent(pathname: string | null, href: string): "page" | "true" | undefined {
+  if (!pathname) return undefined;
+  if (pathname === href) return "page";
+  return href !== "/admin" && pathname.startsWith(`${href}/`) ? "true" : undefined;
+}
 
 /**
  * Admin navigation link with loading feedback.
@@ -16,7 +28,7 @@ import type { ReactNode } from "react";
  */
 export function AdminNavLink({ href, className, children }: { href: string; className?: string; children: ReactNode }) {
   return (
-    <Link className={className} href={href}>
+    <Link aria-current={navCurrent(usePathname(), href)} className={className} href={href}>
       {children}
       <PendingIndicator />
     </Link>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Loader2 } from "lucide-react";
 
@@ -27,6 +27,14 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
   const emailId = useId();
   const passwordId = useId();
   const errorId = useId();
+  const emailRef = useRef<HTMLInputElement>(null);
+
+  // After a rejected attempt, return focus to the first field (now marked
+  // invalid and described by the error) once the fields are enabled again;
+  // otherwise it stays on the disabled button and is lost.
+  useEffect(() => {
+    if (error && !isPending) emailRef.current?.focus();
+  }, [error, isPending]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,6 +80,7 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
           inputMode="email"
           name="email"
           placeholder="you@studio.example"
+          ref={emailRef}
           required
           type="email"
         />

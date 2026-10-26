@@ -84,7 +84,11 @@ export default async function MediaPage() {
                     >
                       <input type="hidden" name="id" value={item.id} />
                       <label className="grid gap-1">
-                        Alt text
+                        <span>
+                          Alt text
+                          {/* Every card repeats these labels; the file name tells the fields apart for assistive technology. */}
+                          <span className="sr-only"> for {item.originalName}</span>
+                        </span>
                         <input
                           className="min-h-10 border border-border bg-background px-3"
                           maxLength={500}
@@ -93,7 +97,10 @@ export default async function MediaPage() {
                         />
                       </label>
                       <label className="grid gap-1">
-                        Caption
+                        <span>
+                          Caption
+                          <span className="sr-only"> for {item.originalName}</span>
+                        </span>
                         <input
                           className="min-h-10 border border-border bg-background px-3"
                           maxLength={2000}
