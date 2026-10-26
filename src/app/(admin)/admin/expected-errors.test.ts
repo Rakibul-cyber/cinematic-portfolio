@@ -164,10 +164,18 @@ describe("role-aware admin controls", () => {
 
 describe("direct requests are still denied on the server", () => {
   it("the Settings page and the inquiry export keep requireAdmin, and the export answers 403", () => {
-    assert.match(read("settings/page.tsx"), /const user = await requireAdmin\("\/admin\/settings"\);/);
+    const settings = read("settings/page.tsx");
+    assert.match(settings, /requireAdmin\("\/admin\/settings"\)\.catch/);
+    assert.match(settings, /if \(error instanceof AuthorizationError\) forbidden\(\);\s*throw error;/);
     const exportRoute = read("inquiries/export/route.ts");
     assert.match(exportRoute, /actor = await requireAdmin\("\/admin\/inquiries"\);/);
     assert.match(exportRoute, /if \(error instanceof AuthorizationError\) \{\s*return new Response\("Forbidden", \{ status: 403/);
+  });
+
+  it("enables the supported 403 interrupt without changing the shared role guards", () => {
+    assert.match(readFileSync("next.config.ts", "utf8"), /authInterrupts: true/);
+    assert.match(read("forbidden.tsx"), /<AdminForbiddenView \/>/);
+    assert.doesNotMatch(readFileSync("src/server/auth/session.ts", "utf8"), /forbidden\(/);
   });
 
   it("deleteAction keeps requireAdmin and does not turn a denial into a message", () => {

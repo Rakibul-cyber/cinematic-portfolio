@@ -7,6 +7,7 @@ import { JSDOM } from "jsdom";
 import type { AdminErrorView as AdminErrorViewType } from "@/components/admin/admin-error-view";
 import type { AdminNavLink as AdminNavLinkType } from "@/components/admin/admin-nav-link";
 import type { AdminNotFoundView as AdminNotFoundViewType } from "@/components/admin/admin-status";
+import type { AdminForbiddenView as AdminForbiddenViewType } from "@/components/admin/admin-status";
 
 /**
  * Admin loading, error and not-found states: what they show, what they must
@@ -25,6 +26,7 @@ let renderToStaticMarkup: typeof import("react-dom/server").renderToStaticMarkup
 let AdminErrorView: typeof AdminErrorViewType;
 let AdminNavLink: typeof AdminNavLinkType;
 let AdminNotFoundView: typeof AdminNotFoundViewType;
+let AdminForbiddenView: typeof AdminForbiddenViewType;
 
 before(async () => {
   // `self` because next/link schedules prefetching through `self.requestIdleCallback`, as in a browser.
@@ -42,7 +44,7 @@ before(async () => {
   ({ renderToStaticMarkup } = await import("react-dom/server"));
   ({ AdminErrorView } = await import("@/components/admin/admin-error-view"));
   ({ AdminNavLink } = await import("@/components/admin/admin-nav-link"));
-  ({ AdminNotFoundView } = await import("@/components/admin/admin-status"));
+  ({ AdminForbiddenView, AdminNotFoundView } = await import("@/components/admin/admin-status"));
 });
 
 after(() => {
@@ -102,6 +104,22 @@ describe("admin not-found state", () => {
   it("carries no user details and none of the public site's chrome", () => {
     assert.doesNotMatch(html(), PRIVATE_CHROME);
     assert.doesNotMatch(html(), /Skip to content|Primary navigation/);
+  });
+});
+
+describe("admin forbidden state", () => {
+  const html = () => renderToStaticMarkup(createElement(AdminForbiddenView));
+
+  it("states the denial without exposing protected or internal details", () => {
+    assert.match(html(), /<h1[^>]*>Access denied<\/h1>/);
+    assert.match(html(), /does not have permission/);
+    assert.doesNotMatch(html(), PRIVATE_CHROME);
+    assert.doesNotMatch(html(), /AuthorizationError|Requires role|Reference:|digest|stack/i);
+  });
+
+  it("offers a safe route back to the admin dashboard", () => {
+    assert.match(html(), /href="\/admin"/);
+    assert.match(html(), /Back to dashboard/);
   });
 });
 

@@ -4,6 +4,12 @@ import type { NextConfig } from "next";
 import { securityHeaders } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Enables Next.js's supported 401/403 interrupt responses. Admin pages
+    // translate only known role denials to `forbidden()`; other errors retain
+    // their existing error-boundary behavior.
+    authInterrupts: true,
+  },
   outputFileTracingRoot: process.cwd(),
   poweredByHeader: false,
   async headers() {

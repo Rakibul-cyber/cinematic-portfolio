@@ -5,6 +5,7 @@ import {
 } from "@/app/(admin)/admin/cms-actions";
 import { AdminForm } from "@/components/admin/admin-form";
 import Link from "next/link";
+import { forbidden } from "next/navigation";
 import { DeleteButton } from "@/components/admin/delete-button";
 import {
   AdminShell,
@@ -13,7 +14,7 @@ import {
   buttonClass,
   inputClass,
 } from "@/components/admin/admin-shell";
-import { requireAdmin } from "@/server/auth/session";
+import { AuthorizationError, requireAdmin } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 export const dynamic = "force-dynamic";
 export default async function Page({
@@ -21,7 +22,10 @@ export default async function Page({
 }: {
   searchParams: Promise<{ error?: string; editSocial?: string }>;
 }) {
-  const user = await requireAdmin("/admin/settings");
+  const user = await requireAdmin("/admin/settings").catch((error: unknown) => {
+    if (error instanceof AuthorizationError) forbidden();
+    throw error;
+  });
   const [settings, links] = await Promise.all([
     prisma.siteSetting.findUnique({ where: { id: "primary" } }),
     prisma.socialLink.findMany({
