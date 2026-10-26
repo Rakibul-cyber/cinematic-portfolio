@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/app/(admin)/admin/login/login-form";
 import { FALLBACK_STUDIO_NAME } from "@/content/site";
-import { ADMIN_ROOT_PATH, isSafeInternalPath } from "@/lib/admin-routes";
+import { getAdminRedirectTarget } from "@/lib/admin-routes";
 import { getCurrentUser } from "@/server/auth/session";
 import { getPublicSiteSettings } from "@/server/public/queries";
 
@@ -26,9 +26,7 @@ export default async function AdminLoginPage({ searchParams }: LoginPageProps) {
 
   // Only same-origin admin paths are accepted, so a crafted `next` value cannot
   // turn the login page into an open redirect.
-  const redirectTo = isSafeInternalPath(requestedNext)
-    ? (requestedNext as string)
-    : ADMIN_ROOT_PATH;
+  const redirectTo = getAdminRedirectTarget(requestedNext);
 
   // An already-authenticated administrator has no reason to see this page.
   const user = await getCurrentUser();

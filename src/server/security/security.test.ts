@@ -85,8 +85,8 @@ describe("login redirect safety", () => {
   it("accepts only admin-area paths", () => {
     assert.equal(isSafeInternalPath("/admin"), true);
     assert.equal(isSafeInternalPath("/admin/customers/1"), true);
-    // An encoded traversal stays a same-origin admin path once the browser
-    // resolves it, so it is safe to keep, but a sibling prefix is not.
+    assert.equal(isSafeInternalPath("/admin/../evil"), false);
+    assert.equal(isSafeInternalPath("/admin/%2e%2e/evil"), false);
     assert.equal(isSafeInternalPath("/administrator-evil"), false);
     assert.equal(isSafeInternalPath(undefined), false);
   });

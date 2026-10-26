@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { buildLoginRedirect, isSafeInternalPath } from "@/lib/admin-routes";
+import {
+  buildLoginRedirect,
+  getAdminRedirectTarget,
+  isSafeInternalPath,
+} from "@/lib/admin-routes";
 import {
   AdminRole,
   isAdminRole,
@@ -61,7 +65,24 @@ describe("post-login redirect target", () => {
   it("accepts admin paths", () => {
     assert.equal(isSafeInternalPath("/admin"), true);
     assert.equal(isSafeInternalPath("/admin/projects"), true);
-    assert.equal(isSafeInternalPath("/admin/projects?status=draft"), true);
+    assert.equal(isSafeInternalPath("/admin/projects?tab=media"), true);
+  });
+
+  it("refuses traversal and ambiguous encodings", () => {
+    const hostile = [
+      "/admin/../evil",
+      "/admin/%2e%2e/evil",
+      "/admin/%252e%252e/evil",
+      "/admin/%25252e%25252e/evil",
+      "/admin/%2e%2e%2fevil",
+      "/admin\\..\\evil",
+      "/admin/%5c..%5cevil",
+      "/admin/%E0%A4%A",
+    ];
+
+    for (const value of hostile) {
+      assert.equal(isSafeInternalPath(value), false, `accepted ${value}`);
+    }
   });
 
   it("refuses off-site and protocol-relative targets", () => {
@@ -94,5 +115,21 @@ describe("post-login redirect target", () => {
     assert.equal(buildLoginRedirect("https://evil.example"), "/admin/login");
     assert.equal(buildLoginRedirect("/admin/login"), "/admin/login");
     assert.equal(buildLoginRedirect(undefined), "/admin/login");
+  });
+
+  it("uses the validated value as the actual post-login destination", () => {
+    assert.equal(getAdminRedirectTarget("/admin"), "/admin");
+    assert.equal(
+      getAdminRedirectTarget("/admin/projects?tab=media"),
+      "/admin/projects?tab=media",
+    );
+    assert.equal(getAdminRedirectTarget("/admin/../evil"), "/admin");
+    assert.equal(getAdminRedirectTarget("/admin/%252e%252e/evil"), "/admin");
+    assert.equal(getAdminRedirectTarget("//evil.example"), "/admin");
+    assert.equal(getAdminRedirectTarget("https://evil.example"), "/admin");
+    assert.equal(getAdminRedirectTarget("/administrator"), "/admin");
+    assert.equal(getAdminRedirectTarget("/admin/%E0%A4%A"), "/admin");
+    assert.equal(getAdminRedirectTarget(""), "/admin");
+    assert.equal(getAdminRedirectTarget(undefined), "/admin");
   });
 });
