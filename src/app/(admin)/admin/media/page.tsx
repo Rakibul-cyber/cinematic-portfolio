@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
+import { AdminForm } from "@/components/admin/admin-form";
 import { DeleteButton } from "@/components/admin/delete-button";
 
 import {
@@ -104,10 +105,11 @@ export default async function MediaPage() {
                         Save metadata
                       </button>
                     </form>
-                    <form action={deleteMediaAction}>
+                    {/* An image still used by a project is refused; the reason appears here, beside it. */}
+                    <AdminForm action={deleteMediaAction} className="grid gap-2">
                       <input type="hidden" name="id" value={item.id} />
                       <DeleteButton>Delete image and all variants</DeleteButton>
-                    </form>
+                    </AdminForm>
                   </div>
                 </li>
               );

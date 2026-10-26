@@ -68,7 +68,7 @@ export async function saveCategory(
 export async function deleteCategory(id: string, actor: AdminUser) {
   if (await prisma.project.count({ where: { categoryId: id } }))
     throw new ReferencedCategoryError(
-      "Move or delete projects in this category first.",
+      "This category still has projects. Move them to another category or delete them first.",
     );
   await prisma.portfolioCategory.delete({ where: { id } });
   await audit(actor, AuditAction.CmsDeleted, "category", id);

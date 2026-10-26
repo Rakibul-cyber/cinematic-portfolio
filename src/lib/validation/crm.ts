@@ -31,5 +31,6 @@ export const customerSchema = z.object({
 });
 export const anonymizeCustomerSchema = z.object({
   customerId: z.string().uuid(),
-  confirmation: z.literal("ANONYMIZE"),
+  // Exact and case-sensitive on purpose; a custom check so the admin form can say so.
+  confirmation: z.string().refine((v) => v === "ANONYMIZE", "Type ANONYMIZE exactly, in capital letters, to confirm."),
 });

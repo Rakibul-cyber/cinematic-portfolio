@@ -5,6 +5,7 @@ import { fillMissingCustomerFields } from "@/lib/crm/customer-fields";
 import { normalizeEmail, type customerSchema, type inquirySchema } from "@/lib/validation/crm";
 import { recordAuditLog } from "@/server/audit/audit-log";
 import type { AdminUser } from "@/server/auth/session";
+import { translateCustomerUpdateError } from "@/server/crm/errors";
 import { prisma } from "@/server/db/prisma";
 
 type InquiryInput = z.infer<typeof inquirySchema>;
@@ -66,6 +67,8 @@ export async function createInquiry(data: InquiryInput) {
 }
 
 export async function updateCustomer(data: CustomerInput, actor: AdminUser) {
-  const customer = await prisma.customer.update({ where: { id: data.id, anonymizedAt: null }, data: { name: data.name, email: data.email, normalizedEmail: normalizeEmail(data.email), phone: data.phone, whatsapp: data.whatsapp, company: data.company } });
+  const customer = await prisma.customer
+    .update({ where: { id: data.id, anonymizedAt: null }, data: { name: data.name, email: data.email, normalizedEmail: normalizeEmail(data.email), phone: data.phone, whatsapp: data.whatsapp, company: data.company } })
+    .catch(translateCustomerUpdateError);
   await recordAuditLog({ action: "customer.updated", entityType: "customer", entityId: customer.id, actorUserId: actor.id, actorEmail: actor.email });
 }

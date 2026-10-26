@@ -12,6 +12,7 @@ import {
   buttonClass,
   inputClass,
 } from "@/components/admin/admin-shell";
+import { isAdministrative } from "@/server/auth/roles";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,8 @@ export default async function Page({
   searchParams: Promise<{ error?: string; edit?: string }>;
 }) {
   const user = await requireUser("/admin/services");
+  // Deleting calls `requireAdmin`; an EDITOR is not offered a control that would be refused.
+  const canDelete = isAdministrative(user.role);
   const rows = await prisma.service.findMany({
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
@@ -82,11 +85,13 @@ export default async function Page({
                 {r.isActive ? "active" : "inactive"}
                 {" · "}<Link className="underline" href={`/admin/services?edit=${r.id}`}>Edit</Link>
               </span>
-              <form action={deleteAction}>
-                <input type="hidden" name="kind" value="service" />
-                <input type="hidden" name="id" value={r.id} />
-                <DeleteButton />
-              </form>
+              {canDelete ? (
+                <form action={deleteAction}>
+                  <input type="hidden" name="kind" value="service" />
+                  <input type="hidden" name="id" value={r.id} />
+                  <DeleteButton />
+                </form>
+              ) : null}
             </li>
           ))
         ) : (

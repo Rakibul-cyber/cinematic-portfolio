@@ -12,6 +12,7 @@ import {
   buttonClass,
   inputClass,
 } from "@/components/admin/admin-shell";
+import { isAdministrative } from "@/server/auth/roles";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,8 @@ export default async function Page({
   searchParams: Promise<{ error?: string; edit?: string }>;
 }) {
   const user = await requireUser("/admin/categories");
+  // Deleting calls `requireAdmin`; an EDITOR is not offered a control that would be refused.
+  const canDelete = isAdministrative(user.role);
   const rows = await prisma.portfolioCategory.findMany({
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
@@ -79,11 +82,11 @@ export default async function Page({
                 {r.name} · {r.slug} · order {r.sortOrder} ·{" "}
                 {r.isActive ? "active" : "inactive"}
               </span>
-              <div className="flex gap-3"><Link className="underline" href={`/admin/categories?edit=${r.id}`}>Edit</Link><form action={deleteAction}>
+              <div className="flex gap-3"><Link className="underline" href={`/admin/categories?edit=${r.id}`}>Edit</Link>{canDelete ? (<form action={deleteAction}>
                 <input type="hidden" name="kind" value="category" />
                 <input type="hidden" name="id" value={r.id} />
                 <DeleteButton />
-              </form></div>
+              </form>) : null}</div>
             </li>
           ))
         ) : (

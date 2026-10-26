@@ -2,6 +2,7 @@ import Link from "next/link";
 import { deleteAction } from "@/app/(admin)/admin/cms-actions";
 import { DeleteButton } from "@/components/admin/delete-button";
 import { AdminShell, Notice } from "@/components/admin/admin-shell";
+import { isAdministrative } from "@/server/auth/roles";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,8 @@ export default async function Page({
   searchParams: Promise<{ error?: string }>;
 }) {
   const user = await requireUser("/admin/projects");
+  // Deleting calls `requireAdmin`; an EDITOR is not offered a control that would be refused.
+  const canDelete = isAdministrative(user.role);
   const rows = await prisma.project.findMany({
     orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
     select: {
@@ -52,11 +55,13 @@ export default async function Page({
                   {r.updatedAt.toLocaleDateString()}
                 </p>
               </div>
-              <form action={deleteAction}>
-                <input type="hidden" name="kind" value="project" />
-                <input type="hidden" name="id" value={r.id} />
-                <DeleteButton />
-              </form>
+              {canDelete ? (
+                <form action={deleteAction}>
+                  <input type="hidden" name="kind" value="project" />
+                  <input type="hidden" name="id" value={r.id} />
+                  <DeleteButton />
+                </form>
+              ) : null}
             </li>
           ))
         ) : (

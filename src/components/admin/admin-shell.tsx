@@ -1,20 +1,9 @@
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/(admin)/admin/actions";
+import { adminLinksFor } from "@/components/admin/admin-links";
 import { AdminNavLink } from "@/components/admin/admin-nav-link";
 import type { AdminUser } from "@/server/auth/session";
 
-const links = [
-  ["Dashboard", "/admin"],
-  ["Inquiries", "/admin/inquiries"],
-  ["Customers", "/admin/customers"],
-  ["Projects", "/admin/projects"],
-  ["Categories", "/admin/categories"],
-  ["Media", "/admin/media"],
-  ["Services", "/admin/services"],
-  ["Testimonials", "/admin/testimonials"],
-  ["Pages", "/admin/pages"],
-  ["Settings", "/admin/settings"],
-] as const;
 export function AdminShell({
   user,
   title,
@@ -35,7 +24,7 @@ export function AdminShell({
           aria-label="Admin"
           className="mt-6 grid grid-cols-2 gap-1 md:grid-cols-1"
         >
-          {links.map(([label, href]) => (
+          {adminLinksFor(user.role).map(({ label, href }) => (
             <AdminNavLink
               className="min-h-10 px-3 py-2 text-sm hover:bg-surface-strong"
               href={href}
