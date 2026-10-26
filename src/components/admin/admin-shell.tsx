@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/(admin)/admin/actions";
 import { adminLinksFor } from "@/components/admin/admin-links";
+import { AdminMenu } from "@/components/admin/admin-menu";
 import { AdminNavLink } from "@/components/admin/admin-nav-link";
 export { Notice } from "@/components/admin/admin-notice";
 import type { AdminUser } from "@/server/auth/session";
@@ -22,27 +23,34 @@ export function AdminShell({
       </a>
       <div className="mx-auto grid min-h-screen max-w-7xl md:grid-cols-[14rem_1fr]">
         <aside className="border-b border-border p-5 md:border-r md:border-b-0">
-          <p className="font-display text-xl">Studio CMS</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {user.name} · {user.role}
-          </p>
-          <nav
-            aria-label="Admin"
-            className="mt-6 grid grid-cols-2 gap-1 md:grid-cols-1"
+          <AdminMenu
+            header={
+              <div>
+                <p className="font-display text-xl">Studio CMS</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {user.name} · {user.role}
+                </p>
+              </div>
+            }
           >
-            {adminLinksFor(user.role).map(({ label, href }) => (
-              <AdminNavLink
-                className="min-h-10 border-l-2 border-transparent px-3 py-2 text-sm hover:bg-surface-strong [&[aria-current]]:border-accent [&[aria-current]]:bg-surface-strong"
-                href={href}
-                key={href}
-              >
-                {label}
-              </AdminNavLink>
-            ))}
-          </nav>
-          <form action={signOutAction} className="mt-6">
-            <button className="text-sm underline">Sign out</button>
-          </form>
+            <nav
+              aria-label="Admin"
+              className="mt-6 grid grid-cols-2 gap-1 md:grid-cols-1"
+            >
+              {adminLinksFor(user.role).map(({ label, href }) => (
+                <AdminNavLink
+                  className="min-h-10 border-l-2 border-transparent px-3 py-2 text-sm hover:bg-surface-strong [&[aria-current]]:border-accent [&[aria-current]]:bg-surface-strong"
+                  href={href}
+                  key={href}
+                >
+                  {label}
+                </AdminNavLink>
+              ))}
+            </nav>
+            <form action={signOutAction} className="mt-6">
+              <button className="inline-flex min-h-10 items-center text-sm underline">Sign out</button>
+            </form>
+          </AdminMenu>
         </aside>
         {/* Focusable only as the skip link's target, so focus lands inside it rather than staying on the link. */}
         <main id="main-content" className="min-w-0 p-5 focus:outline-none sm:p-8" tabIndex={-1}>

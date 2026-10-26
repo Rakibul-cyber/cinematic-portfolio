@@ -44,7 +44,7 @@ export default async function Page({
             >
               <div>
                 <Link
-                  className="font-medium underline"
+                  className="inline-block py-1 font-medium underline"
                   href={`/admin/projects/${r.id}`}
                 >
                   {r.title}

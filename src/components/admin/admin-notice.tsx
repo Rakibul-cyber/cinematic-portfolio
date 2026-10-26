@@ -3,15 +3,22 @@
 import { useEffect, useRef } from "react";
 
 /**
- * The page-level notice an admin action leaves after redirecting back, such
- * as "Customer updated" or why a category could not be deleted.
+ * The page-level notice an admin action leaves after redirecting back.
  *
- * The redirect replaces the page, so focus would otherwise fall back to the
- * document and the notice would be easy to miss. It takes focus when it
- * appears (it is not an extra Tab stop) and stays an alert for screen readers
- * that announce on insertion. The text is the fixed, server-chosen message.
+ * The redirect adds `?saved=` or `?error=`, and the App Router treats a page
+ * with different search params as a new page: it is mounted afresh, so the
+ * button that was used no longer exists and focus would fall back to the
+ * document. The notice therefore takes focus when it appears (it is not an
+ * extra Tab stop), which puts the reader at the outcome and the next Tab into
+ * the page's content.
+ *
+ * `alert` (the default) is for a refusal the administrator has to act on, such
+ * as why a category could not be deleted: assertive, with the accent border.
+ * `status` is for an ordinary outcome such as "Customer updated": polite, so
+ * it does not interrupt, with a neutral border. The text is always the fixed,
+ * server-chosen message.
  */
-export function Notice({ message }: { message?: string }) {
+export function Notice({ message, tone = "alert" }: { message?: string; tone?: "alert" | "status" }) {
   const ref = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
@@ -19,7 +26,13 @@ export function Notice({ message }: { message?: string }) {
   }, [message]);
 
   return message ? (
-    <p className="mb-5 border border-accent p-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" ref={ref} role="alert" tabIndex={-1}>
+    <p
+      aria-live={tone === "status" ? "polite" : undefined}
+      className={`mb-5 border ${tone === "status" ? "border-border" : "border-accent"} p-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+      ref={ref}
+      role={tone}
+      tabIndex={-1}
+    >
       {message}
     </p>
   ) : null;

@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
-import Link from "next/link";
 import { AdminForm } from "@/components/admin/admin-form";
+import { AdminShell } from "@/components/admin/admin-shell";
 import { DeleteButton } from "@/components/admin/delete-button";
 
 import {
@@ -8,7 +8,7 @@ import {
   updateMediaMetadataAction,
 } from "@/app/(admin)/admin/media/actions";
 import { UploadForm } from "@/app/(admin)/admin/media/upload-form";
-import { ADMIN_MEDIA_PATH, ADMIN_ROOT_PATH } from "@/lib/admin-routes";
+import { ADMIN_MEDIA_PATH } from "@/lib/admin-routes";
 import { formatBytes } from "@/lib/media";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
@@ -17,25 +17,15 @@ import { mediaUrl } from "@/server/media/r2";
 export const dynamic = "force-dynamic";
 
 export default async function MediaPage() {
-  await requireUser(ADMIN_MEDIA_PATH);
+  const user = await requireUser(ADMIN_MEDIA_PATH);
   const media = await prisma.media.findMany({
     orderBy: { createdAt: "desc" },
     include: { variants: true, createdBy: { select: { name: true } } },
   });
 
   return (
-    <main id="main-content" className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
-      <header className="mb-8 flex items-end justify-between gap-4 border-b border-border pb-6">
-        <div>
-          <p className="text-xs tracking-[.16em] text-muted-foreground uppercase">
-            Media system
-          </p>
-          <h1 className="mt-2 font-display text-4xl">Media library</h1>
-        </div>
-        <Link href={ADMIN_ROOT_PATH} className="text-sm underline">
-          Admin home
-        </Link>
-      </header>
+    // Inside the shared shell (predates it otherwise) for the same navigation, skip link and main region as every other admin page.
+    <AdminShell user={user} title="Media library">
       <UploadForm />
       <section className="mt-10" aria-labelledby="library-heading">
         <h2 id="library-heading" className="mb-4 font-display text-2xl">
@@ -110,12 +100,13 @@ export default async function MediaPage() {
                       </label>
                       <button className="min-h-10 border border-border px-4 text-xs font-semibold tracking-wider uppercase hover:border-foreground">
                         Save metadata
+                        <span className="sr-only"> for {item.originalName}</span>
                       </button>
                     </form>
                     {/* An image still used by a project is refused; the reason appears here, beside it. */}
                     <AdminForm action={deleteMediaAction} className="grid gap-2">
                       <input type="hidden" name="id" value={item.id} />
-                      <DeleteButton>Delete image and all variants</DeleteButton>
+                      <DeleteButton itemName={item.originalName}>Delete image and all variants</DeleteButton>
                     </AdminForm>
                   </div>
                 </li>
@@ -124,6 +115,6 @@ export default async function MediaPage() {
           </ul>
         )}
       </section>
-    </main>
+    </AdminShell>
   );
 }

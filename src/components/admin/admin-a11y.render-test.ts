@@ -247,7 +247,8 @@ describe("labels and table semantics", () => {
   });
 
   it("the inquiry table has a caption describing the rows shown and column-scoped headers", () => {
-    assert.match(inquiries, /<caption className="sr-only">\{`Inquiries\$\{status\?` with status \$\{status\}`:""\}\$\{q\?` matching “\$\{q\}”`:""\}, newest first, /);
+    assert.match(inquiries, /const caption=`Inquiries\$\{status\?` with status \$\{status\}`:""\}\$\{q\?` matching “\$\{q\}”`:""\}, newest first, /);
+    assert.match(inquiries, /<caption className="sr-only">\{caption\}<\/caption>/);
     assert.match(inquiries, /<th className="border-b p-3" key=\{x\} scope="col">/);
   });
 
