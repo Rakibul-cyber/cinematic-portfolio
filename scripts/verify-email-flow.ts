@@ -1,3 +1,5 @@
+// Must stay first: refuses a non-approved database before anything can connect.
+import "./lib/require-non-production-database";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 

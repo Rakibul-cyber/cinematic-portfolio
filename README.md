@@ -378,10 +378,10 @@ points the CLI at the direct connection.
 
 ```powershell
 npm run db:generate        # regenerate the Prisma Client
-npm run db:migrate         # create and apply a development migration
+npm run db:migrate         # create and apply a development migration (guarded)
 npm run db:migrate:status  # compare migration history with the database
-npm run db:migrate:deploy  # apply committed migrations (deployment)
-npm run db:studio          # browse data locally
+npm run db:migrate:deploy  # apply committed migrations (guarded; see below for production)
+npm run db:studio          # browse data locally (guarded)
 ```
 
 Migrations are the only supported way to change the schema; `prisma db push` is
@@ -390,6 +390,73 @@ already-applied migration is never edited — add a new one instead.
 
 The generated client in `src/generated/` is git-ignored and rebuilt by
 `postinstall`.
+
+## Local database write safety
+
+Every local tool that writes to the database uses whatever `.env.local` names.
+If that is the production branch, a verification run seeds and deletes rows in
+the launch database, and `prisma migrate dev` can offer to reset it. A guard
+therefore runs first and refuses any target it cannot confirm is an approved
+non-production database. It exits non-zero before anything connects, and its
+messages name variables, never values.
+
+**Why the branch label is not enough.** A Neon connection string names a
+compute *endpoint* (the `ep-…` part of the host), not a branch, so nothing in
+the URL proves which branch it reaches, and `NEON_BRANCH` is an informational
+label that anyone can edit. The guard instead requires you to declare the
+endpoint you trust and checks that every connection URL actually points at it.
+
+**Use a separate development branch.** In the Neon console, create a branch
+from `production` (for example `development`), open **Connect** for that branch,
+and put its pooled and direct strings into `DATABASE_URL` and
+`DATABASE_URL_UNPOOLED`. Then add, in `.env.local`:
+
+```dotenv
+NEON_BRANCH=development
+DEV_DATABASE_ENDPOINT=ep-xxxx-xxxxxxxx      # the endpoint id from that branch's host, without -pooler
+PRODUCTION_DATABASE_ENDPOINT=ep-yyyy-yyyyyyyy  # optional locally; production's endpoint id
+```
+
+A local PostgreSQL also works: `DEV_DATABASE_ENDPOINT` is then its host name,
+for example `localhost`.
+
+A target is approved only when all of these hold:
+
+- `NEON_BRANCH` is set and is not `production`, `prod`, `main`, or `master`
+  (case-insensitive);
+- `DATABASE_URL` is a PostgreSQL URL naming exactly one host, and
+  `DATABASE_URL_UNPOOLED`, when set, reaches the same endpoint;
+- neither URL redirects its host through `host`, `hostaddr`, or an `options`
+  endpoint parameter;
+- that endpoint equals `DEV_DATABASE_ENDPOINT` and is not
+  `PRODUCTION_DATABASE_ENDPOINT`.
+
+**Protected commands.** `cms:verify`, `crm:verify`, `email:verify`,
+`media:verify`, `public:verify`, `security:verify` (the guard is each script's
+first import, so running the file directly with `tsx` is guarded too),
+`db:migrate`, `db:studio`, `db:migrate:deploy`, and `admin:bootstrap`.
+`db:migrate:status`, `db:generate`, and the offline `seo:`, `analytics:`, and
+`deploy:verify` scripts do not write and are not guarded.
+
+**Production operations.** Only `admin:bootstrap` and `db:migrate:deploy` may
+run against production, and only when all three are true: the connection URLs
+point at the declared `PRODUCTION_DATABASE_ENDPOINT`, the command is given
+`--allow-production`, and you type that endpoint id at the interactive prompt.
+There is no non-interactive path. Every other command rejects the flag.
+
+```powershell
+npm run db:migrate:deploy -- --allow-production
+```
+
+**What the guard does not cover.** It protects the commands above when they
+are started through npm or, for the scripts, through `tsx`. Running the Prisma
+CLI directly (`npx prisma migrate dev`) bypasses it, and so does the
+application itself: `next dev` and `next start` write sessions, audit rows, and
+inquiries to whatever `.env.local` names, as does `auth:verify` through the
+running server. Keep `.env.local` on a development branch. The declared
+endpoints come from your own environment too, so the guard prevents accidents,
+not deliberate misconfiguration; confirming a branch's real identity needs the
+Neon console or CLI.
 
 ## First administrator
 
@@ -409,6 +476,11 @@ Remove-Item Env:\ADMIN_BOOTSTRAP_PASSWORD
 script refuses an email that already exists and does not reset passwords.
 Hashing is performed by Better Auth; the password is never logged, printed, or
 written to the audit trail.
+
+The script is guarded like the other database-writing tools. To create the
+production administrator, point the connection URLs at production, declare
+`PRODUCTION_DATABASE_ENDPOINT`, add `--allow-production`, and type the endpoint
+id when prompted (see "Local database write safety").
 
 Then sign in at `http://localhost:3000/admin/login`.
 

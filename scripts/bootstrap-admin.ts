@@ -28,18 +28,21 @@
  * in the imported modules resolve to a no-op outside the Next.js bundler, and
  * with `--env-file-if-exists=.env.local` so credentials are present before the
  * auth configuration is evaluated. See the `admin:bootstrap` package script.
+ *
+ * The database write guard runs before the auth configuration and Prisma
+ * client are loaded, which is why those are imported dynamically in `main`.
+ * Against production, the operator must pass `--allow-production`, have
+ * `PRODUCTION_DATABASE_ENDPOINT` declared, and type the endpoint id at the
+ * prompt. See README, "Local database write safety".
  */
 import { randomUUID } from "node:crypto";
 import { parseArgs } from "node:util";
 
 import { AdminRole } from "@/generated/prisma/enums";
-import {
-  AuditAction,
-  AuditEntityType,
-  recordAuditLog,
-} from "@/server/audit/audit-log";
-import { auth } from "@/server/auth/config";
-import { prisma } from "@/server/db/prisma";
+
+import { enforceWithProductionConfirmation, processIo } from "./lib/database-write-guard";
+
+let disconnect: () => Promise<void> = async () => {};
 
 type BootstrapArgs = {
   email: string;
@@ -60,6 +63,8 @@ function readArgs(): BootstrapArgs {
       email: { type: "string" },
       name: { type: "string" },
       role: { type: "string", default: AdminRole.SUPER_ADMIN },
+      // Read by the database write guard, not here.
+      "allow-production": { type: "boolean" },
     },
     allowPositionals: false,
   });
@@ -106,6 +111,15 @@ function readPassword(): string {
 async function main(): Promise<void> {
   const { email, name, role } = readArgs();
   const password = readPassword();
+
+  await enforceWithProductionConfirmation(
+    { operation: "admin:bootstrap", env: process.env, argv: process.argv.slice(2) },
+    processIo(),
+  );
+  const { AuditAction, AuditEntityType, recordAuditLog } = await import("@/server/audit/audit-log");
+  const { auth } = await import("@/server/auth/config");
+  const { prisma } = await import("@/server/db/prisma");
+  disconnect = () => prisma.$disconnect();
 
   const existing = await prisma.user.findUnique({
     where: { email },
@@ -177,4 +191,4 @@ main()
   .catch((error: unknown) =>
     fail(error instanceof Error ? error.message : "unexpected error"),
   )
-  .finally(() => prisma.$disconnect());
+  .finally(() => disconnect());

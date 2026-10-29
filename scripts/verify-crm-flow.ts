@@ -1,3 +1,5 @@
+// Must stay first: refuses a non-approved database before anything can connect.
+import "./lib/require-non-production-database";
 import assert from "node:assert/strict"; import { randomUUID } from "node:crypto"; import { createInquiry,updateCustomer } from "@/server/crm/service"; import { prisma } from "@/server/db/prisma";
 async function main() {
 const token=randomUUID().slice(0,8); const email=`CRM-${token}@Example.invalid`; const existingActor=await prisma.user.findFirst({select:{id:true,name:true,email:true,role:true}}); const temporaryActorId=existingActor?null:randomUUID(); const actor=existingActor??await prisma.user.create({data:{id:temporaryActorId!,name:"CRM verifier",email:`crm-verifier-${token}@invalid.example`,role:"EDITOR"},select:{id:true,name:true,email:true,role:true}}); const ids:string[]=[];
