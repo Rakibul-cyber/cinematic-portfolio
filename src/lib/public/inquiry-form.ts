@@ -18,20 +18,20 @@ export type InquiryFieldConfig = {
 
 /** The text inputs, in display order. */
 export const INQUIRY_INPUT_FIELDS: readonly InquiryFieldConfig[] = [
-  { name: "name", label: "Name", required: true, autoComplete: "name" },
-  { name: "email", label: "Email", required: true, type: "email", autoComplete: "email" },
-  { name: "phone", label: "Phone", type: "tel", autoComplete: "tel" },
+  { name: "name", label: "Full name", required: true, autoComplete: "name" },
+  { name: "email", label: "Email address", required: true, type: "email", autoComplete: "email" },
+  { name: "phone", label: "Phone (optional)", type: "tel", autoComplete: "tel" },
   { name: "whatsapp", label: "WhatsApp", type: "tel", autoComplete: "tel" },
   { name: "company", label: "Company", autoComplete: "organization" },
-  { name: "projectType", label: "Project type", required: true },
-  { name: "projectDate", label: "Preferred date", type: "date" },
+  { name: "projectType", label: "Service or project type", required: true },
+  { name: "projectDate", label: "Event or project date (optional)", type: "date" },
   { name: "location", label: "Location" },
   { name: "budgetLabel", label: "Budget" },
   { name: "referralSource", label: "How did you hear about us?" },
 ];
 
 export const INQUIRY_SERVICE_FIELD: InquiryFieldConfig = { name: "serviceSlug", label: "Service" };
-export const INQUIRY_MESSAGE_FIELD: InquiryFieldConfig = { name: "message", label: "Message", required: true };
+export const INQUIRY_MESSAGE_FIELD: InquiryFieldConfig = { name: "message", label: "Message / project description", required: true };
 
 /** Every visible field, in the order the error summary lists them. */
 export const INQUIRY_FIELDS: readonly InquiryFieldConfig[] = [

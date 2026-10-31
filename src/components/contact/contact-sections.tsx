@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { contactDetails, contactDisciplines } from "@/content/site";
+import { type ContactDetails, contactDisciplines } from "@/content/site";
 
 /**
  * Presentational sections of the contact page, free of data access so they
@@ -59,8 +59,10 @@ function Icon({ path }: { path: string }) {
 function DirectCard({ action, children, icon, label }: { action?: { href: string; label: string }; children: ReactNode; icon: string; label: string }) {
   return (
     <div className="mv-card">
-      <Icon path={icon} />
-      <dt className="mv-label">{label}</dt>
+      <dt className="mv-label">
+        <Icon path={icon} />
+        {label}
+      </dt>
       <dd className="mv-card-value">{children}</dd>
       {action ? (
         <dd className="mv-card-action">
@@ -71,8 +73,8 @@ function DirectCard({ action, children, icon, label }: { action?: { href: string
   );
 }
 
-export function DirectContact({ children }: { children?: ReactNode }) {
-  const { addressLines, business, email, phoneDisplay, phoneHref } = contactDetails;
+export function DirectContact({ children, details }: { children?: ReactNode; details: ContactDetails }) {
+  const { addressLines, business, email, phoneDisplay, phoneHref } = details;
 
   return (
     <section aria-labelledby="direct-contact-title" className="mv-direct" id="direct-contact">

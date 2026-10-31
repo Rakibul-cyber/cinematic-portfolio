@@ -182,7 +182,7 @@ describe("inquiry copy text", () => {
   it("lists visible fields by label, in display order, with the message last", () => {
     assert.equal(
       inquiryCopyText((name) => entries[name]),
-      "Name: Test Visitor\nEmail: visitor@example.test\nService: Weddings\nMessage:\nFirst line.\nSecond line.",
+      "Full name: Test Visitor\nEmail address: visitor@example.test\nService: Weddings\nMessage / project description:\nFirst line.\nSecond line.",
     );
   });
 

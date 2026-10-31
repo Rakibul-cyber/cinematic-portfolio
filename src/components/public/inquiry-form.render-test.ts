@@ -324,6 +324,36 @@ describe("project-type chips and optional details", () => {
     assert.equal(focused(), field("location"));
   });
 
+  it("marks the chips required for assistive technology, leaving validation to the server", async () => {
+    await mount(harness().submitAction);
+    assert.equal(radios().length, 6);
+    for (const radio of radios()) assert.equal(radio.required, true);
+    assert.equal(form()!.noValidate, true);
+    const h = harness();
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await mount(h.submitAction);
+    await act(async () => form()!.requestSubmit());
+    assert.equal(h.calls.length, 1, "an unselected group still reaches the server");
+    await answer(h.answers[0]!, { state: VALIDATION });
+  });
+
+  it("names every error-summary entry with the label the visitor sees on that field", async () => {
+    const h = harness();
+    await mount(h.submitAction);
+    const names = ["name", "email", "phone", "whatsapp", "company", "projectDate", "location", "budgetLabel", "referralSource", "serviceSlug", "message"];
+    const errors = Object.fromEntries([...names, "projectType"].map((name) => [name, ["Problem."]]));
+    await act(async () => form()!.requestSubmit());
+    await answer(h.answers[0]!, { state: { success: false, message: "Please check the highlighted fields.", errors } });
+    const visible = (text: string | null) => (text ?? "").replace(/\s*\*$/, "");
+    for (const name of names) {
+      const label = visible(container.querySelector(`label[for="inquiry-${name}"]`)!.textContent);
+      assert.equal(container.querySelector(`#inquiry-error-summary a[href="#inquiry-${name}"]`)!.textContent, `${label}: Problem.`, name);
+    }
+    const legend = visible(container.querySelector(".mv-chips-legend")!.textContent);
+    assert.equal(container.querySelector('#inquiry-error-summary a[href="#inquiry-projectType"]')!.textContent, `${legend}: Problem.`);
+  });
+
   it("copies the checked chip, not the empty hidden field", async () => {
     const clipboard: string[] = [];
     Object.defineProperty(globalThis.navigator, "clipboard", { configurable: true, value: { writeText: async (text: string) => void clipboard.push(text) } });
@@ -334,7 +364,7 @@ describe("project-type chips and optional details", () => {
     await answer(h.answers[0]!, { error: new UnrecognizedActionError('Server Action "abc" was not found on the server.') });
     const copyButton = [...container.querySelectorAll("button")].find((b) => b.textContent === OUTDATED_COPY_LABEL)!;
     await act(async () => copyButton.click());
-    assert.match(clipboard[0]!, /^Project type: Commercial shoot$/m);
+    assert.match(clipboard[0]!, /^Service or project type: Commercial shoot$/m);
     delete (globalThis.navigator as { clipboard?: unknown }).clipboard;
   });
 });
@@ -424,10 +454,10 @@ describe("mounted inquiry form after a deployment", () => {
     assert.equal(h.calls.length, 1);
     assert.equal(clipboard!.writes.length, 1);
     const copied = clipboard!.writes[0]!;
-    assert.match(copied, /^Name: Test Visitor$/m);
-    assert.match(copied, /^Email: visitor@example\.test$/m);
+    assert.match(copied, /^Full name: Test Visitor$/m);
+    assert.match(copied, /^Email address: visitor@example\.test$/m);
     assert.match(copied, /^Service: Weddings$/m, "the option's text, not its value");
-    assert.match(copied, /Message:\nA test message that is long enough to pass\.$/);
+    assert.match(copied, /Message \/ project description:\nA test message that is long enough to pass\.$/);
     for (const secret of SECRETS) assert.ok(!copied.includes(secret), "a hidden field was copied");
     assert.equal(status.textContent, OUTDATED_COPY_SUCCESS);
     assertValuesKept();
@@ -482,7 +512,7 @@ describe("mounted inquiry form after a deployment", () => {
     await act(async () => copyButton.click());
     assert.equal(h.calls.length, 2, "copying never submits");
     const copied = clipboard!.writes[0]!;
-    assert.match(copied, /^Name: Test Visitor$/m);
+    assert.match(copied, /^Full name: Test Visitor$/m);
     for (const secret of SECRETS) assert.ok(!copied.includes(secret), "a hidden field was copied");
   });
 });

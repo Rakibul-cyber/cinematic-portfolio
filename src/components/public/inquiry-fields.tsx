@@ -91,7 +91,9 @@ export function InquiryInput({ error, field, hint }: { error?: string; field: In
  * nothing: without it the server would report a generic missing-field error
  * instead of the schema's own message. A checked radio follows it in the form
  * data and wins. The first radio carries the field's id, so an error summary
- * link can still focus the group.
+ * link can still focus the group. `required` tells assistive technology what the
+ * visually hidden asterisk cannot; the form is `noValidate`, so the server
+ * remains the only validator.
  */
 export function InquiryChoiceChips({ error, field, options }: { error?: string; field: InquiryFieldConfig; options: readonly string[] }) {
   return (
@@ -104,7 +106,7 @@ export function InquiryChoiceChips({ error, field, options }: { error?: string; 
       <div className="mv-chips-list">
         {options.map((option, index) => (
           <label className="mv-chip" key={option}>
-            <input className={inquiryFocusOffsetClass} id={index === 0 ? inquiryFieldId(field.name) : undefined} name={field.name} type="radio" value={option}/>
+            <input className={inquiryFocusOffsetClass} id={index === 0 ? inquiryFieldId(field.name) : undefined} name={field.name} required={field.required} type="radio" value={option}/>
             <span aria-hidden="true" className="mv-chip-dot"/>
             {option}
           </label>

@@ -7,11 +7,12 @@ import { SocialLinks } from "@/components/public/social-links";
 import { InquiryForm } from "@/components/public/inquiry-form";
 import { JsonLd } from "@/components/seo/json-ld";
 import { isInquiryIntakeOpen } from "@/content/legal";
-import { contactDetails, emptyStates } from "@/content/site";
+import { emptyStates, resolveContactDetails } from "@/content/site";
 import { buildPublicMetadata } from "@/server/public/metadata";
 import {
   getActiveSocialLinks,
   getPublicPage,
+  getPublicSiteSettings,
   getActiveServices,
 } from "@/server/public/queries";
 import { breadcrumbStructuredData } from "@/server/seo/structured-data";
@@ -41,9 +42,10 @@ export async function generateMetadata(): Promise<Metadata> {
  * `isInquiryIntakeOpen()` holds; the action enforces the same gate itself.
  */
 export default async function ContactPage() {
-  const [page, socialLinks, services, structuredData] =
+  const [page, settings, socialLinks, services, structuredData] =
     await Promise.all([
       getPublicPage("contact"),
+      getPublicSiteSettings(),
       getActiveSocialLinks(),
       getActiveServices(),
       breadcrumbStructuredData([
@@ -51,6 +53,8 @@ export default async function ContactPage() {
         { name: "Contact", path: "/contact" },
       ]),
     ]);
+
+  const details = resolveContactDetails(settings);
 
   return (
     <main className="mv-contact" id="main-content">
@@ -80,10 +84,10 @@ export default async function ContactPage() {
         </div>
       </section>
 
-      <DirectContact>
+      <DirectContact details={details}>
         <SocialLinks
           className="mv-direct-social"
-          label={`${contactDetails.business} on social media`}
+          label={`${details.business} on social media`}
           links={socialLinks}
         />
       </DirectContact>

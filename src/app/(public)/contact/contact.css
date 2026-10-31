@@ -472,6 +472,7 @@
 }
 
 .mv-contact .mv-icon {
+  display: block;
   width: 1.5rem;
   height: 1.5rem;
   margin-bottom: 1.5rem;

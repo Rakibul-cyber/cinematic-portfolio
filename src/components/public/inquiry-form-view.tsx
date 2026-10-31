@@ -12,9 +12,8 @@ const PROJECT_TYPE_OPTIONS = ["Photography", "Film & video", "Event coverage", "
 /** Fields tucked into the collapsed optional details; they open if one has an error. */
 const OPTIONAL_DETAIL_FIELDS = ["whatsapp", "company", "location", "budgetLabel", "referralSource"] as const;
 
-function fieldConfig(name: string, label?: string) {
-  const field = INQUIRY_INPUT_FIELDS.find((candidate) => candidate.name === name)!;
-  return label ? { ...field, label } : field;
+function fieldConfig(name: string) {
+  return INQUIRY_INPUT_FIELDS.find((candidate) => candidate.name === name)!;
 }
 
 function FormAct({ children, index, title }: { children: ReactNode; index: string; title: string }) {
@@ -65,19 +64,19 @@ export function InquiryFormView({ services, submitAction, turnstileSiteKey }: { 
   }, [state]);
   if (state.success) return <InquiryConfirmation message={state.message} ref={confirmationRef}/>;
   const error = (name: string) => state.errors?.[name]?.[0];
-  const input = (name: string, label?: string, hint?: string) => <InquiryInput error={error(name)} field={fieldConfig(name, label)} hint={hint} key={name}/>;
+  const input = (name: string, hint?: string) => <InquiryInput error={error(name)} field={fieldConfig(name)} hint={hint} key={name}/>;
   return <form action={action} className="mv-form" noValidate onSubmit={onSubmit}>
     <input name={SUBMISSION_TOKEN_FIELD} type="hidden" value={submissionToken}/><div aria-hidden="true" className="absolute -left-[10000px]"><label>Website<input autoComplete="off" name="website" tabIndex={-1}/></label></div>
     {state.unconfirmed ? <InquiryUnconfirmedSummary disabled={pending || !submissionToken} ref={summaryRef}/> : state.outdated ? <InquiryOutdatedSummary priorUnconfirmed={state.priorUnconfirmed} ref={summaryRef}/> : state.message ? <InquiryErrorSummary errors={state.errors} message={state.message} ref={summaryRef}/> : null}
     <FormAct index="01" title="About you">
-      <div className="mv-fields">{input("name", "Full name")}{input("email", "Email address")}{input("phone", "Phone (optional)")}</div>
+      <div className="mv-fields">{input("name")}{input("email")}{input("phone")}</div>
     </FormAct>
     <FormAct index="02" title="The project">
-      <InquiryChoiceChips error={error("projectType")} field={fieldConfig("projectType", "Service or project type")} options={PROJECT_TYPE_OPTIONS}/>
-      <div className="mv-fields">{input("projectDate", "Event or project date (optional)", "Flexible or undecided? Leave it blank.")}</div>
+      <InquiryChoiceChips error={error("projectType")} field={fieldConfig("projectType")} options={PROJECT_TYPE_OPTIONS}/>
+      <div className="mv-fields">{input("projectDate", "Flexible or undecided? Leave it blank.")}</div>
     </FormAct>
     <FormAct index="03" title="Your story">
-      <InquiryTextarea error={error(INQUIRY_MESSAGE_FIELD.name)} field={{ ...INQUIRY_MESSAGE_FIELD, label: "Message / project description" }} hint="The more you share about your idea, the better we can shape it."/>
+      <InquiryTextarea error={error(INQUIRY_MESSAGE_FIELD.name)} field={INQUIRY_MESSAGE_FIELD} hint="The more you share about your idea, the better we can shape it."/>
     </FormAct>
     <details className="mv-details" ref={detailsRef}>
       <summary>Add optional details</summary>

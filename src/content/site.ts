@@ -34,14 +34,43 @@ export const legalNavigation: readonly NavigationItem[] = [
  */
 export const FALLBACK_STUDIO_NAME = "Portfolio";
 
-/** Public business details for the contact page, as confirmed by the owner. */
+/** Public business details, as confirmed by the owner. The contact page's fallback. */
 export const contactDetails = {
   business: "Munir Visuals",
   email: "official.munirx@gmail.com",
   phoneDisplay: "+49 157 57801897",
   phoneHref: "tel:+4915757801897",
   addressLines: ["Ernst-Lemmer-Straße 17", "35041 Marburg-Wehrda", "Germany"],
-} as const;
+};
+
+export type ContactDetails = typeof contactDetails;
+
+/**
+ * The contact page's details: saved site settings where present, so it agrees
+ * with the rest of the site, and the confirmed details otherwise. A phone is
+ * used only with its dialable link, so the number and the Call action always
+ * belong together.
+ */
+export function resolveContactDetails(
+  settings: {
+    studioName: string;
+    contactEmail: string | null;
+    contactPhone: string | null;
+    phoneHref: string | null;
+    locationText: string | null;
+  } | null,
+): ContactDetails {
+  const phone = settings?.contactPhone?.trim();
+  const location = settings?.locationText?.trim();
+
+  return {
+    business: settings?.studioName.trim() || contactDetails.business,
+    email: settings?.contactEmail?.trim() || contactDetails.email,
+    phoneDisplay: phone && settings?.phoneHref ? phone : contactDetails.phoneDisplay,
+    phoneHref: phone && settings?.phoneHref ? settings.phoneHref : contactDetails.phoneHref,
+    addressLines: location ? [location] : contactDetails.addressLines,
+  };
+}
 
 /** Disciplines listed in the contact hero, from the approved design. */
 export const contactDisciplines = [

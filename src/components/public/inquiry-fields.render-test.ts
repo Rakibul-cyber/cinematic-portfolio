@@ -29,7 +29,7 @@ const phoneField = INQUIRY_INPUT_FIELDS.find((field) => field.name === "phone")!
 describe("inquiry field markup", () => {
   it("labels the control explicitly, without the error text in its name", () => {
     const html = render(React.createElement(InquiryInput, { error: "Enter a valid email address.", field: emailField }));
-    assert.match(html, /<label for="inquiry-email">Email<span aria-hidden="true"> \*<\/span><\/label>/);
+    assert.match(html, /<label for="inquiry-email">Email address<span aria-hidden="true"> \*<\/span><\/label>/);
     assert.doesNotMatch(html, /<label[^>]*>[^]*Enter a valid[^]*<\/label>/);
   });
 
@@ -114,7 +114,7 @@ describe("inquiry error summary", () => {
 
   it("links each visible field error to its control", () => {
     const html = summary();
-    assert.match(html, /<a[^>]*href="#inquiry-email"[^>]*>Email: Enter a valid email address\.<\/a>/);
+    assert.match(html, /<a[^>]*href="#inquiry-email"[^>]*>Email address: Enter a valid email address\.<\/a>/);
     assert.doesNotMatch(html, /submissionToken/);
   });
 
