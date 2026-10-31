@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { before, describe, it } from "node:test";
 import React, { createElement, Fragment } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import * as siteCopy from "@/content/site";
 import { draftAwareTitle, isValidLegalApproval, legalDraftReasons, legalTodoCount } from "@/lib/legal/draft-status";
 
 /**
@@ -34,6 +35,7 @@ before(async () => {
 const APPROVED = { approvedOn: "2026-11-02", approvedBy: "Example Law Firm" };
 const KEYS = ["impressum", "legalNotice", "datenschutz", "privacy"] as const;
 const LEGAL_PATHS = ["/impressum", "/legal-notice", "/datenschutz", "/privacy"];
+const navigationPaths = () => siteCopy.legalNavigation.map((item) => item.href);
 
 describe("finding unfinished legal facts", () => {
   it("counts every marker, however deeply nested in fragments, arrays and markup", () => {
@@ -154,6 +156,67 @@ describe("wiring", () => {
     const source = readFileSync("scripts/verify-deploy-flow.ts", "utf8");
     assert.match(source, /legalLaunchProblems\(\)/);
     assert.ok(source.indexOf('section("legal pages")') > source.indexOf('section("security headers coexistence")'));
+  });
+});
+
+describe("public release safeguards while documents are drafts", () => {
+  const pages = {
+    impressum: "src/app/(public)/impressum/page.tsx",
+    legalNotice: "src/app/(public)/legal-notice/page.tsx",
+    datenschutz: "src/app/(public)/datenschutz/page.tsx",
+    privacy: "src/app/(public)/privacy/page.tsx",
+  } as const;
+
+  it("answers 404 from each legal route, in both its metadata and its page, before anything else", () => {
+    for (const [key, file] of Object.entries(pages)) {
+      const source = readFileSync(file, "utf8");
+      const gate = `if (isLegalDraft("${key}")) notFound();`;
+      assert.equal(source.split(gate).length - 1, 2, `${file} gates metadata and page`);
+      assert.ok(source.indexOf(gate) < source.indexOf("buildPublicMetadata({"), `${file} metadata gate comes first`);
+      assert.ok(source.lastIndexOf(gate) < source.indexOf("<LegalDocument"), `${file} page gate comes first`);
+    }
+  });
+
+  it("has no loading boundary above the legal routes, which would turn the 404 into a soft 200", () => {
+    for (const file of ["src/app/loading.tsx", "src/app/(public)/loading.tsx", ...Object.values(pages).map((page) => page.replace("page.tsx", "loading.tsx"))]) {
+      assert.equal(existsSync(file), false, file);
+    }
+  });
+
+  it("links only published documents from the footer, and omits the legal navigation when none are", () => {
+    const source = readFileSync("src/components/layout/site-footer.tsx", "utf8");
+    assert.match(source, /legalNavigation\.filter\(\(item\) => !draftPaths\.includes\(item\.href\)\)/);
+    assert.match(source, /publishedLegalLinks\.length \?/);
+    assert.doesNotMatch(source, /legalNavigation\.map/);
+    // Every footer link must be one the gate can recognise as a draft.
+    assert.deepEqual(navigationPaths().sort(), [...LEGAL_PATHS].sort());
+    for (const path of navigationPaths()) assert.ok(legal.draftLegalPaths().includes(path), `${path} is hidden today`);
+  });
+
+  it("keeps inquiry intake closed today, and while either privacy document is a draft", () => {
+    assert.equal(legal.isInquiryIntakeOpen(), false);
+    const source = readFileSync("src/content/legal.tsx", "utf8");
+    assert.match(source, /return !isLegalDraft\("privacy"\) && !isLegalDraft\("datenschutz"\);/);
+  });
+
+  it("refuses in the server action before any parsing, database, rate-limit, Turnstile or email work", () => {
+    const source = readFileSync("src/app/(public)/contact/actions.ts", "utf8");
+    const body = source.slice(source.indexOf("export async function submitInquiry"));
+    const gate = body.indexOf("if (!isInquiryIntakeOpen()) return { success: false, message: emptyStates.inquiry };");
+    assert.ok(gate > 0, "the gate is present");
+    for (const work of ["inquirySchema.safeParse", "prisma.", "headers()", "consumeInquiryLimit(", "verifyTurnstile(", "createInquiry(", "deliverInquiryEmails("]) {
+      assert.ok(body.indexOf(work) > gate, `${work} runs only after the gate`);
+    }
+  });
+
+  it("renders the form and Turnstile only while intake is open, and the approved wording otherwise", () => {
+    const source = readFileSync("src/app/(public)/contact/page.tsx", "utf8");
+    const open = source.indexOf("{isInquiryIntakeOpen() ? (");
+    const form = source.indexOf("<InquiryForm ");
+    const closed = source.indexOf("{emptyStates.inquiry}");
+    assert.ok(open > 0 && open < form && form < closed, "the form sits inside the open branch");
+    assert.equal(source.split("<InquiryForm ").length - 1, 1, "the form is rendered from one place");
+    assert.equal(siteCopy.emptyStates.inquiry, "Online inquiries will open soon.");
   });
 });
 

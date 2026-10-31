@@ -1,5 +1,7 @@
 "use server";
 import { headers } from "next/headers";
+import { isInquiryIntakeOpen } from "@/content/legal";
+import { emptyStates } from "@/content/site";
 import { inquirySchema } from "@/lib/validation/crm";
 import { normalizeEmail } from "@/lib/validation/crm";
 import { createInquiry, InvalidServiceError } from "@/server/crm/service";
@@ -16,6 +18,9 @@ export type InquiryFormState = { success: boolean; message?: string; errors?: Re
 // indistinguishable from a first-time submission.
 const SUCCESS_MESSAGE = "Thank you. Your inquiry has been received.";
 export async function submitInquiry(_: InquiryFormState, form: FormData): Promise<InquiryFormState> {
+  // Hiding the form does not remove this action, which stays directly callable,
+  // so the gate belongs here: nothing below may run while intake is closed.
+  if (!isInquiryIntakeOpen()) return { success: false, message: emptyStates.inquiry };
   const parsed = inquirySchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { success: false, message: "Please check the highlighted fields.", errors: parsed.error.flatten().fieldErrors };
   try {

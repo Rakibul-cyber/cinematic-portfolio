@@ -53,6 +53,7 @@ export const sectionLabels = {
 export const emptyStates = {
   work: "New work is being prepared for this portfolio. Please check back soon.",
   showreel: "The showreel is being prepared.",
+  inquiry: "Online inquiries will open soon.",
 } as const;
 
 /** Fallback metadata used before global SEO defaults are configured. */

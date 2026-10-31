@@ -233,7 +233,7 @@ export const englishPrivacy: LegalSection[] = [
  * `approval` stays `null` until the responsible person has completed every
  * TODO and a qualified reviewer has approved the final text; record it then as
  * `{ approvedOn: "YYYY-MM-DD", approvedBy: "<name or firm>" }`. Until both are
- * true the page shows its draft warning, is `noindex`, is left out of the
+ * true the route answers 404, its footer link is hidden, it is left out of the
  * sitemap, and `npm run deploy:verify` fails.
  */
 export const legalDocuments = {
@@ -253,6 +253,15 @@ export function legalDocumentDraftReasons(key: LegalDocumentKey): string[] {
 
 export function isLegalDraft(key: LegalDocumentKey): boolean {
   return legalDocumentDraftReasons(key).length > 0;
+}
+
+/**
+ * Whether the public inquiry form may collect personal data. Fail-closed: it
+ * opens only once both privacy documents are complete and approved, so there is
+ * no separate switch to forget.
+ */
+export function isInquiryIntakeOpen(): boolean {
+  return !isLegalDraft("privacy") && !isLegalDraft("datenschutz");
 }
 
 /**

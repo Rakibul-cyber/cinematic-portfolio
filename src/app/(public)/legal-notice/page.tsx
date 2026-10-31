@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { LegalDocument } from "@/components/public/legal-document";
 import { englishLegalNotice, isLegalDraft, legalMetadataTitle } from "@/content/legal";
 import { buildPublicMetadata } from "@/server/public/metadata";
 
 export function generateMetadata(): Promise<Metadata> {
+  if (isLegalDraft("legalNotice")) notFound();
   return buildPublicMetadata({
     title: legalMetadataTitle("legalNotice"),
     description: "Draft legal notice for Munir Visuals; not approved for publication.",
@@ -14,5 +16,6 @@ export function generateMetadata(): Promise<Metadata> {
 }
 
 export default function LegalNoticePage() {
+  if (isLegalDraft("legalNotice")) notFound();
   return <LegalDocument counterpartHref="/impressum" counterpartLabel="Deutsches Impressum" draft={isLegalDraft("legalNotice")} eyebrow="Legal information" language="en" sections={englishLegalNotice} title="Legal notice" />;
 }

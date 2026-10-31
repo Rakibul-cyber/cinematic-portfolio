@@ -6,7 +6,8 @@ import { SocialLinks } from "@/components/public/social-links";
 import { InquiryForm } from "@/components/public/inquiry-form";
 import { JsonLd } from "@/components/seo/json-ld";
 import { Container } from "@/components/ui/container";
-import { FALLBACK_STUDIO_NAME } from "@/content/site";
+import { isInquiryIntakeOpen } from "@/content/legal";
+import { emptyStates, FALLBACK_STUDIO_NAME } from "@/content/site";
 import { buildPublicMetadata } from "@/server/public/metadata";
 import {
   getActiveSocialLinks,
@@ -38,7 +39,8 @@ export async function generateMetadata(): Promise<Metadata> {
  * contact detail comes from site settings, so no email address, phone number,
  * or location is invented. The form submits to the `submitInquiry` server
  * action in `./actions.ts`, which validates, applies abuse controls, stores
- * the inquiry and sends notification email.
+ * the inquiry and sends notification email. The form and its Turnstile widget
+ * render only while `isInquiryIntakeOpen()` holds.
  */
 export default async function ContactPage() {
   const [page, settings, socialLinks, services, structuredData] =
@@ -143,10 +145,14 @@ export default async function ContactPage() {
         </div>
       </Container>
       <Container className="pb-24 sm:pb-32">
-        <div className="grid gap-10 border-t border-border pt-16 lg:grid-cols-12">
-          <div className="lg:col-span-4"><p className="text-xs tracking-[0.16em] text-accent uppercase">Project inquiry</p><h2 className="mt-4 font-display text-4xl">Tell us what you are planning.</h2></div>
-          <div className="lg:col-span-7 lg:col-start-6"><InquiryForm services={services} turnstileSiteKey={process.env.TURNSTILE_SITE_KEY?.trim() ?? null}/></div>
-        </div>
+        {isInquiryIntakeOpen() ? (
+          <div className="grid gap-10 border-t border-border pt-16 lg:grid-cols-12">
+            <div className="lg:col-span-4"><p className="text-xs tracking-[0.16em] text-accent uppercase">Project inquiry</p><h2 className="mt-4 font-display text-4xl">Tell us what you are planning.</h2></div>
+            <div className="lg:col-span-7 lg:col-start-6"><InquiryForm services={services} turnstileSiteKey={process.env.TURNSTILE_SITE_KEY?.trim() ?? null}/></div>
+          </div>
+        ) : (
+          <p className="border-t border-border pt-16 text-sm leading-7 text-muted-foreground sm:text-base">{emptyStates.inquiry}</p>
+        )}
       </Container>
 
       <JsonLd nodes={structuredData} />
