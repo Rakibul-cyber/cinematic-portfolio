@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
 
-import { FadeReveal } from "@/components/motion/fade-reveal";
-import { PageIntro } from "@/components/public/page-intro";
+import "./contact.css";
+
+import { BrandStatement, ContactHero, DirectContact, InquiryIntro } from "@/components/contact/contact-sections";
 import { SocialLinks } from "@/components/public/social-links";
 import { InquiryForm } from "@/components/public/inquiry-form";
 import { JsonLd } from "@/components/seo/json-ld";
-import { Container } from "@/components/ui/container";
 import { isInquiryIntakeOpen } from "@/content/legal";
-import { emptyStates, FALLBACK_STUDIO_NAME } from "@/content/site";
+import { contactDetails, emptyStates } from "@/content/site";
 import { buildPublicMetadata } from "@/server/public/metadata";
 import {
   getActiveSocialLinks,
   getPublicPage,
-  getPublicSiteSettings,
   getActiveServices,
 } from "@/server/public/queries";
 import { breadcrumbStructuredData } from "@/server/seo/structured-data";
@@ -33,20 +32,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Public contact page.
+ * Public contact page, in the black-and-gold design scoped by `contact.css`.
  *
- * Shows the ways to reach the studio and the project inquiry form. Every
- * contact detail comes from site settings, so no email address, phone number,
- * or location is invented. The form submits to the `submitInquiry` server
- * action in `./actions.ts`, which validates, applies abuse controls, stores
- * the inquiry and sends notification email. The form and its Turnstile widget
- * render only while `isInquiryIntakeOpen()` holds.
+ * CMS page copy replaces the design's default wording once it is saved. The
+ * form submits to the `submitInquiry` server action in `./actions.ts`, which
+ * validates, applies abuse controls, stores the inquiry and sends notification
+ * email. The form and its Turnstile widget render only while
+ * `isInquiryIntakeOpen()` holds; the action enforces the same gate itself.
  */
 export default async function ContactPage() {
-  const [page, settings, socialLinks, services, structuredData] =
+  const [page, socialLinks, services, structuredData] =
     await Promise.all([
       getPublicPage("contact"),
-      getPublicSiteSettings(),
       getActiveSocialLinks(),
       getActiveServices(),
       breadcrumbStructuredData([
@@ -55,105 +52,43 @@ export default async function ContactPage() {
       ]),
     ]);
 
-  const studioName = settings?.studioName ?? FALLBACK_STUDIO_NAME;
-
-  const channels = [
-    settings?.contactEmail && {
-      label: "Email",
-      value: settings.contactEmail,
-      href: `mailto:${settings.contactEmail}`,
-      external: false,
-    },
-    settings?.contactPhone &&
-      settings.phoneHref && {
-        label: "Phone",
-        value: settings.contactPhone,
-        href: settings.phoneHref,
-        external: false,
-      },
-    settings?.whatsappNumber &&
-      settings.whatsappHref && {
-        label: "WhatsApp",
-        value: settings.whatsappNumber,
-        href: settings.whatsappHref,
-        external: true,
-      },
-  ].filter(Boolean) as {
-    label: string;
-    value: string;
-    href: string;
-    external: boolean;
-  }[];
-
   return (
-    <main id="main-content">
-      <PageIntro
+    <main className="mv-contact" id="main-content">
+      <ContactHero
         eyebrow={page?.eyebrow ?? "Start a conversation"}
-        lead={page?.body.at(0)}
-        title={page?.title ?? "Contact"}
+        lead={page?.body.at(0) ?? "Photography, filmmaking, events, commercial shoots and creative collaborations — every project begins with a conversation. Tell us what you are imagining, and we will shape it into a story told with intention."}
+        title={page?.title}
       />
 
-      <Container>
-        <div className="grid gap-12 border-t border-border py-16 sm:py-24 lg:grid-cols-12 lg:gap-x-8">
-          <FadeReveal className="lg:col-span-6">
+      <section aria-label="Project inquiry" className="mv-inquiry" id="inquiry">
+        <div className="mv-wrap mv-inquiry-grid">
+          <InquiryIntro>
             {page?.body.slice(1).map((paragraph) => (
-              <p
-                className="mt-5 max-w-2xl text-sm leading-7 text-muted-foreground first:mt-0 sm:text-base sm:leading-8"
-                key={paragraph.slice(0, 48)}
-              >
+              <p className="mv-intro-text" key={paragraph.slice(0, 48)}>
                 {paragraph}
               </p>
             ))}
-          </FadeReveal>
-
-          <FadeReveal className="lg:col-span-5 lg:col-start-8">
-            {channels.length ? (
-              <dl className="grid gap-6">
-                {channels.map((channel) => (
-                  <div key={channel.label}>
-                    <dt className="text-[0.625rem] tracking-[0.15em] text-muted-foreground uppercase">
-                      {channel.label}
-                    </dt>
-                    <dd className="mt-1">
-                      <a
-                        className="font-display text-2xl transition-colors hover:text-accent sm:text-3xl"
-                        href={channel.href}
-                        {...(channel.external
-                          ? { rel: "noopener noreferrer", target: "_blank" }
-                          : {})}
-                      >
-                        {channel.value}
-                      </a>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null}
-
-            {settings?.locationText ? (
-              <p className="mt-10 text-sm leading-7 text-muted-foreground">
-                {settings.locationText}
-              </p>
-            ) : null}
-
-            <SocialLinks
-              className="mt-8"
-              label={`${studioName} on social media`}
-              links={socialLinks}
-            />
-          </FadeReveal>
-        </div>
-      </Container>
-      <Container className="pb-24 sm:pb-32">
-        {isInquiryIntakeOpen() ? (
-          <div className="grid gap-10 border-t border-border pt-16 lg:grid-cols-12">
-            <div className="lg:col-span-4"><p className="text-xs tracking-[0.16em] text-accent uppercase">Project inquiry</p><h2 className="mt-4 font-display text-4xl">Tell us what you are planning.</h2></div>
-            <div className="lg:col-span-7 lg:col-start-6"><InquiryForm services={services} turnstileSiteKey={process.env.TURNSTILE_SITE_KEY?.trim() ?? null}/></div>
+            <a className="mv-action mt-6" href="#direct-contact">Contact details</a>
+          </InquiryIntro>
+          <div className="mv-inquiry-main">
+            {isInquiryIntakeOpen() ? (
+              <InquiryForm services={services} turnstileSiteKey={process.env.TURNSTILE_SITE_KEY?.trim() ?? null}/>
+            ) : (
+              <p className="mv-closed">{emptyStates.inquiry}</p>
+            )}
           </div>
-        ) : (
-          <p className="border-t border-border pt-16 text-sm leading-7 text-muted-foreground sm:text-base">{emptyStates.inquiry}</p>
-        )}
-      </Container>
+        </div>
+      </section>
+
+      <DirectContact>
+        <SocialLinks
+          className="mv-direct-social"
+          label={`${contactDetails.business} on social media`}
+          links={socialLinks}
+        />
+      </DirectContact>
+
+      <BrandStatement />
 
       <JsonLd nodes={structuredData} />
     </main>

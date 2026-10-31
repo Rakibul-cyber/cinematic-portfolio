@@ -1,0 +1,602 @@
+/*
+ * Contact page design. Every selector is scoped under `.mv-contact`, and the
+ * site tokens are overridden only on that element, so the shared form
+ * components pick up the palette without any global token changing.
+ */
+.mv-contact {
+  --mv-black: #0b0b0b;
+  --mv-charcoal: #171512;
+  --mv-gold: #c5a46d;
+  --mv-gold-soft: #e8d8b8;
+  --mv-ivory: #f5f0e8;
+  --mv-field: #11100e;
+  --mv-hairline: #2b2721;
+  --mv-field-border: #6b6355;
+  --mv-chip-border: #3d372e;
+  --mv-muted: #a69d8f;
+  --mv-subtle: #8c8476;
+  --mv-error: #d99a86;
+
+  --background: var(--mv-black);
+  --surface: var(--mv-charcoal);
+  --foreground: var(--mv-ivory);
+  --accent: var(--mv-gold);
+  --accent-foreground: var(--mv-black);
+  --border: var(--mv-hairline);
+  --input: var(--mv-field-border);
+  --muted-foreground: var(--mv-muted);
+
+  background: var(--mv-black);
+  color: var(--mv-ivory);
+  font-weight: 300;
+}
+
+.mv-contact .mv-wrap {
+  width: 100%;
+  max-width: 90rem;
+  margin-inline: auto;
+  padding-inline: 3rem;
+}
+
+.mv-contact .mv-eyebrow,
+.mv-contact .mv-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.mv-contact .mv-eyebrow {
+  color: var(--mv-gold);
+}
+
+.mv-contact .mv-label {
+  display: block;
+  letter-spacing: 0.14em;
+  color: var(--mv-muted);
+}
+
+.mv-contact .mv-display,
+.mv-contact .mv-h2,
+.mv-contact .mv-statement-text,
+.mv-contact .mv-act-title,
+.mv-contact .mv-card-value {
+  font-family: var(--font-display-source), Georgia, serif;
+  font-weight: 500;
+}
+
+.mv-contact em {
+  color: var(--mv-gold);
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* Hero */
+.mv-contact .mv-hero {
+  padding-block: 8.5rem;
+}
+
+.mv-contact .mv-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+  gap: 1.5rem;
+  align-items: end;
+}
+
+.mv-contact .mv-display {
+  max-width: 11ch;
+  margin: 1.5rem 0 0;
+  font-size: clamp(3.75rem, 9.2vw, 8.75rem);
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+}
+
+.mv-contact .mv-lead {
+  max-width: 38rem;
+  margin: 2.5rem 0 0;
+  color: var(--mv-muted);
+  font-size: 1.125rem;
+  line-height: 1.65;
+}
+
+.mv-contact .mv-disciplines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+}
+
+.mv-contact .mv-disciplines li {
+  display: flex;
+  gap: 1.25rem;
+  padding-block: 1rem;
+  border-top: 1px solid var(--mv-hairline);
+}
+
+.mv-contact .mv-numeral {
+  color: var(--mv-gold);
+  font-family: var(--font-display-source), Georgia, serif;
+  font-style: italic;
+}
+
+/* Inquiry */
+.mv-contact .mv-inquiry {
+  padding-block: 8.5rem;
+  border-top: 1px solid var(--mv-hairline);
+}
+
+.mv-contact .mv-inquiry-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.mv-contact .mv-inquiry-intro {
+  grid-column: 1 / span 4;
+}
+
+.mv-contact .mv-inquiry-main {
+  grid-column: 6 / span 7;
+  min-width: 0;
+}
+
+.mv-contact .mv-h2 {
+  margin: 0;
+  font-size: 3.75rem;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.mv-contact .mv-intro-text {
+  margin: 1.5rem 0 0;
+  color: var(--mv-muted);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+.mv-contact .mv-steps {
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+}
+
+.mv-contact .mv-steps li {
+  display: flex;
+  gap: 1rem;
+  padding-block: 0.75rem;
+  border-top: 1px solid var(--mv-hairline);
+}
+
+.mv-contact .mv-closed {
+  padding: 3rem;
+  border: 1px solid var(--mv-hairline);
+  border-top-color: var(--mv-gold);
+  background: var(--mv-charcoal);
+  font-family: var(--font-display-source), Georgia, serif;
+  font-size: 2.25rem;
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+.mv-contact .mv-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  color: var(--mv-gold-soft);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  transition: color 250ms ease;
+}
+
+.mv-contact .mv-action::after {
+  content: "→" / "";
+  transition: transform 250ms ease;
+}
+
+.mv-contact .mv-action:hover {
+  color: var(--mv-gold);
+}
+
+.mv-contact .mv-action:hover::after {
+  transform: translateX(5px);
+}
+
+/* Form */
+.mv-contact .mv-form {
+  display: grid;
+  gap: 3.5rem;
+}
+
+.mv-contact .mv-act {
+  display: grid;
+  gap: 1.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.mv-contact .mv-act-title {
+  float: left;
+  width: 100%;
+  margin-bottom: 1.75rem;
+  padding: 0;
+  font-size: 1.875rem;
+  line-height: 1.1;
+}
+
+.mv-contact .mv-act-title + * {
+  clear: both;
+}
+
+.mv-contact .mv-act-title .mv-numeral {
+  margin-right: 0.75rem;
+}
+
+.mv-contact .mv-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.75rem 1.5rem;
+}
+
+.mv-contact .mv-form label,
+.mv-contact .mv-chips-legend {
+  color: var(--mv-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.mv-contact .mv-form :is(input:not([type="radio"]), select, textarea) {
+  width: 100%;
+  background: var(--mv-field);
+  color: var(--mv-ivory);
+  font-size: 1rem;
+  font-weight: 400;
+  color-scheme: dark;
+  transition: border-color 250ms ease, box-shadow 250ms ease;
+}
+
+.mv-contact .mv-form :is(input:not([type="radio"]), select, textarea):hover {
+  border-color: var(--mv-subtle);
+}
+
+.mv-contact .mv-form :is(input:not([type="radio"]), select, textarea):focus {
+  border-color: var(--mv-gold);
+  outline: 1px solid var(--mv-gold);
+  outline-offset: 0;
+  box-shadow: 0 0 0 3px rgba(197, 164, 109, 0.16);
+}
+
+.mv-contact .mv-form :is(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--mv-error);
+}
+
+.mv-contact .mv-hint {
+  color: var(--mv-subtle);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.mv-contact .mv-form .text-red-300 {
+  color: var(--mv-error);
+}
+
+.mv-contact .border-red-400 {
+  border-color: var(--mv-error);
+}
+
+/* Project-type chips: native radios, so keyboard behaviour comes free. */
+.mv-contact .mv-chips {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.mv-contact .mv-chips-legend {
+  padding: 0;
+}
+
+.mv-contact .mv-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-top: 0.75rem;
+}
+
+.mv-contact .mv-form label.mv-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  padding-inline: 1rem;
+  border: 1px solid var(--mv-chip-border);
+  color: var(--mv-ivory);
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition: border-color 250ms ease, background-color 250ms ease, color 250ms ease;
+}
+
+.mv-contact .mv-chip input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.mv-contact .mv-chip-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1px solid var(--mv-subtle);
+  border-radius: 50%;
+}
+
+.mv-contact .mv-form label.mv-chip:hover {
+  border-color: var(--mv-subtle);
+}
+
+.mv-contact .mv-form label.mv-chip:has(input:checked) {
+  border-color: var(--mv-gold);
+  background: rgba(197, 164, 109, 0.07);
+  color: var(--mv-gold-soft);
+}
+
+.mv-contact .mv-chip:has(input:checked) .mv-chip-dot {
+  border-color: var(--mv-gold);
+  background: var(--mv-gold);
+}
+
+.mv-contact .mv-chip:has(input:focus-visible) {
+  outline: 2px solid var(--mv-gold);
+  outline-offset: 3px;
+}
+
+.mv-contact .mv-chips[data-invalid] .mv-chip {
+  border-color: var(--mv-error);
+}
+
+/* Optional details */
+.mv-contact .mv-details {
+  border-block: 1px solid var(--mv-hairline);
+}
+
+.mv-contact .mv-details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 3.5rem;
+  color: var(--mv-gold-soft);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.mv-contact .mv-details .mv-fields {
+  padding-block: 0.75rem 2rem;
+}
+
+/* Submit */
+.mv-contact .mv-submit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.mv-contact .mv-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.25rem;
+  padding-inline: 2rem;
+  border: 1px solid var(--mv-gold);
+  background: var(--mv-gold);
+  color: var(--mv-black);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 250ms ease, border-color 250ms ease;
+}
+
+.mv-contact .mv-submit::after {
+  content: "→" / "";
+  transition: transform 250ms ease;
+}
+
+.mv-contact .mv-submit:hover:not(:disabled) {
+  border-color: var(--mv-gold-soft);
+  background: var(--mv-gold-soft);
+}
+
+.mv-contact .mv-submit:hover:not(:disabled)::after {
+  transform: translateX(5px);
+}
+
+.mv-contact .mv-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mv-contact .mv-submit:focus-visible {
+  outline: 1px solid var(--mv-gold);
+  outline-offset: 4px;
+}
+
+/* Direct contact */
+.mv-contact .mv-direct {
+  padding-block: 8.5rem;
+  background: var(--mv-charcoal);
+  scroll-margin-top: var(--header-height);
+}
+
+.mv-contact .mv-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin: 4rem 0 0;
+}
+
+.mv-contact .mv-card {
+  position: relative;
+  padding-top: 2rem;
+  border-top: 1px solid var(--mv-hairline);
+}
+
+.mv-contact .mv-card::before {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 3.5rem;
+  height: 1px;
+  background: var(--mv-gold);
+  content: "";
+  transition: width 500ms ease;
+}
+
+.mv-contact .mv-card:hover::before {
+  width: 100%;
+}
+
+.mv-contact .mv-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--mv-gold);
+}
+
+.mv-contact .mv-card-value {
+  margin: 0.75rem 0 0;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.mv-contact .mv-card-value address {
+  font-style: normal;
+}
+
+.mv-contact .mv-card-value address span {
+  display: block;
+}
+
+.mv-contact .mv-card-action {
+  margin: 1rem 0 0;
+}
+
+.mv-contact .mv-direct-social {
+  margin-top: 3.5rem;
+  font-size: 0.875rem;
+}
+
+/* Brand statement */
+.mv-contact .mv-statement {
+  padding-block: 10.5rem;
+  text-align: center;
+}
+
+.mv-contact .mv-rule {
+  display: block;
+  width: 4rem;
+  height: 1px;
+  margin: 0 auto 3rem;
+  background: var(--mv-gold);
+}
+
+.mv-contact .mv-statement-text {
+  max-width: 16ch;
+  margin: 0 auto;
+  font-size: clamp(2.75rem, 6.4vw, 6rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.mv-contact .mv-signature {
+  margin: 3rem 0 0;
+}
+
+@media (max-width: 56.24rem) {
+  .mv-contact .mv-wrap {
+    padding-inline: 1.25rem;
+  }
+
+  .mv-contact .mv-hero,
+  .mv-contact .mv-inquiry,
+  .mv-contact .mv-direct {
+    padding-block: 4.5rem;
+  }
+
+  .mv-contact .mv-statement {
+    padding-block: 6rem;
+  }
+
+  .mv-contact .mv-hero-grid,
+  .mv-contact .mv-cards,
+  .mv-contact .mv-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mv-contact .mv-hero-grid {
+    gap: 3rem;
+  }
+
+  .mv-contact .mv-display {
+    font-size: 3.375rem;
+  }
+
+  .mv-contact .mv-lead {
+    font-size: 1rem;
+  }
+
+  .mv-contact .mv-inquiry-intro,
+  .mv-contact .mv-inquiry-main {
+    grid-column: 1 / -1;
+  }
+
+  .mv-contact .mv-inquiry-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3rem;
+  }
+
+  .mv-contact .mv-h2 {
+    font-size: 2.5rem;
+  }
+
+  .mv-contact .mv-act-title {
+    font-size: 1.625rem;
+  }
+
+  .mv-contact .mv-closed {
+    padding: 2rem 1.5rem;
+    font-size: 1.75rem;
+  }
+
+  .mv-contact .mv-card-value {
+    font-size: 1.5rem;
+  }
+
+  .mv-contact .mv-statement-text {
+    font-size: 2.625rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mv-contact .mv-action:hover::after,
+  .mv-contact .mv-submit:hover:not(:disabled)::after {
+    transform: none;
+  }
+}

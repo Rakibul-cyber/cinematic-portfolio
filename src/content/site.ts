@@ -34,6 +34,24 @@ export const legalNavigation: readonly NavigationItem[] = [
  */
 export const FALLBACK_STUDIO_NAME = "Portfolio";
 
+/** Public business details for the contact page, as confirmed by the owner. */
+export const contactDetails = {
+  business: "Munir Visuals",
+  email: "official.munirx@gmail.com",
+  phoneDisplay: "+49 157 57801897",
+  phoneHref: "tel:+4915757801897",
+  addressLines: ["Ernst-Lemmer-Straße 17", "35041 Marburg-Wehrda", "Germany"],
+} as const;
+
+/** Disciplines listed in the contact hero, from the approved design. */
+export const contactDisciplines = [
+  "Photography",
+  "Filmmaking",
+  "Events",
+  "Commercial shoots",
+  "Creative collaborations",
+] as const;
+
 /** Section labels. Editorial chrome, not studio content. */
 export const sectionLabels = {
   selectedWork: "Selected work",

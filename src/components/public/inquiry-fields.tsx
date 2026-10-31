@@ -44,9 +44,12 @@ const UNCONFIRMED_MESSAGE_ID = "inquiry-unconfirmed-message";
 const OUTDATED_TITLE_ID = "inquiry-outdated-title";
 const OUTDATED_MESSAGE_ID = "inquiry-outdated-message";
 
-function controlProps(name: string, error?: string) {
+const inquiryHintId = (name: string) => `inquiry-${name}-hint`;
+
+function controlProps(name: string, error?: string, hint?: string) {
+  const describedBy = [error ? inquiryErrorId(name) : null, hint ? inquiryHintId(name) : null].filter(Boolean).join(" ");
   return {
-    "aria-describedby": error ? inquiryErrorId(name) : undefined,
+    "aria-describedby": describedBy || undefined,
     "aria-invalid": error ? true : undefined,
     id: inquiryFieldId(name),
     name,
@@ -59,7 +62,7 @@ function controlProps(name: string, error?: string) {
  * rows at their own height when a neighbouring column's error makes the grid
  * row taller, instead of stretching this field's control to match.
  */
-function FieldShell({ children, error, field }: { children: ReactNode; error?: string; field: InquiryFieldConfig }) {
+function FieldShell({ children, error, field, hint }: { children: ReactNode; error?: string; field: InquiryFieldConfig; hint?: string }) {
   return (
     <div className="grid content-start gap-2 text-sm">
       <label htmlFor={inquiryFieldId(field.name)}>
@@ -67,16 +70,48 @@ function FieldShell({ children, error, field }: { children: ReactNode; error?: s
         {field.required ? <span aria-hidden="true"> *</span> : null}
       </label>
       {children}
+      {hint ? <span className="mv-hint" id={inquiryHintId(field.name)}>{hint}</span> : null}
       {error ? <span className="text-sm text-red-300" id={inquiryErrorId(field.name)}>{error}</span> : null}
     </div>
   );
 }
 
-export function InquiryInput({ error, field }: { error?: string; field: InquiryFieldConfig }) {
+export function InquiryInput({ error, field, hint }: { error?: string; field: InquiryFieldConfig; hint?: string }) {
   return (
-    <FieldShell error={error} field={field}>
-      <input {...controlProps(field.name, error)} autoComplete={field.autoComplete} className={`${inquiryControlClass} px-4`} required={field.required} type={field.type ?? "text"}/>
+    <FieldShell error={error} field={field} hint={hint}>
+      <input {...controlProps(field.name, error, hint)} autoComplete={field.autoComplete} className={`${inquiryControlClass} px-4`} required={field.required} type={field.type ?? "text"}/>
     </FieldShell>
+  );
+}
+
+/**
+ * A required single choice as native radios, so arrow keys and focus come free.
+ *
+ * The empty hidden field comes first because an unselected radio group submits
+ * nothing: without it the server would report a generic missing-field error
+ * instead of the schema's own message. A checked radio follows it in the form
+ * data and wins. The first radio carries the field's id, so an error summary
+ * link can still focus the group.
+ */
+export function InquiryChoiceChips({ error, field, options }: { error?: string; field: InquiryFieldConfig; options: readonly string[] }) {
+  return (
+    <fieldset aria-describedby={error ? inquiryErrorId(field.name) : undefined} className="mv-chips" data-invalid={error ? "" : undefined}>
+      <legend className="mv-chips-legend">
+        {field.label}
+        {field.required ? <span aria-hidden="true"> *</span> : null}
+      </legend>
+      <input name={field.name} type="hidden" value=""/>
+      <div className="mv-chips-list">
+        {options.map((option, index) => (
+          <label className="mv-chip" key={option}>
+            <input className={inquiryFocusOffsetClass} id={index === 0 ? inquiryFieldId(field.name) : undefined} name={field.name} type="radio" value={option}/>
+            <span aria-hidden="true" className="mv-chip-dot"/>
+            {option}
+          </label>
+        ))}
+      </div>
+      {error ? <span className="mt-2 block text-sm text-red-300" id={inquiryErrorId(field.name)}>{error}</span> : null}
+    </fieldset>
   );
 }
 
@@ -88,10 +123,10 @@ export function InquirySelect({ children, error, field }: { children?: ReactNode
   );
 }
 
-export function InquiryTextarea({ error, field }: { error?: string; field: InquiryFieldConfig }) {
+export function InquiryTextarea({ error, field, hint }: { error?: string; field: InquiryFieldConfig; hint?: string }) {
   return (
-    <FieldShell error={error} field={field}>
-      <textarea {...controlProps(field.name, error)} className={`${inquiryControlClass} min-h-40 p-4`} required={field.required}/>
+    <FieldShell error={error} field={field} hint={hint}>
+      <textarea {...controlProps(field.name, error, hint)} className={`${inquiryControlClass} min-h-40 p-4`} required={field.required} rows={7}/>
     </FieldShell>
   );
 }
@@ -136,8 +171,9 @@ export function InquiryUnconfirmedSummary({ disabled, ref }: { disabled: boolean
 /** What the visitor sees in a field: an option's text, not its value. */
 function visibleValue(form: HTMLFormElement, name: string): string | undefined {
   const control = form.elements.namedItem(name);
-  // Missing, or a group of same-named controls: neither is an inquiry field.
-  if (!control || !("tagName" in control)) return undefined;
+  if (!control) return undefined;
+  // A group of same-named controls is the project-type radios: the checked one.
+  if (!("tagName" in control)) return (control as RadioNodeList).value || undefined;
   if (control.tagName === "SELECT") {
     const select = control as HTMLSelectElement;
     return select.value ? select.selectedOptions[0]?.text : undefined;
@@ -211,6 +247,9 @@ export function InquiryErrorSummary({ errors, message, ref }: { errors?: Record<
                   const control = document.getElementById(item.fieldId);
                   if (!control) return;
                   event.preventDefault();
+                  // A control inside collapsed optional details cannot take focus.
+                  const details = control.closest("details");
+                  if (details) details.open = true;
                   control.focus();
                 }}
               >

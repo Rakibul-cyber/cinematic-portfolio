@@ -42,7 +42,8 @@ const TOKEN = "3f1c2a7e-8b4d-4e6f-9a1b-2c3d4e5f6a7b";
 const SUCCESS: InquiryFormState = { success: true, message: "Thank you. Your inquiry has been received." };
 const VALIDATION: InquiryFormState = { success: false, message: "Please check the highlighted fields.", errors: { email: ["Enter a valid email address."] } };
 // Placeholder values only.
-const VALUES = { name: "Test Visitor", email: "visitor@example.test", projectType: "Wedding film", message: "A test message that is long enough to pass." };
+const VALUES = { name: "Test Visitor", email: "visitor@example.test", message: "A test message that is long enough to pass." };
+const PROJECT_TYPE = "Film & video";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/contact", pretendToBeVisual: true });
 type Globals = Record<string, unknown>;
@@ -131,19 +132,23 @@ async function mount(submitAction: ReturnType<typeof harness>["submitAction"]) {
 
 const form = () => container.querySelector("form");
 const field = (name: string) => container.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${name}"]`)!;
-const sendButton = () => [...container.querySelectorAll("button")].find((b) => /Send/.test(b.textContent ?? ""))!;
+const sendButton = () => [...container.querySelectorAll("button")].find((b) => /Sending|Submit/.test(b.textContent ?? ""))!;
 const focused = () => dom.window.document.activeElement;
 
 async function solveChallenge(response: string) {
   await act(async () => turnstile.options.at(-1)!.callback(response));
 }
 
+const projectTypeChip = () => [...container.querySelectorAll<HTMLInputElement>('input[type="radio"][name="projectType"]')].find((radio) => radio.value === PROJECT_TYPE)!;
+
 function fill() {
   for (const [name, value] of Object.entries(VALUES)) field(name).value = value;
+  projectTypeChip().checked = true;
 }
 
 function assertValuesKept() {
   for (const [name, value] of Object.entries(VALUES)) assert.equal(field(name).value, value, `${name} was cleared`);
+  assert.equal(projectTypeChip().checked, true, "projectType was cleared");
 }
 
 async function answer(deferred: Deferred, outcome: { state: InquiryFormState } | { error: unknown }) {
@@ -158,7 +163,7 @@ describe("mounted inquiry form", () => {
     const h = harness();
     await mount(h.submitAction);
     assert.ok(form());
-    for (const name of [...Object.keys(VALUES), "phone", "serviceSlug"]) assert.ok(field(name), name);
+    for (const name of [...Object.keys(VALUES), "projectType", "phone", "serviceSlug"]) assert.ok(field(name), name);
     assert.equal(field(SUBMISSION_TOKEN_FIELD).value, TOKEN);
     assert.equal(randomUUID.mock.callCount(), 1);
     assert.equal(turnstile.options.length, 1, "the challenge is rendered once");
@@ -208,7 +213,7 @@ describe("mounted inquiry form", () => {
     // pending async transition.)
     await answer(h.answers[0]!, { state: VALIDATION });
     assert.equal(sendButton().disabled, false);
-    assert.equal(sendButton().textContent, "Send inquiry");
+    assert.equal(sendButton().textContent, "Submit inquiry");
     await act(async () => form()!.requestSubmit());
     assert.equal(h.calls.length, 2);
     await answer(h.answers[1]!, { state: VALIDATION });
@@ -251,6 +256,7 @@ describe("mounted inquiry form", () => {
     assert.equal(h.calls[1]![SUBMISSION_TOKEN_FIELD], TOKEN, "the replay lookup needs the original token");
     assert.equal(h.calls[1]![SUBMISSION_TOKEN_FIELD], h.calls[0]![SUBMISSION_TOKEN_FIELD]);
     for (const [name, value] of Object.entries(VALUES)) assert.equal(h.calls[1]![name], value);
+    assert.equal(h.calls[1]!.projectType, PROJECT_TYPE);
     assert.equal(h.calls[1]![TURNSTILE_RESPONSE_FIELD], "challenge-2");
 
     await answer(h.answers[1]!, { state: SUCCESS });
@@ -262,6 +268,74 @@ describe("mounted inquiry form", () => {
     assert.match(container.textContent ?? "", /Your inquiry has been received\./);
     assert.equal(h.calls.length, 2);
     assert.equal(h.reports.length, 1);
+  });
+});
+
+describe("project-type chips and optional details", () => {
+  const radios = () => [...container.querySelectorAll<HTMLInputElement>('input[type="radio"][name="projectType"]')];
+
+  it("keeps every schema field in the form, including those in the collapsed details", async () => {
+    await mount(harness().submitAction);
+    for (const name of ["name", "email", "phone", "whatsapp", "company", "projectType", "projectDate", "location", "budgetLabel", "referralSource", "serviceSlug", "message", "website", SUBMISSION_TOKEN_FIELD]) {
+      assert.ok(field(name), name);
+    }
+    const details = container.querySelector("details")!;
+    assert.equal(details.open, false, "optional details start collapsed");
+    for (const name of ["whatsapp", "company", "location", "budgetLabel", "referralSource", "serviceSlug"]) assert.ok(details.querySelector(`[name="${name}"]`), name);
+    assert.equal(details.querySelector('[name="phone"]'), null, "phone stays in the first act");
+  });
+
+  it("submits the chosen chip as the project type", async () => {
+    const h = harness();
+    await mount(h.submitAction);
+    assert.equal(radios().length, 6);
+    radios().find((radio) => radio.value === "Event coverage")!.checked = true;
+    await act(async () => form()!.requestSubmit());
+    assert.equal(h.calls[0]!.projectType, "Event coverage");
+    await answer(h.answers[0]!, { state: VALIDATION });
+  });
+
+  it("submits an empty project type when none is chosen, so the schema reports its own message", async () => {
+    const h = harness();
+    await mount(h.submitAction);
+    await act(async () => form()!.requestSubmit());
+    assert.equal(h.calls[0]!.projectType, "");
+    await answer(h.answers[0]!, { state: { success: false, message: "Please check the highlighted fields.", errors: { projectType: ["Enter a project type."] } } });
+
+    const link = container.querySelector<HTMLAnchorElement>('#inquiry-error-summary a[href="#inquiry-projectType"]')!;
+    assert.ok(link);
+    await act(async () => link.click());
+    assert.equal(focused(), radios()[0], "the summary link reaches the chips");
+    assert.match(container.textContent ?? "", /Enter a project type\./);
+  });
+
+  it("opens the details when one of their fields has an error, and its summary link focuses that control", async () => {
+    const h = harness();
+    await mount(h.submitAction);
+    await act(async () => form()!.requestSubmit());
+    await answer(h.answers[0]!, { state: { success: false, message: "Please check the highlighted fields.", errors: { location: ["Too long."] } } });
+    const details = container.querySelector("details")!;
+    assert.equal(details.open, true);
+
+    details.open = false;
+    const link = container.querySelector<HTMLAnchorElement>('#inquiry-error-summary a[href="#inquiry-location"]')!;
+    await act(async () => link.click());
+    assert.equal(details.open, true);
+    assert.equal(focused(), field("location"));
+  });
+
+  it("copies the checked chip, not the empty hidden field", async () => {
+    const clipboard: string[] = [];
+    Object.defineProperty(globalThis.navigator, "clipboard", { configurable: true, value: { writeText: async (text: string) => void clipboard.push(text) } });
+    const h = harness();
+    await mount(h.submitAction);
+    radios().find((radio) => radio.value === "Commercial shoot")!.checked = true;
+    await act(async () => form()!.requestSubmit());
+    await answer(h.answers[0]!, { error: new UnrecognizedActionError('Server Action "abc" was not found on the server.') });
+    const copyButton = [...container.querySelectorAll("button")].find((b) => b.textContent === OUTDATED_COPY_LABEL)!;
+    await act(async () => copyButton.click());
+    assert.match(clipboard[0]!, /^Project type: Commercial shoot$/m);
+    delete (globalThis.navigator as { clipboard?: unknown }).clipboard;
   });
 });
 
