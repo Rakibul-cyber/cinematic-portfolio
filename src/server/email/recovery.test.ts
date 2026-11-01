@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 
-import { deliveryRecovery, missingDeliveryTypes, STALE_PROCESSING_MS } from "@/lib/email/delivery-claims";
+import { deliveryDuplicateRisk, deliveryRecovery, DUPLICATE_EVIDENCE_ACTIONS, missingDeliveryTypes, STALE_PROCESSING_MS } from "@/lib/email/delivery-claims";
 import type { EmailConfig } from "@/server/email/config";
 import type { EmailSender, OutboundEmail, SendResult } from "@/server/email/client";
 
@@ -35,9 +35,12 @@ let inquiry: Record<string, unknown> | null;
 let inquiriesCreated: number;
 let failNextClaim: Error | null;
 let beforeNextClaim: (() => void) | null;
+let failNextAuditRead: boolean;
+let auditSelections: string[][];
 let service: typeof import("@/server/email/service");
 let workflow: typeof import("@/server/email/recovery-workflow");
 let queries: typeof import("@/server/email/delivery-claim-queries");
+let AuditAction: typeof import("@/server/audit/audit-log").AuditAction;
 
 function seedRow(type: string, status: string, ageMs = 0, attemptCount = 1) {
   rows.push({ id: `row-${type}`, inquiryId: INQUIRY_ID, type, status, attemptCount, lastErrorCode: null, updatedAt: new Date(Date.now() - ageMs) });
@@ -116,6 +119,7 @@ before(async () => {
       return [{ ...row }];
     },
     emailDelivery: {
+      findMany: async () => rows.map((row) => ({ ...row, sentAt: null })),
       findUnique: async ({ where }: { where: { id?: string; inquiryId_type?: { type: string } } }) => {
         const row = rows.find((candidate) => (where.id ? candidate.id === where.id : candidate.type === where.inquiryId_type!.type));
         return row ? { ...row, inquiry: { anonymizedAt: inquiry?.anonymizedAt ?? null } } : null;
@@ -127,12 +131,20 @@ before(async () => {
         return { count: 1 };
       },
     },
-    auditLog: { create: async ({ data }: { data: Record<string, unknown> }) => { audits.push(data); } },
+    auditLog: {
+      create: async ({ data }: { data: Record<string, unknown> }) => { audits.push(data); },
+      findMany: async ({ where, select }: { where: { entityId: { in: string[] }; action: { in: string[] } }; select: Record<string, boolean> }) => {
+        auditSelections.push(Object.keys(select));
+        if (failNextAuditRead) { failNextAuditRead = false; throw new Error("audit read failed"); }
+        return audits.filter((entry) => where.entityId.in.includes(String(entry.entityId)) && where.action.in.includes(String(entry.action)));
+      },
+    },
   };
   (globalThis as unknown as { cinematicPortfolioPrisma: unknown }).cinematicPortfolioPrisma = client;
   service = await import("@/server/email/service");
   workflow = await import("@/server/email/recovery-workflow");
   queries = await import("@/server/email/delivery-claim-queries");
+  ({ AuditAction } = await import("@/server/audit/audit-log"));
 });
 
 beforeEach(() => {
@@ -141,6 +153,8 @@ beforeEach(() => {
   inquiriesCreated = 0;
   failNextClaim = null;
   beforeNextClaim = null;
+  failNextAuditRead = false;
+  auditSelections = [];
   inquiry = {
     id: INQUIRY_ID, createdAt: new Date("2026-11-01T10:00:00.000Z"), anonymizedAt: null,
     nameSnapshot: SENSITIVE[1], emailSnapshot: SENSITIVE[0], phoneSnapshot: SENSITIVE[3], whatsappSnapshot: null, companySnapshot: null,
@@ -484,7 +498,9 @@ describe("stale delivery ownership", () => {
     // The audit trail is what shows this retry could send a second email.
     assert.ok(audits.some((entry) => entry.action === "email.delivery_result_superseded" && (entry.metadata as { result: string }).result === "ACCEPTED"));
     const sender = fakeSender();
-    assert.equal((await service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender, false))).status, "ACCEPTED");
+    await assert.rejects(service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender, false)), /may already have been sent/);
+    assert.equal(sender.sent.length, 0);
+    assert.equal((await service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender))).status, "ACCEPTED");
     assert.equal(sender.sent[0]!.idempotencyKey, `${INQUIRY_ID}:${ADMIN}:2`);
   });
 
@@ -554,6 +570,154 @@ describe("stale delivery ownership", () => {
     const written = lines.join(" ") + JSON.stringify(audits);
     for (const value of SENSITIVE) assert.ok(!written.includes(value), `no ${value}`);
     assert.equal(inquiriesCreated, 0);
+  });
+});
+
+describe("duplicate-risk evidence", () => {
+  const superseded = (result: unknown) => ({ action: DUPLICATE_EVIDENCE_ACTIONS.superseded, metadata: { result } });
+
+  it("reads the actions the service actually writes", () => {
+    assert.equal(DUPLICATE_EVIDENCE_ACTIONS.superseded, AuditAction.EmailDeliveryResultSuperseded);
+    assert.equal(DUPLICATE_EVIDENCE_ACTIONS.retried, AuditAction.EmailDeliveryRetried);
+  });
+
+  it("classifies each kind of evidence, without inventing certainty", () => {
+    assert.equal(deliveryDuplicateRisk(null, []), "none");
+    assert.equal(deliveryDuplicateRisk("validation_error", []), "none", "a definite provider rejection");
+    assert.equal(deliveryDuplicateRisk("invalid_recipient", []), "none", "never reached the provider");
+    for (const code of ["unexpected_error", "provider_error"]) assert.equal(deliveryDuplicateRisk(code, []), "possible", code);
+    assert.equal(deliveryDuplicateRisk(null, [superseded("ACCEPTED")]), "accepted");
+    assert.equal(deliveryDuplicateRisk("validation_error", [superseded("ACCEPTED")]), "accepted");
+    assert.equal(deliveryDuplicateRisk(null, [superseded("FAILED")]), "possible", "a recorded failure may follow the send");
+    assert.equal(deliveryDuplicateRisk(null, [superseded("SKIPPED")]), "none", "that worker sent nothing");
+    assert.equal(deliveryDuplicateRisk(null, [{ action: DUPLICATE_EVIDENCE_ACTIONS.retried, metadata: { staleProcessing: true } }]), "possible");
+    assert.equal(deliveryDuplicateRisk(null, [{ action: DUPLICATE_EVIDENCE_ACTIONS.retried, metadata: { inquiryId: "x" } }]), "none", "an ordinary retry");
+  });
+
+  it("fails towards a warning on malformed superseded evidence", () => {
+    for (const metadata of [null, "text", {}, { result: 7 }]) {
+      assert.equal(deliveryDuplicateRisk(null, [{ action: DUPLICATE_EVIDENCE_ACTIONS.superseded, metadata }]), "possible", JSON.stringify(metadata));
+    }
+  });
+
+  it("lets accepted evidence outrank anything else, in any order", () => {
+    const stale = { action: DUPLICATE_EVIDENCE_ACTIONS.retried, metadata: { staleProcessing: true } };
+    assert.equal(deliveryDuplicateRisk("provider_error", [stale, superseded("FAILED"), superseded("ACCEPTED")]), "accepted");
+    assert.equal(deliveryDuplicateRisk(null, [superseded("ACCEPTED"), stale]), "accepted");
+  });
+
+  it("makes a retry with evidence require confirmation at each deliveryRecovery input", () => {
+    const now = new Date();
+    assert.equal(deliveryRecovery({ status: "FAILED", updatedAt: now }, now, "accepted"), "confirm");
+    assert.equal(deliveryRecovery({ status: "SKIPPED", updatedAt: now }, now, "possible"), "confirm");
+    assert.equal(deliveryRecovery({ status: "FAILED", updatedAt: now }, now, "none"), "retry");
+    assert.equal(deliveryRecovery({ status: "ACCEPTED", updatedAt: now }, now, "accepted"), "none");
+    assert.equal(deliveryRecovery({ status: "PROCESSING", updatedAt: now }, now, "accepted"), "none");
+  });
+
+  const seedEvidence = (result: string) => audits.push({ action: AuditAction.EmailDeliveryResultSuperseded, entityType: "email_delivery", entityId: `row-${ADMIN}`, metadata: { inquiryId: INQUIRY_ID, type: ADMIN, attempt: 1, result } });
+
+  for (const [label, prepare] of [
+    ["a superseded accepted attempt followed by FAILED", () => { seedRow(ADMIN, "FAILED"); seedEvidence("ACCEPTED"); }],
+    ["a superseded unknown outcome", () => { seedRow(ADMIN, "FAILED"); seedEvidence("FAILED"); }],
+    ["a past stale takeover", () => { seedRow(ADMIN, "FAILED"); audits.push({ action: AuditAction.EmailDeliveryRetried, entityType: "email_delivery", entityId: `row-${ADMIN}`, metadata: { staleProcessing: true } }); }],
+    ["an error that can follow the send", () => { seedRow(ADMIN, "FAILED"); rows[0]!.lastErrorCode = "unexpected_error"; }],
+  ] as const) {
+    it(`refuses a retry after ${label} until confirmed on the server, then sends once`, async () => {
+      prepare();
+      const sender = fakeSender();
+      await assert.rejects(service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender, false)), /may already have been sent/);
+      assert.equal(sender.sent.length, 0);
+      assert.equal(rows[0]!.status, "FAILED", "nothing was claimed");
+      assert.equal(rows[0]!.attemptCount, 1);
+      assert.equal((await service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender))).status, "ACCEPTED");
+      assert.equal(sender.sent.length, 1);
+    });
+  }
+
+  it("retries a normal FAILED delivery without confirmation", async () => {
+    seedRow(ADMIN, "FAILED");
+    rows[0]!.lastErrorCode = "validation_error";
+    const sender = fakeSender();
+    assert.equal((await service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender, false))).status, "ACCEPTED");
+    assert.equal(sender.sent.length, 1);
+  });
+
+  it("sends nothing automatically: reading the risk attempts no delivery", async () => {
+    seedRow(ADMIN, "FAILED");
+    seedEvidence("ACCEPTED");
+    const before = JSON.stringify(rows);
+    assert.equal((await service.getInquiryDeliveries(INQUIRY_ID))[0]!.duplicateRisk, "accepted");
+    assert.equal(JSON.stringify(rows), before);
+  });
+
+  it("refuses rather than sends when the evidence cannot be read", async () => {
+    seedRow(ADMIN, "FAILED");
+    failNextAuditRead = true;
+    const sender = fakeSender();
+    await assert.rejects(service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender, false)), /audit read failed/);
+    assert.equal(sender.sent.length, 0);
+    assert.equal(rows[0]!.status, "FAILED");
+  });
+
+  it("lets one of two confirmed concurrent retries proceed, on one new key", async () => {
+    seedRow(ADMIN, "FAILED");
+    seedEvidence("ACCEPTED");
+    const sender = fakeSender();
+    const results = await Promise.allSettled([
+      service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender)),
+      service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender)),
+    ]);
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(sender.sent.length, 1);
+    assert.equal(sender.sent[0]!.idempotencyKey, `${INQUIRY_ID}:${ADMIN}:2`);
+  });
+
+  it("sends nothing from concurrent unconfirmed retries", async () => {
+    seedRow(ADMIN, "FAILED");
+    seedEvidence("ACCEPTED");
+    const sender = fakeSender();
+    const results = await Promise.allSettled([
+      service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender, false)),
+      service.retryInquiryEmail(INQUIRY_ID, ADMIN, ACTOR, dependencies(sender, false)),
+    ]);
+    assert.ok(results.every((result) => result.status === "rejected"));
+    assert.equal(sender.sent.length, 0);
+  });
+
+  it("denies an unauthorized retry before reading any evidence", async () => {
+    seedRow(ADMIN, "FAILED");
+    seedEvidence("ACCEPTED");
+    const data = new FormData();
+    data.set("inquiryId", INQUIRY_ID);
+    data.set("type", ADMIN);
+    data.set("confirmDuplicateRisk", "yes");
+    await assert.rejects(
+      workflow.runRetryEmail(data, { requireActor: async () => { throw new Error("NOT_AUTHORIZED"); }, retry: (id, type, actor, options) => service.retryInquiryEmail(id, type, actor, { ...dependencies(fakeSender(), false), ...options }) }),
+      /NOT_AUTHORIZED/,
+    );
+    assert.deepEqual(auditSelections, []);
+    assert.equal(rows[0]!.status, "FAILED");
+  });
+
+  it("shows the risk message to an authorized administrator who did not confirm", async () => {
+    seedRow(ADMIN, "FAILED");
+    seedEvidence("ACCEPTED");
+    const data = new FormData();
+    data.set("inquiryId", INQUIRY_ID);
+    data.set("type", ADMIN);
+    const answer = await workflow.runRetryEmail(data, { requireActor: async () => ACTOR, retry: (id, type, actor, options) => service.retryInquiryEmail(id, type, actor, { ...dependencies(fakeSender(), false), ...options }) });
+    assert.deepEqual(answer, { inquiryId: INQUIRY_ID, outcome: "error", notice: "This email may already have been sent. Confirm the duplicate risk before retrying." });
+  });
+
+  it("exposes no audit detail: the page gets a category, and only action and metadata are read", async () => {
+    seedRow(ADMIN, "FAILED");
+    audits.push({ action: AuditAction.EmailDeliveryResultSuperseded, entityType: "email_delivery", entityId: `row-${ADMIN}`, actorEmail: "actor@example.test", metadata: { result: "ACCEPTED" } });
+    const [delivery] = await service.getInquiryDeliveries(INQUIRY_ID);
+    assert.deepEqual(auditSelections, [["entityId", "action", "metadata"]]);
+    const shown = JSON.stringify(delivery);
+    for (const value of [...SENSITIVE, "actor@example.test", "row-"]) assert.ok(!shown.includes(value), value);
+    assert.ok(!("id" in delivery!));
   });
 });
 

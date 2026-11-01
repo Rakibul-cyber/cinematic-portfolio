@@ -1,5 +1,5 @@
 import { buttonClass } from "@/components/admin/admin-styles";
-import { deliveryRecovery, missingDeliveryTypes } from "@/lib/email/delivery-claims";
+import { deliveryRecovery, missingDeliveryTypes, type DuplicateRisk } from "@/lib/email/delivery-claims";
 
 /**
  * Transactional email state for one inquiry.
@@ -21,6 +21,7 @@ type Delivery = {
   lastErrorCode: string | null;
   sentAt: Date | null;
   updatedAt: Date;
+  duplicateRisk: DuplicateRisk;
 };
 
 const LABEL: Record<Delivery["type"], string> = {
@@ -38,6 +39,12 @@ const STATUS_TEXT: Record<Delivery["status"], string> = {
   ACCEPTED: "Accepted by the email provider",
   FAILED: "Not sent",
   SKIPPED: "Not attempted — email is not configured",
+};
+
+/** Never says the email was delivered or sent: the evidence stops at the provider. */
+const RISK_TEXT: Record<Exclude<DuplicateRisk, "none">, string> = {
+  accepted: "Possible duplicate: the email provider reported accepting an earlier attempt, so this email may already have been sent, even though the latest attempt's result is shown here.",
+  possible: "Possible duplicate: the result of an earlier attempt is unknown, so this email may already have been sent.",
 };
 
 const STALE_TEXT = "Attempt stopped before its result was recorded — the email may or may not have been sent";
@@ -71,13 +78,15 @@ export function EmailDeliveryRows({
   return (
     <ul className="mt-3 grid gap-3">
       {deliveries.map((delivery) => {
-        const recovery = anonymized ? "none" : deliveryRecovery(delivery, now);
+        const recovery = anonymized ? "none" : deliveryRecovery(delivery, now, delivery.duplicateRisk);
+        const atRisk = delivery.duplicateRisk !== "none";
+        const stale = delivery.status === "PROCESSING" && recovery === "confirm";
 
         return (
           <li className="border border-border p-3" key={delivery.type}>
             <p className="font-medium">{LABEL[delivery.type]}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {recovery === "confirm" ? STALE_TEXT : delivery.lastErrorCode === "inquiry_anonymized" ? "Not sent — the inquiry was anonymized" : STATUS_TEXT[delivery.status]}
+              {stale ? STALE_TEXT : delivery.lastErrorCode === "inquiry_anonymized" ? "Not sent — the inquiry was anonymized" : atRisk && delivery.status === "FAILED" ? "Latest attempt failed" : STATUS_TEXT[delivery.status]}
               {delivery.status === "ACCEPTED" && delivery.sentAt
                 ? ` · ${delivery.sentAt.toLocaleString()}`
                 : ` · last attempted ${delivery.updatedAt.toLocaleString()}`}
@@ -85,15 +94,20 @@ export function EmailDeliveryRows({
                 ? ` · ${delivery.attemptCount} attempts`
                 : null}
             </p>
+            {delivery.duplicateRisk === "accepted" || (atRisk && delivery.status !== "ACCEPTED") ? (
+              <p className="mt-2 text-sm font-medium" role="note">{RISK_TEXT[delivery.duplicateRisk as Exclude<DuplicateRisk, "none">]}</p>
+            ) : null}
             {recovery !== "none" ? (
               <form action={retryAction} className="mt-3">
                 <input type="hidden" name="inquiryId" value={inquiryId} />
                 <input type="hidden" name="type" value={delivery.type} />
-                {delivery.status === "FAILED" ? (
+                {delivery.status === "FAILED" && !atRisk ? (
                   <p className="text-sm text-muted-foreground">If the provider did accept the earlier attempt, a retry sends a second email.</p>
                 ) : null}
-                {recovery === "confirm" ? (
+                {stale ? (
                   <DuplicateRiskConfirmation label="I understand this may send a duplicate email. The provider can usually catch a duplicate for about 24 hours after the original attempt, but not after that." />
+                ) : recovery === "confirm" ? (
+                  <DuplicateRiskConfirmation label="I understand this may send a duplicate email. This retry is a new attempt, so the provider will not catch the duplicate. Check the recipient or the provider's records first if you can." />
                 ) : null}
                 <button className={`${buttonClass} mt-3`}>Retry email</button>
               </form>

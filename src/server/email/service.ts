@@ -13,7 +13,13 @@ import {
   type InquirySnapshot,
 } from "@/emails/inquiry-content";
 import { isEmailAddress, type MailAddress } from "@/lib/email/address";
-import { missingDeliveryTypes, STALE_PROCESSING_MS } from "@/lib/email/delivery-claims";
+import {
+  deliveryDuplicateRisk,
+  DUPLICATE_EVIDENCE_ACTIONS,
+  missingDeliveryTypes,
+  STALE_PROCESSING_MS,
+  type DuplicateRisk,
+} from "@/lib/email/delivery-claims";
 import { AuditAction, AuditEntityType, recordAuditLog } from "@/server/audit/audit-log";
 import type { AdminUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
@@ -489,6 +495,24 @@ async function attemptUnclaimedDeliveries(
 
 export class DeliveryNotRetryableError extends Error {}
 
+/** Each delivery's duplicate risk. Reads only the action and metadata, never an actor. */
+async function duplicateRisks(deliveries: Array<{ id: string; lastErrorCode: string | null }>): Promise<Map<string, DuplicateRisk>> {
+  const evidence = deliveries.length
+    ? await prisma.auditLog.findMany({
+        where: {
+          entityType: AuditEntityType.EmailDelivery,
+          entityId: { in: deliveries.map((delivery) => delivery.id) },
+          action: { in: Object.values(DUPLICATE_EVIDENCE_ACTIONS) },
+        },
+        select: { entityId: true, action: true, metadata: true },
+      })
+    : [];
+  return new Map(deliveries.map((delivery) => [
+    delivery.id,
+    deliveryDuplicateRisk(delivery.lastErrorCode, evidence.filter((entry) => entry.entityId === delivery.id)),
+  ]));
+}
+
 /**
  * Re-attempts one delivery on an administrator's request.
  *
@@ -497,7 +521,9 @@ export class DeliveryNotRetryableError extends Error {}
  * the statement returning a row is what proves this request won.
  * An already-`ACCEPTED` delivery can never be taken, so a retry cannot resend a
  * message the provider already accepted. A stale `PROCESSING` delivery is only
- * taken with `confirmedDuplicateRisk`.
+ * taken with `confirmedDuplicateRisk`, as is any delivery with evidence that an
+ * earlier attempt may have reached the provider. A new attempt has a new
+ * idempotency key, so the provider could not collapse the two.
  */
 export async function retryInquiryEmail(
   inquiryId: string,
@@ -505,6 +531,16 @@ export async function retryInquiryEmail(
   actor: AdminUser,
   dependencies: DeliveryDependencies = {},
 ): Promise<DeliveryOutcome> {
+  if (!dependencies.confirmedDuplicateRisk) {
+    const current = await prisma.emailDelivery.findUnique({
+      where: { inquiryId_type: { inquiryId, type } },
+      select: { id: true, lastErrorCode: true },
+    });
+    if (current && (await duplicateRisks([current])).get(current.id) !== "none") {
+      throw new DeliveryNotRetryableError("This email may already have been sent. Confirm the duplicate risk before retrying.");
+    }
+  }
+
   const claimedAt = new Date();
   const staleBefore = new Date(claimedAt.getTime() - STALE_PROCESSING_MS);
 
@@ -599,10 +635,11 @@ export async function recoverMissingInquiryEmails(
 
 /** Delivery state for the admin inquiry page. */
 export async function getInquiryDeliveries(inquiryId: string) {
-  return prisma.emailDelivery.findMany({
+  const deliveries = await prisma.emailDelivery.findMany({
     where: { inquiryId },
     orderBy: [{ type: "asc" }],
     select: {
+      id: true,
       type: true,
       status: true,
       attemptCount: true,
@@ -611,4 +648,6 @@ export async function getInquiryDeliveries(inquiryId: string) {
       updatedAt: true,
     },
   });
+  const risks = await duplicateRisks(deliveries);
+  return deliveries.map(({ id, ...delivery }) => ({ ...delivery, duplicateRisk: risks.get(id) ?? "none" }));
 }

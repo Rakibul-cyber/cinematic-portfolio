@@ -97,6 +97,14 @@ is the ownership token, used without a schema change. A worker that lost ownersh
 cannot change the record; if it had a result, the audit trail records it as
 `email.delivery_result_superseded`, which is the evidence a duplicate may exist.
 
+A delivery row can say `FAILED` while an earlier attempt was accepted, so the
+inquiry page derives a duplicate risk and a retry with any risk requires the same
+server-checked confirmation. `accepted` comes from a superseded result recorded as
+accepted. `possible` comes from a superseded failure, a past stale takeover, or an
+error code that can follow the send. No evidence does not mean no email: audit
+writes are best-effort and nothing reports what reached an inbox, so the page never
+says a message was delivered.
+
 Delivery is awaited inside the public Server Action rather than deferred.
 Serverless invocations may be frozen immediately after a response, so an
 unawaited promise, `setTimeout`, or in-memory queue would silently lose

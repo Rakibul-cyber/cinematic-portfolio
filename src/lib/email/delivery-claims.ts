@@ -28,10 +28,50 @@ export type DeliveryRecovery = "none" | "retry" | "confirm";
 export function deliveryRecovery(
   delivery: { status: "PROCESSING" | "ACCEPTED" | "FAILED" | "SKIPPED"; updatedAt: Date },
   now: Date,
+  duplicateRisk: DuplicateRisk = "none",
 ): DeliveryRecovery {
-  if (delivery.status === "FAILED" || delivery.status === "SKIPPED") return "retry";
+  if (delivery.status === "FAILED" || delivery.status === "SKIPPED") return duplicateRisk === "none" ? "retry" : "confirm";
   if (delivery.status !== "PROCESSING") return "none";
   return delivery.updatedAt.getTime() < now.getTime() - STALE_PROCESSING_MS ? "confirm" : "none";
+}
+
+/**
+ * What the records say about an earlier attempt having reached the provider.
+ *
+ * `accepted` is an attempt the provider reported accepting, which lost ownership
+ * of the record, so the record itself shows a later attempt's result. `possible`
+ * is an attempt whose result nobody knows. `none` means no evidence was found, not
+ * that no email exists: audit writes are best-effort, and no webhook reports what
+ * reached an inbox.
+ */
+export type DuplicateRisk = "none" | "possible" | "accepted";
+
+/** Failures that can happen after the provider accepted the message. */
+const UNKNOWN_OUTCOME_CODES = new Set(["unexpected_error", "provider_error", "application_error", "internal_server_error"]);
+
+/** The audit actions that carry this evidence. Pinned to `AuditAction` by a test. */
+export const DUPLICATE_EVIDENCE_ACTIONS = {
+  superseded: "email.delivery_result_superseded",
+  retried: "email.delivery_retried",
+} as const;
+
+export function deliveryDuplicateRisk(
+  lastErrorCode: string | null,
+  evidence: ReadonlyArray<{ action: string; metadata: unknown }>,
+): DuplicateRisk {
+  let risk: DuplicateRisk = lastErrorCode && UNKNOWN_OUTCOME_CODES.has(lastErrorCode) ? "possible" : "none";
+  for (const { action, metadata } of evidence) {
+    const details = (typeof metadata === "object" && metadata !== null ? metadata : {}) as { result?: unknown; staleProcessing?: unknown };
+    if (action === DUPLICATE_EVIDENCE_ACTIONS.superseded) {
+      if (details.result === "ACCEPTED") return "accepted";
+      // A recorded failure may be an error after the send, so only a skip rules one out.
+      if (details.result !== "SKIPPED") risk = "possible";
+    } else if (action === DUPLICATE_EVIDENCE_ACTIONS.retried && details.staleProcessing === true) {
+      // The attempt taken over stopped before recording what happened.
+      risk = "possible";
+    }
+  }
+  return risk;
 }
 
 /** The expected deliveries that have no record, in the order they are attempted. */

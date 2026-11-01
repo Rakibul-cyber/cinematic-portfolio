@@ -16,8 +16,8 @@ const ADMIN = "INQUIRY_ADMIN_NOTIFICATION" as const;
 const CUSTOMER = "INQUIRY_CUSTOMER_ACKNOWLEDGMENT" as const;
 type Status = "PROCESSING" | "ACCEPTED" | "FAILED" | "SKIPPED";
 
-const row = (type: typeof ADMIN | typeof CUSTOMER, status: Status, minutesAgo = 0) => ({
-  type, status, attemptCount: 1, lastErrorCode: null, sentAt: status === "ACCEPTED" ? NOW : null, updatedAt: new Date(NOW.getTime() - minutesAgo * 60_000),
+const row = (type: typeof ADMIN | typeof CUSTOMER, status: Status, minutesAgo = 0, duplicateRisk: "none" | "possible" | "accepted" = "none") => ({
+  type, status, duplicateRisk, attemptCount: 1, lastErrorCode: null, sentAt: status === "ACCEPTED" ? NOW : null, updatedAt: new Date(NOW.getTime() - minutesAgo * 60_000),
 });
 const render = (deliveries: ReturnType<typeof row>[], anonymized = false) =>
   renderToStaticMarkup(createElement(EmailDeliveryRows, { anonymized, deliveries, inquiryId: "id", now: NOW, recoverAction: async () => {}, retryAction: async () => {} }));
@@ -76,6 +76,46 @@ describe("email delivery recovery actions", () => {
     const html = render([row(ADMIN, "ACCEPTED")]);
     assert.equal(count(html, "No email has been attempted"), 1);
     assert.equal(count(html, "Send missing emails"), 1);
+  });
+
+  it("warns about an accepted earlier attempt on a FAILED row, without claiming delivery, and requires confirmation", () => {
+    const html = render([row(ADMIN, "FAILED", 0, "accepted"), row(CUSTOMER, "ACCEPTED")]);
+    assert.match(html, /Possible duplicate: the email provider reported accepting an earlier attempt/);
+    assert.match(html, /may already have been sent/);
+    assert.match(html, /Latest attempt failed/);
+    assert.doesNotMatch(html, /Not sent/);
+    assert.doesNotMatch(html, /delivered/i);
+    assertRequiredConfirmation(html);
+    assert.match(html, /will not catch the duplicate/);
+  });
+
+  it("warns about an unknown earlier outcome and requires confirmation", () => {
+    const html = render([row(ADMIN, "SKIPPED", 0, "possible"), row(CUSTOMER, "ACCEPTED")]);
+    assert.match(html, /the result of an earlier attempt is unknown/);
+    assertRequiredConfirmation(html);
+  });
+
+  it("shows a normal FAILED delivery with no warning and no confirmation", () => {
+    const html = render([row(ADMIN, "FAILED"), row(CUSTOMER, "ACCEPTED")]);
+    assert.doesNotMatch(html, /Possible duplicate/);
+    assert.equal(count(html, "confirmDuplicateRisk"), 0);
+    assert.match(html, /Not sent/);
+  });
+
+  it("notes a superseded acceptance on an ACCEPTED row, with no action", () => {
+    const html = render([row(ADMIN, "ACCEPTED", 0, "accepted"), row(CUSTOMER, "ACCEPTED")]);
+    assert.match(html, /Possible duplicate/);
+    assert.doesNotMatch(html, /<button/);
+  });
+
+  it("offers no retry for an active attempt, even with evidence", () => {
+    assert.doesNotMatch(render([row(ADMIN, "PROCESSING", 1, "accepted"), row(CUSTOMER, "ACCEPTED")]), /<button/);
+  });
+
+  it("keeps the warning on an anonymized inquiry, with no action", () => {
+    const html = render([row(ADMIN, "FAILED", 0, "accepted")], true);
+    assert.match(html, /Possible duplicate/);
+    assert.doesNotMatch(html, /<button/);
   });
 
   it("offers no recovery of any kind for an anonymized inquiry", () => {
