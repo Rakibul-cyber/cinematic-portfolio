@@ -21,7 +21,7 @@ async function main() {
 
   try {
     const actor = await prisma.user.create({ data: { id: actorId, name: "Security verifier", email: `security-${token}@invalid.example`, role: "SUPER_ADMIN" }, select: { id: true, name: true, email: true, role: true } });
-    const base = { website: "", name: "Privacy Person", email, phone: "+49 000", whatsapp: "+49 111", company: "Private Company", projectType: "Portrait", projectDate: null, location: "Private location", budgetLabel: null, serviceSlug: null, referralSource: "Private referral", message: "Private inquiry message for verification." };
+    const base = { website: "", name: "Privacy Person", email, phone: "+49 000", whatsapp: "+49 111", company: "Private Company", projectType: "Portrait", projectDate: null, location: "Private location", budgetLabel: "Private budget", serviceSlug: null, referralSource: "Private referral", message: "Private inquiry message for verification." };
     const first = await createInquiry({ ...base, submissionToken: randomUUID() });
     createdIds.push(first.id);
     const inquiry = await prisma.inquiry.findUniqueOrThrow({ where: { id: first.id } });
@@ -41,7 +41,7 @@ async function main() {
     assert.equal((await anonymizeCustomer(inquiry.customerId, actor)).changed, false, "repeat anonymization is a no-op");
     const erased = await prisma.customer.findUniqueOrThrow({ where: { id: inquiry.customerId }, include: { inquiries: true, notes: true } });
     const erasedText = JSON.stringify(erased);
-    for (const pii of [email, "Privacy Person", "+49 000", "+49 111", "Private Company", "Private location", "Private referral", "Private inquiry message", "Private internal note"]) assert.ok(!erasedText.includes(pii), `PII remained: ${pii}`);
+    for (const pii of [email, "Privacy Person", "+49 000", "+49 111", "Private Company", "Private location", "Private budget", "Private referral", "Private inquiry message", "Private internal note"]) assert.ok(!erasedText.includes(pii), `PII remained: ${pii}`);
     assert.equal(erased.inquiries.length, 1, "operational inquiry relation remains");
     await assert.rejects(() => retryInquiryEmail(inquiry.id, "INQUIRY_CUSTOMER_ACKNOWLEDGMENT", actor), DeliveryNotRetryableError);
 

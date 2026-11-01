@@ -5,12 +5,11 @@ import { fillMissingCustomerFields } from "@/lib/crm/customer-fields";
 import { normalizeEmail, type customerSchema, type inquirySchema } from "@/lib/validation/crm";
 import { recordAuditLog } from "@/server/audit/audit-log";
 import type { AdminUser } from "@/server/auth/session";
-import { translateCustomerUpdateError } from "@/server/crm/errors";
+import { InvalidServiceError, translateCustomerUpdateError } from "@/server/crm/errors";
 import { prisma } from "@/server/db/prisma";
 
 type InquiryInput = z.infer<typeof inquirySchema>;
 type CustomerInput = z.infer<typeof customerSchema>;
-export class InvalidServiceError extends Error {}
 
 export async function createInquiry(data: InquiryInput) {
   const service = data.serviceSlug ? await prisma.service.findFirst({ where: { slug: data.serviceSlug, isActive: true }, select: { id: true, name: true } }) : null;

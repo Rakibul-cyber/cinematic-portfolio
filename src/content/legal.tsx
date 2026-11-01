@@ -237,10 +237,10 @@ export const englishPrivacy: LegalSection[] = [
  * sitemap, and `npm run deploy:verify` fails.
  */
 export const legalDocuments = {
-  impressum: { path: "/impressum", file: "src/content/legal.tsx (germanLegalNotice)", sections: germanLegalNotice, metadataTitle: "Impressum", language: "de", approval: null as LegalApproval | null },
-  legalNotice: { path: "/legal-notice", file: "src/content/legal.tsx (englishLegalNotice)", sections: englishLegalNotice, metadataTitle: "Legal notice", language: "en", approval: null as LegalApproval | null },
-  datenschutz: { path: "/datenschutz", file: "src/content/legal.tsx (germanPrivacy)", sections: germanPrivacy, metadataTitle: "Datenschutz", language: "de", approval: null as LegalApproval | null },
-  privacy: { path: "/privacy", file: "src/content/legal.tsx (englishPrivacy)", sections: englishPrivacy, metadataTitle: "Privacy notice", language: "en", approval: null as LegalApproval | null },
+  impressum: { path: "/impressum", file: "src/content/legal.tsx (germanLegalNotice)", sections: germanLegalNotice, metadataTitle: "Impressum", metadataDescription: { draft: "Entwurf des Impressums von Munir Visuals, nicht zur Veröffentlichung freigegeben.", approved: "Impressum von Munir Visuals." }, language: "de", approval: null as LegalApproval | null },
+  legalNotice: { path: "/legal-notice", file: "src/content/legal.tsx (englishLegalNotice)", sections: englishLegalNotice, metadataTitle: "Legal notice", metadataDescription: { draft: "Draft legal notice for Munir Visuals; not approved for publication.", approved: "Legal notice for Munir Visuals." }, language: "en", approval: null as LegalApproval | null },
+  datenschutz: { path: "/datenschutz", file: "src/content/legal.tsx (germanPrivacy)", sections: germanPrivacy, metadataTitle: "Datenschutz", metadataDescription: { draft: "Entwurf der Datenschutzhinweise von Munir Visuals, nicht zur Veröffentlichung freigegeben.", approved: "Datenschutzhinweise von Munir Visuals." }, language: "de", approval: null as LegalApproval | null },
+  privacy: { path: "/privacy", file: "src/content/legal.tsx (englishPrivacy)", sections: englishPrivacy, metadataTitle: "Privacy notice", metadataDescription: { draft: "Draft privacy notice for Munir Visuals; not approved for publication.", approved: "Privacy notice for Munir Visuals." }, language: "en", approval: null as LegalApproval | null },
 } as const;
 
 export type LegalDocumentKey = keyof typeof legalDocuments;
@@ -257,11 +257,13 @@ export function isLegalDraft(key: LegalDocumentKey): boolean {
 
 /**
  * Whether the public inquiry form may collect personal data. Fail-closed: it
- * opens only once both privacy documents are complete and approved, so there is
- * no separate switch to forget.
+ * opens only once every legal document is complete and approved, so there is no
+ * separate switch to forget. `isDraft` defaults to each document's real status;
+ * it is a parameter only so tests can show the open state without recording a
+ * fictitious approval.
  */
-export function isInquiryIntakeOpen(): boolean {
-  return !isLegalDraft("privacy") && !isLegalDraft("datenschutz");
+export function isInquiryIntakeOpen(isDraft: (key: LegalDocumentKey) => boolean = isLegalDraft): boolean {
+  return (Object.keys(legalDocuments) as LegalDocumentKey[]).every((key) => !isDraft(key));
 }
 
 /**
@@ -272,6 +274,12 @@ export function isInquiryIntakeOpen(): boolean {
 export function legalMetadataTitle(key: LegalDocumentKey, draft: boolean = isLegalDraft(key)): string {
   const document = legalDocuments[key];
   return draftAwareTitle(document.metadataTitle, document.language, draft);
+}
+
+/** The page's metadata description, from the same status as its title. */
+export function legalMetadataDescription(key: LegalDocumentKey, draft: boolean = isLegalDraft(key)): string {
+  const { metadataDescription } = legalDocuments[key];
+  return draft ? metadataDescription.draft : metadataDescription.approved;
 }
 
 /** Paths of legal documents that must not be indexed or advertised yet. */

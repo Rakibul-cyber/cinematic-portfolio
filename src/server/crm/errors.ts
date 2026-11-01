@@ -1,5 +1,8 @@
 import { Prisma } from "@/generated/prisma/client";
 
+/** A submitted service that no longer exists. Its message is fixed, safe text. */
+export class InvalidServiceError extends Error {}
+
 /**
  * Expected failures when an administrator edits a customer.
  *

@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { LegalDocument } from "@/components/public/legal-document";
-import { germanLegalNotice, isLegalDraft, legalMetadataTitle } from "@/content/legal";
+import { germanLegalNotice, isLegalDraft, legalMetadataDescription, legalMetadataTitle } from "@/content/legal";
 import { buildPublicMetadata } from "@/server/public/metadata";
 
 export function generateMetadata(): Promise<Metadata> {
   if (isLegalDraft("impressum")) notFound();
   return buildPublicMetadata({
     title: legalMetadataTitle("impressum"),
-    description: "Entwurf des Impressums von Munir Visuals, nicht zur Veröffentlichung freigegeben.",
+    description: legalMetadataDescription("impressum"),
     path: "/impressum",
     indexable: !isLegalDraft("impressum"),
   });

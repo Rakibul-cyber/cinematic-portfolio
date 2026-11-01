@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { LegalDocument } from "@/components/public/legal-document";
-import { englishLegalNotice, isLegalDraft, legalMetadataTitle } from "@/content/legal";
+import { englishLegalNotice, isLegalDraft, legalMetadataDescription, legalMetadataTitle } from "@/content/legal";
 import { buildPublicMetadata } from "@/server/public/metadata";
 
 export function generateMetadata(): Promise<Metadata> {
   if (isLegalDraft("legalNotice")) notFound();
   return buildPublicMetadata({
     title: legalMetadataTitle("legalNotice"),
-    description: "Draft legal notice for Munir Visuals; not approved for publication.",
+    description: legalMetadataDescription("legalNotice"),
     path: "/legal-notice",
     indexable: !isLegalDraft("legalNotice"),
   });

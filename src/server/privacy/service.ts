@@ -35,6 +35,7 @@ export async function anonymizeCustomer(customerId: string, actor: AdminUser) {
         companySnapshot: null,
         projectType: "[Removed during privacy anonymization]",
         location: null,
+        budgetLabel: null,
         referralSource: null,
         message: "[Removed during privacy anonymization]",
         anonymizedAt,

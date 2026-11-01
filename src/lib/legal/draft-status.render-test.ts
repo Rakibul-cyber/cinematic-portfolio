@@ -193,20 +193,24 @@ describe("public release safeguards while documents are drafts", () => {
     for (const path of navigationPaths()) assert.ok(legal.draftLegalPaths().includes(path), `${path} is hidden today`);
   });
 
-  it("keeps inquiry intake closed today, and while either privacy document is a draft", () => {
+  it("keeps inquiry intake closed today", () => {
     assert.equal(legal.isInquiryIntakeOpen(), false);
-    const source = readFileSync("src/content/legal.tsx", "utf8");
-    assert.match(source, /return !isLegalDraft\("privacy"\) && !isLegalDraft\("datenschutz"\);/);
   });
 
-  it("refuses in the server action before any parsing, database, rate-limit, Turnstile or email work", () => {
-    const source = readFileSync("src/app/(public)/contact/actions.ts", "utf8");
-    const body = source.slice(source.indexOf("export async function submitInquiry"));
-    const gate = body.indexOf("if (!isInquiryIntakeOpen()) return { success: false, message: emptyStates.inquiry };");
-    assert.ok(gate > 0, "the gate is present");
-    for (const work of ["inquirySchema.safeParse", "prisma.", "headers()", "consumeInquiryLimit(", "verifyTurnstile(", "createInquiry(", "deliverInquiryEmails("]) {
-      assert.ok(body.indexOf(work) > gate, `${work} runs only after the gate`);
+  it("keeps intake closed while any one of the four legal documents is a draft", () => {
+    assert.deepEqual(Object.keys(legal.legalDocuments).sort(), [...KEYS].sort());
+    for (const draftKey of KEYS) {
+      assert.equal(legal.isInquiryIntakeOpen((key) => key === draftKey), false, `${draftKey} alone keeps intake closed`);
     }
+  });
+
+  it("opens intake only when none of the documents is a draft", () => {
+    assert.equal(legal.isInquiryIntakeOpen(() => false), true);
+  });
+
+  it("binds the server action and the page to the same gate, with no argument that could override it", () => {
+    assert.match(readFileSync("src/app/(public)/contact/actions.ts", "utf8"), /isIntakeOpen: \(\) => isInquiryIntakeOpen\(\)/);
+    assert.match(readFileSync("src/app/(public)/contact/page.tsx", "utf8"), /\{isInquiryIntakeOpen\(\) \? \(/);
   });
 
   it("renders the form and Turnstile only while intake is open, and the approved wording otherwise", () => {
@@ -261,6 +265,38 @@ describe("metadata titles follow the draft status", () => {
       const source = readFileSync(TITLES[key].file, "utf8");
       assert.match(source, new RegExp(`title: legalMetadataTitle\\("${key}"\\)`), `${key} uses the derived title`);
       assert.doesNotMatch(source, /title: "[^"]*– (Entwurf|draft)"/, `${key} has no literal draft title`);
+    }
+  });
+});
+
+describe("metadata descriptions follow the draft status", () => {
+  const FILES = {
+    impressum: "src/app/(public)/impressum/page.tsx",
+    legalNotice: "src/app/(public)/legal-notice/page.tsx",
+    datenschutz: "src/app/(public)/datenschutz/page.tsx",
+    privacy: "src/app/(public)/privacy/page.tsx",
+  } as const;
+
+  it("keeps each document's draft description while it is a draft", () => {
+    for (const key of KEYS) {
+      assert.match(legal.legalMetadataDescription(key), /Entwurf|Draft/, key);
+      assert.match(legal.legalMetadataDescription(key), /nicht zur Veröffentlichung freigegeben|not approved for publication/, key);
+    }
+  });
+
+  it("drops every draft claim once approved", () => {
+    for (const key of KEYS) {
+      const approved = legal.legalMetadataDescription(key, false);
+      assert.match(approved, /Munir Visuals/, key);
+      assert.doesNotMatch(approved, /entwurf|draft|freigegeben|approved/i, key);
+    }
+  });
+
+  it("is wired into every legal page, with no hard-coded description left behind", () => {
+    for (const key of KEYS) {
+      const source = readFileSync(FILES[key], "utf8");
+      assert.match(source, new RegExp(`description: legalMetadataDescription\\("${key}"\\)`), `${key} uses the derived description`);
+      assert.doesNotMatch(source, /description: "/, `${key} has no literal description`);
     }
   });
 });
