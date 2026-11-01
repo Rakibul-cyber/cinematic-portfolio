@@ -25,7 +25,7 @@ const count = (html: string, text: string) => html.split(text).length - 1;
 function assertRequiredConfirmation(html: string) {
   const input = /<input[^>]*name="confirmDuplicateRisk"[^>]*>/.exec(html)?.[0] ?? "";
   assert.match(input, /type="checkbox"/);
-  assert.match(input, /brequired=""/);
+  assert.match(input, /\brequired=""/);
   assert.match(input, /value="yes"/);
 }
 
