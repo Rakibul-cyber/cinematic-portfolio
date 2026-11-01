@@ -4,9 +4,13 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 
+import { AuditAction, AuditEntityType, recordAuditLog } from "@/server/audit/audit-log";
 import { prisma } from "@/server/db/prisma";
 import { getServerEnv } from "@/server/env";
+import { createLoginGuard, logLoginGuardEvent } from "@/server/auth/login-rate-limit";
 import { ADMIN_ROLE_VALUES, AdminRole } from "@/server/auth/roles";
+import { NETLIFY_CLIENT_IP_HEADER } from "@/server/security/client-ip";
+import { incrementBuckets, pruneExpiredBucketsSql, rateLimitHmacKey } from "@/server/security/rate-limit-buckets";
 
 const env = getServerEnv();
 
@@ -19,6 +23,8 @@ const env = getServerEnv();
  *   way to create an administrator is the server-side bootstrap script.
  * - `role` is declared as an additional user field with `input: false` so it can
  *   never be set or escalated through the auth API by a client.
+ * - Sign-in attempts are limited durably by `createLoginGuard`, on the HTTP route
+ *   and the Server Action alike, before any password is checked.
  * - Password hashing, session tokens, and cookie signing are handled by Better
  *   Auth using `BETTER_AUTH_SECRET`. No credential material is handled here.
  */
@@ -70,7 +76,25 @@ export const auth = betterAuth({
     accountLinking: { enabled: false },
   },
 
+  hooks: {
+    before: createLoginGuard({
+      hmacKey: rateLimitHmacKey,
+      increment: (increments) => prisma.$transaction((tx) => incrementBuckets(tx, increments)),
+      prune: (now) => prisma.$executeRaw(pruneExpiredBucketsSql(now)),
+      log: logLoginGuardEvent,
+      auditLimited: (limits) =>
+        recordAuditLog({
+          action: AuditAction.AdminSignInThrottled,
+          entityType: AuditEntityType.Session,
+          metadata: { limits },
+        }),
+    }),
+  },
+
   advanced: {
+    // Better Auth would otherwise read client-supplied forwarding headers for its
+    // own per-process limiter and for the IP stored on a session.
+    ipAddress: { ipAddressHeaders: [NETLIFY_CLIENT_IP_HEADER] },
     useSecureCookies: env.NODE_ENV === "production",
     defaultCookieAttributes: {
       httpOnly: true,

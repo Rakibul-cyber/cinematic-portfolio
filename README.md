@@ -484,6 +484,13 @@ id when prompted (see "Local database write safety").
 
 Then sign in at `http://localhost:3000/admin/login`.
 
+Sign-in attempts are limited across all function instances: 6 per account and 20
+per client address in each fixed 15-minute window, counting every attempt. A
+production deployment refuses sign-in without `RATE_LIMIT_HMAC_SECRET`, or while
+the database is unavailable. Local runs count too, so repeating `auth:verify` can
+hit the limit until the window ends. See
+[ADR 0011](docs/DECISIONS/0011-admin-login-rate-limit.md).
+
 ## Verifying authentication
 
 Pure authorization logic (the role hierarchy and redirect-target validation) is

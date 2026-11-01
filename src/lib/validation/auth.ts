@@ -30,3 +30,10 @@ export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
  */
 export const GENERIC_SIGN_IN_ERROR =
   "Unable to sign in with those credentials.";
+
+/**
+ * Shown when the login guard refuses an attempt. It applies to every email alike,
+ * so it reveals nothing about whether an account exists.
+ */
+export const SIGN_IN_UNAVAILABLE_ERROR =
+  "Sign-in is temporarily unavailable. Please try again later.";

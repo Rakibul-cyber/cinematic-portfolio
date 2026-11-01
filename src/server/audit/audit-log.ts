@@ -19,6 +19,7 @@ import { prisma } from "@/server/db/prisma";
 export const AuditAction = {
   AdminSignedIn: "admin.signed_in",
   AdminSignInFailed: "admin.sign_in_failed",
+  AdminSignInThrottled: "admin.sign_in_throttled",
   AdminSignedOut: "admin.signed_out",
   AdminUserBootstrapped: "admin_user.bootstrapped",
   MediaUploaded: "media.uploaded",
@@ -102,7 +103,7 @@ export async function recordAuditLog(input: AuditLogInput): Promise<void> {
     console.error(
       "[audit] Failed to record audit entry for action:",
       input.action,
-      error instanceof Error ? error.message : "unknown error",
+      error instanceof Error ? error.name : "unknown error",
     );
   }
 }
