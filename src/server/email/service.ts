@@ -1,6 +1,8 @@
 import "server-only";
 
-import { Prisma } from "@/generated/prisma/client";
+import { randomUUID } from "node:crypto";
+
+import type { Prisma } from "@/generated/prisma/client";
 import {
   EmailDeliveryStatus,
   EmailDeliveryType,
@@ -21,6 +23,12 @@ import {
   type OutboundEmail,
 } from "@/server/email/client";
 import { getEmailConfig, type EmailConfig } from "@/server/email/config";
+import {
+  claimFinishedDelivery,
+  claimNewDelivery,
+  claimStaleDelivery,
+  type ClaimedDelivery,
+} from "@/server/email/delivery-claim-queries";
 import type { RenderedEmail, RenderInput } from "@/server/email/render";
 
 /**
@@ -36,6 +44,12 @@ import type { RenderedEmail, RenderInput } from "@/server/email/render";
  * insert, so a replayed submission or a double click cannot produce a second
  * provider call. Each database write is a single short statement; the provider
  * call and the React render both happen with no transaction open.
+ *
+ * Holding no transaction across the provider call has one consequence: no
+ * database lock can cover the send itself. Claims coordinate with anonymization
+ * (see `delivery-claim-queries.ts`) and each worker re-checks just before
+ * sending, but an erasure that commits in the moment after that check cannot stop
+ * a message already on its way, and nothing here can recall one the provider has.
  */
 
 export const EMAIL_DELIVERY_TYPES = [
@@ -66,6 +80,10 @@ export type DeliveryOutcome = {
   status: EmailDeliveryStatus;
   /** True when another request already owned this delivery. */
   alreadyClaimed?: boolean;
+  /** True when a newer attempt took this delivery over, so `status` is that attempt's. */
+  superseded?: boolean;
+  /** True when the inquiry was erased after the claim, so nothing was sent. */
+  erased?: boolean;
 };
 
 export type EmailRenderer = {
@@ -119,51 +137,62 @@ function adminInquiryUrl(config: EmailConfig, inquiryId: string): string | null 
   return `${config.appBaseUrl.replace(/\/$/, "")}/admin/inquiries/${inquiryId}`;
 }
 
+/** Why a claimed delivery was skipped when its inquiry was erased before the send. */
+const INQUIRY_ANONYMIZED = "inquiry_anonymized";
+
+/** A claimed delivery and the worker's ownership token. */
+type OwnedDelivery = ClaimedDelivery & { claimedAt: Date };
+
 /**
- * Records the result of one attempt.
+ * Matches a delivery only while this worker still owns it.
+ *
+ * The attempt number and idempotency key cannot tell two workers apart, because a
+ * stale takeover deliberately keeps both. The `updatedAt` each claim writes can:
+ * only a claim or a recorded result changes it, and a takeover cannot happen
+ * within five minutes of the claim it replaces.
+ */
+const ownedBy = (delivery: OwnedDelivery) => ({
+  id: delivery.id,
+  status: EmailDeliveryStatus.PROCESSING,
+  attemptCount: delivery.attemptCount,
+  updatedAt: delivery.claimedAt,
+});
+
+type DeliveryResult =
+  | { ok: true; providerMessageId: string | null }
+  | { ok: false; errorCode: string }
+  | { skipped: true; reason?: string };
+
+/**
+ * Records the result of one attempt, if this worker still owns the delivery.
+ *
+ * Returns the status written, or `null` when a newer attempt owns the record.
  *
  * A single short update. `lastErrorCode` is cleared on success so a recovered
  * delivery does not keep displaying a stale failure.
  */
 async function finish(
-  deliveryId: string,
+  delivery: OwnedDelivery,
   provider: string | null,
-  result:
-    | { ok: true; providerMessageId: string | null }
-    | { ok: false; errorCode: string }
-    | { skipped: true },
-): Promise<EmailDeliveryStatus> {
+  result: DeliveryResult,
+): Promise<EmailDeliveryStatus | null> {
+  const write = async (data: Prisma.EmailDeliveryUpdateManyMutationInput, status: EmailDeliveryStatus) => {
+    const { count } = await prisma.emailDelivery.updateMany({ where: ownedBy(delivery), data: { ...data, status } });
+    return count === 1 ? status : null;
+  };
+
   if ("skipped" in result) {
-    await prisma.emailDelivery.update({
-      where: { id: deliveryId },
-      data: { status: EmailDeliveryStatus.SKIPPED, provider: null },
-    });
-    return EmailDeliveryStatus.SKIPPED;
+    return write({ provider: null, ...(result.reason ? { lastErrorCode: result.reason } : {}) }, EmailDeliveryStatus.SKIPPED);
   }
 
   if (result.ok) {
-    await prisma.emailDelivery.update({
-      where: { id: deliveryId },
-      data: {
-        status: EmailDeliveryStatus.ACCEPTED,
-        provider,
-        providerMessageId: result.providerMessageId,
-        sentAt: new Date(),
-        lastErrorCode: null,
-      },
-    });
-    return EmailDeliveryStatus.ACCEPTED;
+    return write(
+      { provider, providerMessageId: result.providerMessageId, sentAt: new Date(), lastErrorCode: null },
+      EmailDeliveryStatus.ACCEPTED,
+    );
   }
 
-  await prisma.emailDelivery.update({
-    where: { id: deliveryId },
-    data: {
-      status: EmailDeliveryStatus.FAILED,
-      provider,
-      lastErrorCode: result.errorCode.slice(0, 64),
-    },
-  });
-  return EmailDeliveryStatus.FAILED;
+  return write({ provider, lastErrorCode: result.errorCode.slice(0, 64) }, EmailDeliveryStatus.FAILED);
 }
 
 /**
@@ -193,6 +222,63 @@ async function auditDelivery(
       status,
     },
   });
+}
+
+/**
+ * Records a result and its audit entry, and answers with the delivery's state.
+ *
+ * A worker that lost ownership cannot change the record, but what it did still
+ * happened: an accepted message from an older worker is the evidence that a
+ * second email may exist, so it goes in the audit trail instead.
+ */
+async function settle(
+  delivery: OwnedDelivery,
+  provider: string | null,
+  result: DeliveryResult,
+  action: string,
+  actor?: AdminUser,
+): Promise<DeliveryOutcome> {
+  const status = await finish(delivery, provider, result);
+  if (status) {
+    await auditDelivery(action, delivery, status, actor);
+    return { type: delivery.type, status };
+  }
+
+  await recordAuditLog({
+    action: AuditAction.EmailDeliveryResultSuperseded,
+    entityType: AuditEntityType.EmailDelivery,
+    entityId: delivery.id,
+    actorUserId: actor?.id ?? null,
+    actorEmail: actor?.email ?? null,
+    metadata: {
+      inquiryId: delivery.inquiryId,
+      type: delivery.type,
+      attempt: delivery.attemptCount,
+      result: "skipped" in result ? EmailDeliveryStatus.SKIPPED : result.ok ? EmailDeliveryStatus.ACCEPTED : EmailDeliveryStatus.FAILED,
+    },
+  });
+  const current = await prisma.emailDelivery.findUnique({ where: { id: delivery.id }, select: { status: true } });
+  return { type: delivery.type, status: current?.status ?? EmailDeliveryStatus.PROCESSING, superseded: true };
+}
+
+/**
+ * The last check before a provider call: whether this worker still owns the
+ * delivery, and whether the inquiry has been erased since the claim.
+ */
+async function preSendCheck(delivery: OwnedDelivery): Promise<"send" | "superseded" | "erased"> {
+  const current = await prisma.emailDelivery.findUnique({
+    where: { id: delivery.id },
+    select: { status: true, attemptCount: true, updatedAt: true, inquiry: { select: { anonymizedAt: true } } },
+  });
+  if (
+    !current ||
+    current.status !== EmailDeliveryStatus.PROCESSING ||
+    current.attemptCount !== delivery.attemptCount ||
+    current.updatedAt.getTime() !== delivery.claimedAt.getTime()
+  ) {
+    return "superseded";
+  }
+  return current.inquiry.anonymizedAt ? "erased" : "send";
 }
 
 /**
@@ -260,12 +346,7 @@ function buildOutbound(
  * recorded as a failure so the delivery stays visible and retryable.
  */
 async function performDelivery(
-  delivery: {
-    id: string;
-    inquiryId: string;
-    type: EmailDeliveryType;
-    attemptCount: number;
-  },
+  delivery: OwnedDelivery,
   inquiry: InquirySnapshot,
   dependencies: DeliveryDependencies,
   actor?: AdminUser,
@@ -273,9 +354,7 @@ async function performDelivery(
   const config = dependencies.config ?? getEmailConfig();
 
   if (!config.configured) {
-    const status = await finish(delivery.id, null, { skipped: true });
-    await auditDelivery(AuditAction.EmailDeliverySkipped, delivery, status, actor);
-    return { type: delivery.type, status };
+    return settle(delivery, null, { skipped: true }, AuditAction.EmailDeliverySkipped, actor);
   }
 
   const sender =
@@ -284,9 +363,7 @@ async function performDelivery(
       : dependencies.sender;
 
   if (!sender) {
-    const status = await finish(delivery.id, null, { skipped: true });
-    await auditDelivery(AuditAction.EmailDeliverySkipped, delivery, status, actor);
-    return { type: delivery.type, status };
+    return settle(delivery, null, { skipped: true }, AuditAction.EmailDeliverySkipped, actor);
   }
 
   try {
@@ -313,33 +390,31 @@ async function performDelivery(
     );
 
     if (!outbound) {
-      const status = await finish(delivery.id, sender.provider, {
-        ok: false,
-        errorCode: "invalid_recipient",
-      });
-      await auditDelivery(AuditAction.EmailDeliveryFailed, delivery, status, actor);
-      return { type: delivery.type, status };
+      return await settle(delivery, sender.provider, { ok: false, errorCode: "invalid_recipient" }, AuditAction.EmailDeliveryFailed, actor);
+    }
+
+    const check = await preSendCheck(delivery);
+    if (check === "superseded") {
+      const current = await prisma.emailDelivery.findUnique({ where: { id: delivery.id }, select: { status: true } });
+      return { type: delivery.type, status: current?.status ?? EmailDeliveryStatus.PROCESSING, superseded: true };
+    }
+    if (check === "erased") {
+      const outcome = await settle(delivery, null, { skipped: true, reason: INQUIRY_ANONYMIZED }, AuditAction.EmailDeliverySkipped, actor);
+      return { ...outcome, erased: true };
     }
 
     const result = await sender.send(outbound);
-    const status = await finish(delivery.id, sender.provider, result);
-    await auditDelivery(
-      result.ok ? AuditAction.EmailDeliveryAccepted : AuditAction.EmailDeliveryFailed,
+    return await settle(
       delivery,
-      status,
+      sender.provider,
+      result,
+      result.ok ? AuditAction.EmailDeliveryAccepted : AuditAction.EmailDeliveryFailed,
       actor,
     );
-
-    return { type: delivery.type, status };
   } catch {
     // Nothing from the thrown value is stored or logged: it may carry provider
     // detail or recipient data. Only a bounded category is kept.
-    const status = await finish(delivery.id, sender.provider, {
-      ok: false,
-      errorCode: "unexpected_error",
-    });
-    await auditDelivery(AuditAction.EmailDeliveryFailed, delivery, status, actor);
-    return { type: delivery.type, status };
+    return settle(delivery, sender.provider, { ok: false, errorCode: "unexpected_error" }, AuditAction.EmailDeliveryFailed, actor);
   }
 }
 
@@ -380,40 +455,24 @@ async function attemptUnclaimedDeliveries(
     const outcomes: DeliveryOutcome[] = [];
 
     for (const type of EMAIL_DELIVERY_TYPES) {
-      let delivery;
+      // Creating the row is the claim. Losing this race means another request
+      // owns the delivery, and this one must not send anything.
+      const claimedAt = new Date();
+      const [claimed] = await prisma.$queryRaw<ClaimedDelivery[]>(
+        claimNewDelivery({ id: randomUUID(), inquiryId, type, claimedAt }),
+      );
 
-      try {
-        // Creating the row is the claim. Losing this race means another
-        // request owns the delivery, and this one must not send anything.
-        delivery = await prisma.emailDelivery.create({
-          data: {
-            inquiryId,
-            type,
-            status: EmailDeliveryStatus.PROCESSING,
-            attemptCount: 1,
-          },
-          select: { id: true, inquiryId: true, type: true, attemptCount: true },
+      if (!claimed) {
+        const existing = await prisma.emailDelivery.findUnique({
+          where: { inquiryId_type: { inquiryId, type } },
+          select: { status: true },
         });
-      } catch (error) {
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2002"
-        ) {
-          const existing = await prisma.emailDelivery.findUnique({
-            where: { inquiryId_type: { inquiryId, type } },
-            select: { status: true },
-          });
-          outcomes.push({
-            type,
-            status: existing?.status ?? EmailDeliveryStatus.PROCESSING,
-            alreadyClaimed: true,
-          });
-          continue;
-        }
-        throw error;
+        // No record and no claim means the inquiry was erased after the read above.
+        if (existing) outcomes.push({ type, status: existing.status, alreadyClaimed: true });
+        continue;
       }
 
-      outcomes.push(await performDelivery(delivery, inquiry, dependencies, actor));
+      outcomes.push(await performDelivery({ ...claimed, claimedAt }, inquiry, dependencies, actor));
     }
 
     return outcomes;
@@ -435,7 +494,7 @@ export class DeliveryNotRetryableError extends Error {}
  *
  * The claim is a conditional update rather than an insert: only a delivery that
  * is currently `FAILED`, `SKIPPED`, or stale-`PROCESSING` can be taken, and
- * `updateMany` reporting a single affected row is what proves this request won.
+ * the statement returning a row is what proves this request won.
  * An already-`ACCEPTED` delivery can never be taken, so a retry cannot resend a
  * message the provider already accepted. A stale `PROCESSING` delivery is only
  * taken with `confirmedDuplicateRisk`.
@@ -446,7 +505,8 @@ export async function retryInquiryEmail(
   actor: AdminUser,
   dependencies: DeliveryDependencies = {},
 ): Promise<DeliveryOutcome> {
-  const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS);
+  const claimedAt = new Date();
+  const staleBefore = new Date(claimedAt.getTime() - STALE_PROCESSING_MS);
 
   // A definite FAILED/SKIPPED result starts a new logical provider attempt and
   // therefore gets a new key. A stale PROCESSING row is different: the prior
@@ -454,51 +514,22 @@ export async function retryInquiryEmail(
   // its durable attempt number and replay the same key. Resend can then return
   // the original result instead of accepting a duplicate during its 24-hour
   // idempotency window.
-  let claimed = await prisma.emailDelivery.updateMany({
-    where: {
-      inquiryId,
-      type,
-      // Claiming and the erasure check must be one statement. A separate read
-      // after the claim would leave a window in which anonymization commits
-      // between the check and the provider call.
-      inquiry: { anonymizedAt: null },
-      status: { in: [EmailDeliveryStatus.FAILED, EmailDeliveryStatus.SKIPPED] },
-    },
-    data: {
-      status: EmailDeliveryStatus.PROCESSING,
-      attemptCount: { increment: 1 },
-    },
-  });
+  let [claimed] = await prisma.$queryRaw<ClaimedDelivery[]>(claimFinishedDelivery({ inquiryId, type, claimedAt }));
 
-  const definiteOutcome = claimed.count === 1;
+  const definiteOutcome = claimed !== undefined;
 
-  if (!definiteOutcome && dependencies.confirmedDuplicateRisk) {
-    claimed = await prisma.emailDelivery.updateMany({
-      where: {
-        inquiryId,
-        type,
-        inquiry: { anonymizedAt: null },
-        status: EmailDeliveryStatus.PROCESSING,
-        updatedAt: { lt: staleBefore },
-      },
-      // Updating the timestamp takes ownership without changing attempt
-      // identity; concurrent retry requests can no longer match this row.
-      data: { status: EmailDeliveryStatus.PROCESSING },
-    });
+  if (!claimed && dependencies.confirmedDuplicateRisk) {
+    [claimed] = await prisma.$queryRaw<ClaimedDelivery[]>(claimStaleDelivery({ inquiryId, type, claimedAt, staleBefore }));
   }
 
-  if (claimed.count !== 1) {
-    throw new DeliveryNotRetryableError(
+  if (!claimed) {    throw new DeliveryNotRetryableError(
       dependencies.confirmedDuplicateRisk
         ? "This email cannot be retried right now."
         : "This email cannot be retried right now. If its last attempt stopped, confirm the duplicate risk first.",
     );
   }
 
-  const delivery = await prisma.emailDelivery.findUniqueOrThrow({
-    where: { inquiryId_type: { inquiryId, type } },
-    select: { id: true, inquiryId: true, type: true, attemptCount: true },
-  });
+  const delivery: OwnedDelivery = { ...claimed, claimedAt };
 
   const inquiry = await prisma.inquiry.findUnique({
     where: { id: inquiryId },
@@ -506,6 +537,7 @@ export async function retryInquiryEmail(
   });
 
   if (!inquiry || inquiry.anonymizedAt) {
+    await finish(delivery, null, { skipped: true, reason: INQUIRY_ANONYMIZED });
     throw new DeliveryNotRetryableError("This inquiry no longer exists.");
   }
 

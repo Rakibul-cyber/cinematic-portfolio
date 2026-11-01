@@ -39,6 +39,7 @@ export const AuditAction = {
   EmailDeliverySkipped: "email.delivery_skipped",
   EmailDeliveryRetried: "email.delivery_retried",
   EmailDeliveryRecoveryRequested: "email.delivery_recovery_requested",
+  EmailDeliveryResultSuperseded: "email.delivery_result_superseded",
   PrivacyCustomerExported: "privacy.customer_exported",
   PrivacyCustomerAnonymized: "privacy.customer_anonymized",
 } as const;

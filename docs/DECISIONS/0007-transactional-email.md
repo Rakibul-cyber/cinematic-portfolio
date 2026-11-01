@@ -84,6 +84,19 @@ claim as a submission, so existing records are untouched and concurrent requests
 produce one send each. A `FAILED` retry can also duplicate if the provider
 accepted a message whose result could not be recorded; the page says so.
 
+Each claim is one statement that locks the inquiry row with `FOR SHARE`, so a
+claim meeting an uncommitted anonymization waits and then claims nothing. Workers
+re-check ownership and erasure immediately before the provider call. No
+transaction is held across that call, so an erasure committing in the moment after
+the check cannot stop a message already on its way, and an accepted message cannot
+be recalled.
+
+A stale takeover deliberately keeps the attempt number and idempotency key, so
+those cannot tell two workers apart. The exact `updatedAt` written by each claim
+is the ownership token, used without a schema change. A worker that lost ownership
+cannot change the record; if it had a result, the audit trail records it as
+`email.delivery_result_superseded`, which is the evidence a duplicate may exist.
+
 Delivery is awaited inside the public Server Action rather than deferred.
 Serverless invocations may be frozen immediately after a response, so an
 unawaited promise, `setTimeout`, or in-memory queue would silently lose

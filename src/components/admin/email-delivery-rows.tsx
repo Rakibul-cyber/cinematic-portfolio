@@ -77,7 +77,7 @@ export function EmailDeliveryRows({
           <li className="border border-border p-3" key={delivery.type}>
             <p className="font-medium">{LABEL[delivery.type]}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {recovery === "confirm" ? STALE_TEXT : STATUS_TEXT[delivery.status]}
+              {recovery === "confirm" ? STALE_TEXT : delivery.lastErrorCode === "inquiry_anonymized" ? "Not sent — the inquiry was anonymized" : STATUS_TEXT[delivery.status]}
               {delivery.status === "ACCEPTED" && delivery.sentAt
                 ? ` · ${delivery.sentAt.toLocaleString()}`
                 : ` · last attempted ${delivery.updatedAt.toLocaleString()}`}

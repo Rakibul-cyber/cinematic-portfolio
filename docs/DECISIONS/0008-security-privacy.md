@@ -46,13 +46,13 @@ genuinely unclaimed delivery triggers recovery; a `FAILED` or `SKIPPED` row is a
 claim that reached a definite outcome and remains the administrator's explicit
 retry, never a public one.
 
-Anonymization is checked inside the delivery claim itself, so no email attempt
-can start for an erased inquiry through either the administrator retry path or
-the public idempotent replay path. Work that has already crossed the claim
-boundary is not recalled: an initial send in flight when anonymization commits
-may still reach the provider, exactly as an already-posted letter cannot be
-retrieved. The guarantee this phase makes is therefore about future attempts,
-not about in-flight ones.
+Anonymization is checked inside the delivery claim itself, under a row lock on the
+inquiry, so no claim can be taken for an erased inquiry through the administrator
+retry and recovery paths or the public idempotent replay path. A worker past the
+claim re-checks immediately before its provider call. Work past that check is not
+recalled: a send in flight when anonymization commits may still reach the provider,
+exactly as an already-posted letter cannot be retrieved. The guarantee is therefore
+about attempts not yet at the provider, not about in-flight ones.
 
 Local anonymization does not reach the transactional email processor. A message
 already handed to Resend may persist in provider logs and in the recipient's

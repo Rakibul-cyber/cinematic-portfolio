@@ -20,6 +20,9 @@ export type RecoveryAnswer = { inquiryId: string; outcome: "saved" | "info" | "e
 
 type RequireActor = () => Promise<AdminUser>;
 
+const SUPERSEDED = "A newer attempt now owns this email";
+const ERASED = "The inquiry was anonymized, so nothing more was sent";
+
 const options = (confirmDuplicateRisk: "yes" | undefined): Pick<DeliveryDependencies, "confirmedDuplicateRisk"> =>
   confirmDuplicateRisk ? { confirmedDuplicateRisk: true } : {};
 
@@ -37,6 +40,8 @@ export async function runRetryEmail(
   let notice = "Email retried";
   try {
     const delivery = await dependencies.retry(data.inquiryId, data.type, actor, options(data.confirmDuplicateRisk));
+    if (delivery.superseded) return { inquiryId: data.inquiryId, outcome: "info", notice: SUPERSEDED };
+    if (delivery.erased) return { inquiryId: data.inquiryId, outcome: "info", notice: ERASED };
     notice =
       delivery.status === "ACCEPTED"
         ? "Email accepted by the provider"
@@ -53,9 +58,10 @@ export async function runRetryEmail(
 }
 
 function describeRecovery(outcomes: DeliveryOutcome[]): Pick<RecoveryAnswer, "outcome" | "notice"> {
-  const attempted = outcomes.filter((delivery) => !delivery.alreadyClaimed);
+  const attempted = outcomes.filter((delivery) => !delivery.alreadyClaimed && !delivery.superseded);
   if (outcomes.length === 0) return { outcome: "error", notice: "The missing emails could not be sent." };
   if (attempted.length === 0) return { outcome: "info", notice: "Another request is already handling these emails" };
+  if (attempted.some((delivery) => delivery.erased)) return { outcome: "info", notice: ERASED };
   if (attempted.some((delivery) => delivery.status === "FAILED")) return { outcome: "error", notice: "A missing email could not be sent" };
   if (attempted.some((delivery) => delivery.status === "SKIPPED")) return { outcome: "info", notice: "Email is not configured, so nothing was sent" };
   return { outcome: "saved", notice: "Missing emails accepted by the provider" };
