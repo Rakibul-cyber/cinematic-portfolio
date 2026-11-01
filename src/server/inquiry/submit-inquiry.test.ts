@@ -115,6 +115,32 @@ describe("replay handling", () => {
     assert.equal(h.captured.delivered, INQUIRY_ID);
   });
 
+  it("answers generically and logs when recovery throws, so the visitor can retry the same token", async () => {
+    const h = harness({
+      findReplay: async () => ({ id: INQUIRY_ID, emailDeliveries: [] }),
+      deliverEmails: async () => { throw new Error(`provider said ${EMAIL}`); },
+    });
+    const result = await submitInquiryWorkflow(validForm(), h.dependencies);
+    assert.deepEqual(result, { success: false, message: "We could not receive your inquiry. Please try again." });
+    assert.deepEqual(h.categories(), ["replay_recovery_failed"]);
+    assert.deepEqual(h.calls, ["gate"], "no new inquiry and no abuse-control attempt");
+  });
+
+  it("keeps the replay's success and logs a recovered delivery that failed or was skipped", async () => {
+    const h = harness({
+      findReplay: async () => ({ id: INQUIRY_ID, emailDeliveries: [] }),
+      deliverEmails: async () => [{ type: "INQUIRY_ADMIN_NOTIFICATION", status: "FAILED" }, { type: "INQUIRY_CUSTOMER_ACKNOWLEDGMENT", status: "SKIPPED" }],
+    });
+    assert.equal((await submitInquiryWorkflow(validForm(), h.dependencies)).success, true);
+    assert.deepEqual(h.categories(), ["email_failed", "email_skipped"]);
+  });
+
+  it("logs nothing when recovery of an erased inquiry correctly attempts nothing", async () => {
+    const h = harness({ findReplay: async () => ({ id: INQUIRY_ID, emailDeliveries: [] }), deliverEmails: async () => [] });
+    assert.equal((await submitInquiryWorkflow(validForm(), h.dependencies)).success, true);
+    assert.deepEqual(h.failures, []);
+  });
+
   it("reports a failed replay lookup under its own category", async () => {
     const h = harness({ findReplay: async () => { throw new Error("down"); } });
     const result = await submitInquiryWorkflow(validForm(), h.dependencies);
@@ -150,6 +176,14 @@ describe("rate limiting", () => {
     await submitInquiryWorkflow(validForm(), h.dependencies);
     assert.deepEqual(h.captured.limit, { submissionToken: TOKEN, normalizedEmail: EMAIL.toLowerCase() });
     assert.deepEqual(h.captured.turnstile, { token: TURNSTILE_TOKEN });
+  });
+
+  it("fails safely when the IP lookup throws, before any abuse-control attempt or write", async () => {
+    const h = harness({ getTrustedClientIp: async () => { throw new Error(`header ${CLIENT_IP}`); } });
+    const result = await submitInquiryWorkflow(validForm(), h.dependencies);
+    assert.deepEqual(result, { success: false, message: "We could not receive your inquiry. Please try again." });
+    assert.deepEqual(h.calls, ["gate", "replay"]);
+    assert.deepEqual(h.categories(), ["rate_limit_failed"]);
   });
 
   it("fails safely when the limiter throws", async () => {
@@ -276,6 +310,53 @@ describe("privacy-safe failure logging", () => {
       logInquiryFailure("persistence_failed", "a thrown string with someone@example.test");
       assert.deepEqual(output.lines.map((line) => JSON.parse(line)), [{ scope: "inquiry", category: "persistence_failed" }, { scope: "inquiry", category: "persistence_failed" }]);
     } finally { output.restore(); }
+  });
+
+  it("keeps the category when reading the error throws, and never throws itself", () => {
+    const output = captureConsole();
+    const throwingGetters = {
+      get name(): string { throw new Error("someone@example.test"); },
+      get code(): string { throw new Error("someone@example.test"); },
+    };
+    const hostileProxy = new Proxy({}, { get: () => { throw new Error("someone@example.test"); } });
+    const revoked = Proxy.revocable({}, {});
+    revoked.revoke();
+    try {
+      for (const value of [throwingGetters, hostileProxy, revoked.proxy, null, undefined, 7, Symbol("x")]) {
+        assert.doesNotThrow(() => logInquiryFailure("persistence_failed", value));
+      }
+      assert.equal(output.lines.length, 7);
+      for (const line of output.lines) assert.deepEqual(JSON.parse(line), { scope: "inquiry", category: "persistence_failed" });
+    } finally { output.restore(); }
+  });
+
+  it("does not throw when the console itself fails", () => {
+    const fail = () => { throw new Error("stream closed"); };
+    const error = mock.method(console, "error", fail);
+    const warn = mock.method(console, "warn", fail);
+    try {
+      assert.doesNotThrow(() => logInquiryFailure("persistence_failed"));
+      assert.doesNotThrow(() => logInquiryFailure("rate_limited"));
+    } finally { error.mock.restore(); warn.mock.restore(); }
+  });
+
+  it("gives the same answers on every path when logging fails", async () => {
+    const fail = () => { throw new Error("stream closed"); };
+    const paths: Array<[Partial<SubmitInquiryDependencies>, boolean, string | undefined]> = [
+      [{ isIntakeOpen: () => false }, false, emptyStates.inquiry],
+      [{ consumeLimit: async () => ({ allowed: false, configured: true }) }, false, "We could not receive your inquiry. Please try again later."],
+      [{ verifyTurnstile: async () => ({ ok: false, reason: "unavailable" }) }, false, "Verification failed. Please try again."],
+      [{ createInquiry: async () => { throw new Error("down"); } }, false, "We could not receive your inquiry. Please try again."],
+      [{ deliverEmails: async () => { throw new Error("down"); } }, true, "Thank you. Your inquiry has been received."],
+      [{ deliverEmails: async () => [{ type: "INQUIRY_ADMIN_NOTIFICATION", status: "FAILED" }] }, true, "Thank you. Your inquiry has been received."],
+    ];
+    const error = mock.method(console, "error", fail);
+    const warn = mock.method(console, "warn", fail);
+    try {
+      for (const [overrides, success, message] of paths) {
+        assert.deepEqual(await submitInquiryWorkflow(validForm(), harness({ ...overrides, logFailure: logInquiryFailure }).dependencies), { success, message });
+      }
+    } finally { error.mock.restore(); warn.mock.restore(); }
   });
 
   it("logs expected refusals as warnings and faults as errors", () => {

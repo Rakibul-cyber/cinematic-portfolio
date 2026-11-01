@@ -43,8 +43,6 @@ const TURNSTILE_FAILURES = {
 
 /** Records deliveries that did not reach the provider, so a lost notification is visible. */
 function logDeliveryOutcomes(outcomes: DeliveryOutcome[], logFailure: SubmitInquiryDependencies["logFailure"]): void {
-  // A new inquiry always has two deliveries to attempt; none means orchestration failed.
-  if (outcomes.length === 0) logFailure("email_orchestration_failed");
   const attempted = outcomes.filter((outcome) => !outcome.alreadyClaimed);
   if (attempted.some((outcome) => outcome.status === EmailDeliveryStatus.FAILED)) logFailure("email_failed");
   if (attempted.some((outcome) => outcome.status === EmailDeliveryStatus.SKIPPED)) logFailure("email_skipped");
@@ -80,7 +78,8 @@ export async function submitInquiryWorkflow(form: FormData, dependencies: Submit
       // and `deliverInquiryEmails` remains authoritative on erasure.
       if (!hasAllDeliveryClaims(replay.emailDeliveries)) {
         step = "replay_recovery_failed";
-        await dependencies.deliverEmails(replay.id);
+        // No outcomes is not a failure here: an erased inquiry correctly attempts nothing.
+        logDeliveryOutcomes(await dependencies.deliverEmails(replay.id), logFailure);
       }
       return { success: true, message: SUCCESS_MESSAGE };
     }
@@ -115,7 +114,10 @@ export async function submitInquiryWorkflow(form: FormData, dependencies: Submit
     // frozen. Delivery is not expected to throw, and never resends for a
     // replayed submission; even if it did throw, the answer below must stand.
     try {
-      logDeliveryOutcomes(await dependencies.deliverEmails(inquiry.id), logFailure);
+      const outcomes = await dependencies.deliverEmails(inquiry.id);
+      // A new inquiry always has two deliveries to attempt; none means orchestration failed.
+      if (outcomes.length === 0) logFailure("email_orchestration_failed");
+      logDeliveryOutcomes(outcomes, logFailure);
     } catch (error) {
       logFailure("email_orchestration_failed", error);
     }

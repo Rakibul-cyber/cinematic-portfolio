@@ -40,15 +40,26 @@ const PRISMA_CODE = /^P\d{4}$/;
 
 function errorFields(error: unknown): { errorName?: string; errorCode?: string } {
   if (typeof error !== "object" || error === null) return {};
-  const { name, code } = error as { name?: unknown; code?: unknown };
-  return {
-    ...(typeof name === "string" && IDENTIFIER.test(name) ? { errorName: name } : {}),
-    ...(typeof code === "string" && PRISMA_CODE.test(code) ? { errorCode: code } : {}),
-  };
+  // A thrown value can be anything, including an object whose getters throw.
+  // The category alone is still worth logging, so that only costs these fields.
+  try {
+    const { name, code } = error as { name?: unknown; code?: unknown };
+    return {
+      ...(typeof name === "string" && IDENTIFIER.test(name) ? { errorName: name } : {}),
+      ...(typeof code === "string" && PRISMA_CODE.test(code) ? { errorCode: code } : {}),
+    };
+  } catch {
+    return {};
+  }
 }
 
+/** Never throws: a logging problem must not change what happens to an inquiry. */
 export function logInquiryFailure(category: InquiryFailureCategory, error?: unknown): void {
-  const line = JSON.stringify({ scope: "inquiry", category, ...errorFields(error) });
-  if ((EXPECTED_REJECTIONS as readonly string[]).includes(category)) console.warn(line);
-  else console.error(line);
+  try {
+    const line = JSON.stringify({ scope: "inquiry", category, ...errorFields(error) });
+    if ((EXPECTED_REJECTIONS as readonly string[]).includes(category)) console.warn(line);
+    else console.error(line);
+  } catch {
+    // Nowhere left to report this.
+  }
 }
