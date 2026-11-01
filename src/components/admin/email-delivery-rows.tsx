@@ -1,11 +1,12 @@
-import { buttonClass } from "@/components/admin/admin-shell";
+import { buttonClass } from "@/components/admin/admin-styles";
+import { deliveryRecovery, missingDeliveryTypes } from "@/lib/email/delivery-claims";
 
 /**
  * Transactional email state for one inquiry.
  *
- * Deliberately small: two rows, a plain-language status, and a retry button
- * where a retry is possible. Phase 7 extends the inquiry page only — there is
- * no email dashboard, template editor, or delivery analytics.
+ * Deliberately small: two rows, a plain-language status, and a recovery action
+ * where one is possible. Phase 7 extends the inquiry page only — there is no
+ * email dashboard, template editor, or delivery analytics.
  *
  * Provider message ids, raw provider errors, and configuration state are not
  * shown. An administrator needs to know whether the studio was notified and
@@ -39,37 +40,44 @@ const STATUS_TEXT: Record<Delivery["status"], string> = {
   SKIPPED: "Not attempted — email is not configured",
 };
 
+const STALE_TEXT = "Attempt stopped before its result was recorded — the email may or may not have been sent";
+
+function DuplicateRiskConfirmation({ label }: { label: string }) {
+  return (
+    <label className="mt-3 flex items-start gap-2 text-sm">
+      <input className="mt-1" name="confirmDuplicateRisk" required type="checkbox" value="yes" />
+      <span>{label}</span>
+    </label>
+  );
+}
+
 export function EmailDeliveryRows({
   deliveries,
   inquiryId,
   retryAction,
+  recoverAction,
   anonymized = false,
+  now = new Date(),
 }: {
   deliveries: Delivery[];
   inquiryId: string;
   retryAction: (form: FormData) => Promise<void>;
+  recoverAction: (form: FormData) => Promise<void>;
   anonymized?: boolean;
+  now?: Date;
 }) {
-  if (deliveries.length === 0) {
-    return (
-      <p className="mt-3 text-muted-foreground">
-        No email has been attempted for this inquiry.
-      </p>
-    );
-  }
+  const missing = missingDeliveryTypes(deliveries);
 
   return (
     <ul className="mt-3 grid gap-3">
       {deliveries.map((delivery) => {
-        const retryable =
-          !anonymized &&
-          (delivery.status === "FAILED" || delivery.status === "SKIPPED");
+        const recovery = anonymized ? "none" : deliveryRecovery(delivery, now);
 
         return (
           <li className="border border-border p-3" key={delivery.type}>
             <p className="font-medium">{LABEL[delivery.type]}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {STATUS_TEXT[delivery.status]}
+              {recovery === "confirm" ? STALE_TEXT : STATUS_TEXT[delivery.status]}
               {delivery.status === "ACCEPTED" && delivery.sentAt
                 ? ` · ${delivery.sentAt.toLocaleString()}`
                 : ` · last attempted ${delivery.updatedAt.toLocaleString()}`}
@@ -77,16 +85,40 @@ export function EmailDeliveryRows({
                 ? ` · ${delivery.attemptCount} attempts`
                 : null}
             </p>
-            {retryable ? (
+            {recovery !== "none" ? (
               <form action={retryAction} className="mt-3">
                 <input type="hidden" name="inquiryId" value={inquiryId} />
                 <input type="hidden" name="type" value={delivery.type} />
-                <button className={buttonClass}>Retry email</button>
+                {delivery.status === "FAILED" ? (
+                  <p className="text-sm text-muted-foreground">If the provider did accept the earlier attempt, a retry sends a second email.</p>
+                ) : null}
+                {recovery === "confirm" ? (
+                  <DuplicateRiskConfirmation label="I understand this may send a duplicate email. The provider can usually catch a duplicate for about 24 hours after the original attempt, but not after that." />
+                ) : null}
+                <button className={`${buttonClass} mt-3`}>Retry email</button>
               </form>
             ) : null}
           </li>
         );
       })}
+      {missing.map((type) => (
+        <li className="border border-border p-3" key={type}>
+          <p className="font-medium">{LABEL[type]}</p>
+          <p className="mt-1 text-sm text-muted-foreground">No email has been attempted</p>
+        </li>
+      ))}
+      {missing.length > 0 && !anonymized ? (
+        <li className="border border-border p-3">
+          <form action={recoverAction}>
+            <input type="hidden" name="inquiryId" value={inquiryId} />
+            <p className="text-sm text-muted-foreground">
+              Sends only the emails listed as not attempted. A customer acknowledgment would reach the visitor late, and says only that the inquiry was received.
+            </p>
+            <DuplicateRiskConfirmation label="I understand this may send a duplicate email if a delivery record was removed from the database by hand. Otherwise, the records show these emails were never attempted." />
+            <button className={`${buttonClass} mt-3`}>Send missing emails</button>
+          </form>
+        </li>
+      ) : null}
     </ul>
   );
 }

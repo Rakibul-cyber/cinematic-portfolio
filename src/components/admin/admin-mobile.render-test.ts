@@ -331,8 +331,9 @@ describe("notices: errors are alerts, ordinary outcomes are polite", () => {
 
   it("routes accepted, neutral, failed, and domain outcomes through the correct trusted channel", () => {
     const actions = read("src/app/(admin)/admin/crm-actions.ts");
-    assert.match(actions, /delivery\.status === "ACCEPTED" \? "saved" : delivery\.status === "SKIPPED" \? "info" : "error"/);
-    assert.match(actions, /outcome = "error";[\s\S]*error instanceof DeliveryNotRetryableError/);
+    const recovery = read("src/server/email/recovery-workflow.ts");
+    assert.match(recovery, /delivery\.status === "ACCEPTED" \? "saved" : delivery\.status === "SKIPPED" \? "info" : "error"/);
+    assert.match(recovery, /error instanceof DeliveryNotRetryableError \? error\.message : fallback/);
     assert.match(actions, /\?\$\{outcome\}=\$\{encodeURIComponent\(notice\)\}/);
     assert.match(actions, /\?error=Customer\+is\+anonymized/);
     assert.doesNotMatch(actions, /provider[^\n]*(message|detail)[^\n]*notice/i);

@@ -329,11 +329,13 @@ async function main() {
         sender: staleSender,
         renderer,
         config: configured,
+        confirmedDuplicateRisk: true,
       }),
       retryInquiryEmail(stale.id, "INQUIRY_ADMIN_NOTIFICATION", actor, {
         sender: staleSender,
         renderer,
         config: configured,
+        confirmedDuplicateRisk: true,
       }),
     ]);
     assert.equal(staleSender.sent.length, 1, "a stale retry race sends once");

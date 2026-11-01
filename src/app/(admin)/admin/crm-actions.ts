@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { anonymizeCustomerSchema, customerSchema, noteSchema, retryEmailSchema } from "@/lib/validation/crm";
+import { anonymizeCustomerSchema, customerSchema, noteSchema } from "@/lib/validation/crm";
 import { statusSchema } from "@/lib/validation/crm";
 import { describeValidationError, type AdminFormState } from "@/lib/admin/form-state";
 import { recordAuditLog } from "@/server/audit/audit-log";
@@ -9,7 +9,8 @@ import { requireSuperAdmin, requireUser } from "@/server/auth/session";
 import { anonymizeCustomer } from "@/server/privacy/service";
 import { updateCustomer } from "@/server/crm/service";
 import { CustomerUpdateError } from "@/server/crm/errors";
-import { DeliveryNotRetryableError, retryInquiryEmail } from "@/server/email/service";
+import { type RecoveryAnswer, runRecoverMissingEmails, runRetryEmail } from "@/server/email/recovery-workflow";
+import { recoverMissingInquiryEmails, retryInquiryEmail } from "@/server/email/service";
 import { prisma } from "@/server/db/prisma";
 
 const values = (form: FormData) => Object.fromEntries(form);
@@ -68,36 +69,20 @@ export async function updateCustomerAction(_state: AdminFormState, form: FormDat
  * of that work, not a privileged operation like CSV export.
  *
  * The service performs the authorization-independent safety checks: only a
- * failed, skipped, or stale delivery can be claimed, so this can never resend
- * a message the provider already accepted, and two administrators clicking at
- * once cannot both send.
+ * failed, skipped, or confirmed stale delivery can be claimed, so this can never
+ * resend a message the provider already accepted, and two administrators
+ * clicking at once cannot both send.
  */
 export async function retryInquiryEmailAction(form: FormData) {
-  const actor = await requireUser("/admin/inquiries");
-  const data = retryEmailSchema.parse(values(form));
+  showRecoveryAnswer(await runRetryEmail(form, { requireActor: () => requireUser("/admin/inquiries"), retry: retryInquiryEmail }));
+}
 
-  let outcome: "saved" | "info" | "error" = "saved";
-  let notice = "Email retried";
-  try {
-    const delivery = await retryInquiryEmail(data.inquiryId, data.type, actor);
-    notice =
-      delivery.status === "ACCEPTED"
-        ? "Email accepted by the provider"
-        : delivery.status === "SKIPPED"
-          ? "Email is not configured, so nothing was sent"
-          : "Email could not be sent";
-    outcome = delivery.status === "ACCEPTED" ? "saved" : delivery.status === "SKIPPED" ? "info" : "error";
-  } catch (error) {
-    // Provider detail is never surfaced to the admin UI.
-    outcome = "error";
-    notice =
-      error instanceof DeliveryNotRetryableError
-        ? error.message
-        : "The email could not be retried.";
-  }
+/** Sends the emails an inquiry has no delivery record for. Same access as a retry. */
+export async function recoverMissingInquiryEmailsAction(form: FormData) {
+  showRecoveryAnswer(await runRecoverMissingEmails(form, { requireActor: () => requireUser("/admin/inquiries"), recover: recoverMissingInquiryEmails }));
+}
 
-  revalidatePath(`/admin/inquiries/${data.inquiryId}`);
-  redirect(
-    `/admin/inquiries/${data.inquiryId}?${outcome}=${encodeURIComponent(notice)}`,
-  );
+function showRecoveryAnswer({ inquiryId, outcome, notice }: RecoveryAnswer): never {
+  revalidatePath(`/admin/inquiries/${inquiryId}`);
+  redirect(`/admin/inquiries/${inquiryId}?${outcome}=${encodeURIComponent(notice)}`);
 }

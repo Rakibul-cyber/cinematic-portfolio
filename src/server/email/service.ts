@@ -11,6 +11,7 @@ import {
   type InquirySnapshot,
 } from "@/emails/inquiry-content";
 import { isEmailAddress, type MailAddress } from "@/lib/email/address";
+import { missingDeliveryTypes, STALE_PROCESSING_MS } from "@/lib/email/delivery-claims";
 import { AuditAction, AuditEntityType, recordAuditLog } from "@/server/audit/audit-log";
 import type { AdminUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
@@ -41,16 +42,6 @@ export const EMAIL_DELIVERY_TYPES = [
   EmailDeliveryType.INQUIRY_ADMIN_NOTIFICATION,
   EmailDeliveryType.INQUIRY_CUSTOMER_ACKNOWLEDGMENT,
 ] as const;
-
-/**
- * How long a claim may sit in `PROCESSING` before a retry may take it over.
- *
- * A process killed between claiming and recording the outcome — a serverless
- * invocation hitting its platform timeout, for instance — would otherwise
- * strand that delivery forever. The window is comfortably longer than any
- * plausible provider call, so a merely slow send is never stolen.
- */
-export const STALE_PROCESSING_MS = 5 * 60_000;
 
 /** Fields the templates need. No mutable Customer data is ever read. */
 const snapshotSelect = {
@@ -88,6 +79,13 @@ export type DeliveryDependencies = {
   renderer?: EmailRenderer;
   config?: EmailConfig;
   studioName?: string;
+  /**
+   * The administrator accepted that this may send a second email. Required
+   * wherever the records cannot rule that out: a stale `PROCESSING` delivery may
+   * already have reached the provider, and a missing record is only proof of no
+   * attempt if nobody removed it from the database by hand.
+   */
+  confirmedDuplicateRisk?: boolean;
 };
 
 /**
@@ -358,6 +356,15 @@ export async function deliverInquiryEmails(
   inquiryId: string,
   dependencies: DeliveryDependencies = {},
 ): Promise<DeliveryOutcome[]> {
+  return attemptUnclaimedDeliveries(inquiryId, dependencies);
+}
+
+/** Claims and sends whichever deliveries have no record. `actor` is absent for a public submission. */
+async function attemptUnclaimedDeliveries(
+  inquiryId: string,
+  dependencies: DeliveryDependencies,
+  actor?: AdminUser,
+): Promise<DeliveryOutcome[]> {
   try {
     const inquiry = await prisma.inquiry.findUnique({
       where: { id: inquiryId },
@@ -406,7 +413,7 @@ export async function deliverInquiryEmails(
         throw error;
       }
 
-      outcomes.push(await performDelivery(delivery, inquiry, dependencies));
+      outcomes.push(await performDelivery(delivery, inquiry, dependencies, actor));
     }
 
     return outcomes;
@@ -430,7 +437,8 @@ export class DeliveryNotRetryableError extends Error {}
  * is currently `FAILED`, `SKIPPED`, or stale-`PROCESSING` can be taken, and
  * `updateMany` reporting a single affected row is what proves this request won.
  * An already-`ACCEPTED` delivery can never be taken, so a retry cannot resend a
- * message the provider already accepted.
+ * message the provider already accepted. A stale `PROCESSING` delivery is only
+ * taken with `confirmedDuplicateRisk`.
  */
 export async function retryInquiryEmail(
   inquiryId: string,
@@ -462,7 +470,9 @@ export async function retryInquiryEmail(
     },
   });
 
-  if (claimed.count === 0) {
+  const definiteOutcome = claimed.count === 1;
+
+  if (!definiteOutcome && dependencies.confirmedDuplicateRisk) {
     claimed = await prisma.emailDelivery.updateMany({
       where: {
         inquiryId,
@@ -479,7 +489,9 @@ export async function retryInquiryEmail(
 
   if (claimed.count !== 1) {
     throw new DeliveryNotRetryableError(
-      "This email cannot be retried right now.",
+      dependencies.confirmedDuplicateRisk
+        ? "This email cannot be retried right now."
+        : "This email cannot be retried right now. If its last attempt stopped, confirm the duplicate risk first.",
     );
   }
 
@@ -503,10 +515,54 @@ export async function retryInquiryEmail(
     entityId: delivery.id,
     actorUserId: actor.id,
     actorEmail: actor.email,
-    metadata: { inquiryId, type },
+    metadata: { inquiryId, type, ...(definiteOutcome ? {} : { staleProcessing: true }) },
   });
 
   return performDelivery(delivery, inquiry, dependencies, actor);
+}
+
+/**
+ * Sends the emails an inquiry has no delivery record for, on an administrator's
+ * request.
+ *
+ * A record is created before any provider call, so a missing one means the
+ * application never attempted that email. This goes through the same claim as a
+ * submission: the unique constraint lets one request win each record, existing
+ * records are left alone, and no inquiry is created.
+ */
+export async function recoverMissingInquiryEmails(
+  inquiryId: string,
+  actor: AdminUser,
+  dependencies: DeliveryDependencies = {},
+): Promise<DeliveryOutcome[]> {
+  if (!dependencies.confirmedDuplicateRisk) {
+    throw new DeliveryNotRetryableError("Confirm the duplicate risk before sending missing emails.");
+  }
+
+  const inquiry = await prisma.inquiry.findUnique({
+    where: { id: inquiryId },
+    select: { anonymizedAt: true, emailDeliveries: { select: { type: true } } },
+  });
+
+  if (!inquiry || inquiry.anonymizedAt) {
+    throw new DeliveryNotRetryableError("This inquiry no longer exists.");
+  }
+
+  const missing = missingDeliveryTypes(inquiry.emailDeliveries);
+  if (missing.length === 0) {
+    throw new DeliveryNotRetryableError("No email records are missing for this inquiry.");
+  }
+
+  await recordAuditLog({
+    action: AuditAction.EmailDeliveryRecoveryRequested,
+    entityType: AuditEntityType.Inquiry,
+    entityId: inquiryId,
+    actorUserId: actor.id,
+    actorEmail: actor.email,
+    metadata: { inquiryId, types: missing },
+  });
+
+  return attemptUnclaimedDeliveries(inquiryId, dependencies, actor);
 }
 
 /** Delivery state for the admin inquiry page. */

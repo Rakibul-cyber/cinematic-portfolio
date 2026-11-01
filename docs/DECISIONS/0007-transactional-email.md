@@ -73,6 +73,17 @@ duplicate case above more likely rather than less. Provider calls are therefore
 bounded by the platform's own function timeout, and a delivery stranded that way
 is recovered through the stale-claim path.
 
+Administrators can recover every state except `ACCEPTED` and an active
+`PROCESSING` attempt. `FAILED` and `SKIPPED` retry directly. A stale `PROCESSING`
+row and a missing row both require an explicit, server-checked confirmation of
+the duplicate risk. A stale attempt may already have reached the provider. A
+record is always created before the provider call, so a missing one means the
+application never attempted that email, but the application cannot detect a row
+removed from the database by hand. Missing records are created through the same
+claim as a submission, so existing records are untouched and concurrent requests
+produce one send each. A `FAILED` retry can also duplicate if the provider
+accepted a message whose result could not be recorded; the page says so.
+
 Delivery is awaited inside the public Server Action rather than deferred.
 Serverless invocations may be frozen immediately after a response, so an
 unawaited promise, `setTimeout`, or in-memory queue would silently lose

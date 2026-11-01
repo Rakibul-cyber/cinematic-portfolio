@@ -38,6 +38,7 @@ const EXPECTED: Record<string, Record<string, Guard>> = {
     anonymizeCustomerAction: "requireSuperAdmin",
     updateCustomerAction: "requireUser",
     retryInquiryEmailAction: "requireUser",
+    recoverMissingInquiryEmailsAction: "requireUser",
   },
   "media/actions.ts": {
     deleteMediaAction: "requireUser",
