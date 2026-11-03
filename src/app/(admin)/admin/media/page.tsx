@@ -10,6 +10,7 @@ import {
 import { UploadForm } from "@/app/(admin)/admin/media/upload-form";
 import { ADMIN_MEDIA_PATH } from "@/lib/admin-routes";
 import { formatBytes } from "@/lib/media";
+import { isAdministrative } from "@/server/auth/roles";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 import { mediaUrl } from "@/server/media/r2";
@@ -18,6 +19,8 @@ export const dynamic = "force-dynamic";
 
 export default async function MediaPage() {
   const user = await requireUser(ADMIN_MEDIA_PATH);
+  // Deleting an image is destructive (ADR 0004); the action enforces the same rule.
+  const canDelete = isAdministrative(user.role);
   const media = await prisma.media.findMany({
     orderBy: { createdAt: "desc" },
     include: { variants: true, createdBy: { select: { name: true } } },
@@ -108,10 +111,12 @@ export default async function MediaPage() {
                       </button>
                     </form>
                     {/* An image still used by a project is refused; the reason appears here, beside it. */}
-                    <AdminForm action={deleteMediaAction} className="grid gap-2">
-                      <input type="hidden" name="id" value={item.id} />
-                      <DeleteButton itemName={item.originalName}>Delete image and all variants</DeleteButton>
-                    </AdminForm>
+                    {canDelete ? (
+                      <AdminForm action={deleteMediaAction} className="grid gap-2">
+                        <input type="hidden" name="id" value={item.id} />
+                        <DeleteButton itemName={item.originalName}>Delete image and all variants</DeleteButton>
+                      </AdminForm>
+                    ) : null}
                   </div>
                 </li>
               );

@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.0.0 |
+| Version | 1.1.0 (DEF-01 fix and DEF-04 registration) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `4f7f564` (branch `docs/context-architecture`) |
+| Reviewed against | commit `2e3419a` plus uncommitted DEF-01 changes on `fix/media-delete-admin-only` |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose
@@ -54,6 +54,7 @@ never marked deployed.**
 | Legal approvals | Pending (all four `null`) |
 | Production administrators | 0; creation not authorized |
 | Database-backed integration testing | **POSTPONED by owner (BLOCKED)** |
+| DEF-01 media-deletion fix | LOCAL ONLY, uncommitted (`fix/media-delete-admin-only`) |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -114,7 +115,7 @@ the owner's descriptions to commits.
 - **Depends on:** P0-03
 - **Acceptance:** each item in the [decision register](#decision-register) is
   decided, recorded (an ADR where architectural), and linked to its tasks.
-- **Security impact:** OD-01, OD-03, OD-06, and OD-15 affect security.
+- **Security impact:** OD-03, OD-06, and OD-15 affect security (OD-01 resolved 2026-11-03).
 - **Production impact:** none until implemented.
 
 #### P0-05 — Release-state inventory confirmation
@@ -152,7 +153,7 @@ the owner's descriptions to commits.
 - **Security impact:** core. **Production impact:** live.
 
 #### P1-04 — Role authorization
-- **Status:** DONE, with defect DEF-01 open (P1-07) · **Completed:** 2026-09-08; fixes 2026-10-06, 2026-10-26, 2026-10-27
+- **Status:** DONE · **Completed:** 2026-09-08; fixes 2026-10-06, 2026-10-26, 2026-10-27. DEF-01 fixed locally under P1-07 (not deployed)
 - **Requirements:** FR-ADM-04
 - **Evidence:** `3092221`, `29c5b6c`, `5487fc2`; `action-guards.test.ts`; `expected-errors.test.ts`.
 - **Security impact:** core. **Production impact:** live.
@@ -178,14 +179,32 @@ the owner's descriptions to commits.
 - **Security impact:** core. **Production impact:** live.
 
 #### P1-07 — Fix media deletion authorization (DEF-01)
-- **Status:** BLOCKED on decision OD-01
-- **Depends on:** OD-01 · **Requirements:** FR-MED-02, FR-ADM-04
-- **Files:** `src/app/(admin)/admin/media/actions.ts`, `src/app/(admin)/admin/media/page.tsx`
-- **Acceptance (if OD-01 decides ADMIN):** `deleteMediaAction` requires ADMIN;
-  the delete control is hidden from EDITORs; a test proves an EDITOR is refused.
-- **Required tests:** an action-guard unit test and a render test for the hidden control.
-- **Security impact:** medium (prevents an EDITOR from destroying media).
-- **Production impact:** behaviour change for EDITORs after release.
+- **Status:** DONE (offline verification) · **Completed:** 2026-11-03 · **Release:** LOCAL ONLY. **Uncommitted** on branch `fix/media-delete-admin-only` (from `2e3419a`); not deployed.
+- **Depends on:** OD-01 (resolved 2026-11-03: ADMIN and SUPER_ADMIN only) · **Requirements:** FR-MED-02, FR-ADM-04
+- **Files:** `src/app/(admin)/admin/media/actions.ts` (guard `requireAdmin(ADMIN_MEDIA_PATH)`),
+  `src/app/(admin)/admin/media/page.tsx` (`canDelete = isAdministrative(user.role)`),
+  `src/server/auth/action-guards.test.ts` (expects `requireAdmin`),
+  `src/app/(admin)/admin/expected-errors.test.ts` (role-gated control),
+  `src/app/(admin)/admin/media/delete-authorization.test.ts` (new).
+- **Acceptance:** `deleteMediaAction` requires ADMIN; the Delete control is
+  hidden from EDITORs; an EDITOR calling the action directly is refused and
+  nothing is deleted; `updateMediaMetadataAction` is unchanged.
+- **Tests:** `delete-authorization.test.ts` bundles the real action with the
+  real `requireAdmin` → `requireRole` → `requireUser` → `getCurrentUser` chain
+  and stubs only Better Auth, Prisma's user read, Next.js request and cache
+  APIs, and the media service. 8 tests: EDITOR refused, refusal before input
+  validation, role taken from the user row rather than the session, anonymous
+  and deleted-user callers redirected, ADMIN and SUPER_ADMIN allowed, EDITOR
+  metadata edit still allowed. Against the original code, 5 tests fail. Full
+  run: `npm test` 481 passed, 0 failed, 2 skipped; render 264 passed;
+  typecheck, lint, and `git diff --check` clean.
+- **Pending:** proof over a real HTTP Server Action call with a real session
+  and database is part of P4-03 (BLOCKED, postponed).
+- **Evidence:** working-tree diff on `fix/media-delete-admin-only` (no commit SHA yet).
+- **Security impact:** medium (an EDITOR can no longer destroy media).
+- **Production impact:** none until published. After release, EDITORs lose
+  media deletion: mistaken uploads wait for an ADMIN, and in ADR 0003's
+  replacement flow an ADMIN retires the old image.
 
 #### P1-08 — Password recovery and MFA decision
 - **Status:** TODO (decision OD-03)
@@ -257,6 +276,24 @@ the owner's descriptions to commits.
 - **Status:** TODO (decision OD-16 for the HTTP sign-in path)
 - **Acceptance:** every written action is an `AuditAction` constant; the
   sign-in audit covers the agreed paths.
+
+#### P2-11 — Make media deletion safe against concurrent assignment (DEF-04)
+- **Status:** TODO. Needs design first; not implemented.
+- **Depends on:** P1-07 · **Requirements:** FR-MED-02
+- **Files (expected):** `src/server/media/service.ts`; possibly the project-save path in `src/server/cms/service.ts`.
+- **Problem:** `deleteMedia` counts references, deletes the R2 objects, then
+  deletes the row. An assignment committed in between leaves the row
+  referenced while its objects are gone.
+- **Prerequisites to occur:** an ADMIN deletes an unassigned image while another
+  session assigns the same image to a project within the same short window.
+- **Acceptance:** a documented design (for example a row lock or a tombstone
+  state taken before object deletion, or row deletion before object deletion
+  with an orphan-object sweep) that keeps ADR 0003's no-orphan intent or amends
+  it in an ADR, and never leaves a referenced row without objects.
+- **Required tests:** a concurrency test on real PostgreSQL (PGlite or a
+  disposable branch) that interleaves assignment and deletion; R2 must be faked.
+- **Security impact:** low (availability and integrity of content).
+- **Production impact:** published projects could show broken images if the race occurs.
 
 ## Phase 3 — UI integration
 
@@ -421,7 +458,7 @@ the owner's descriptions to commits.
 
 ## Recommended release sequence
 
-1. P0-04: decide OD-01 and the other blocking decisions.
+1. P0-04: decide the remaining open decisions (OD-01 resolved 2026-11-03).
 2. P5-01: owner review of the local commits.
 3. P4-03: authorize and run disposable-Neon integration.
 4. P5-02: confirm the Netlify environment, especially `RATE_LIMIT_HMAC_SECRET`.
@@ -435,7 +472,7 @@ the owner's descriptions to commits.
 
 | ID | Decision | Raised in | Blocks | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
-| OD-01 | May EDITORs delete media? | 04_TRD DEF-01 | P1-07 | Owner | OPEN |
+| OD-01 | May EDITORs delete media? **No**: only ADMIN and SUPER_ADMIN may permanently delete media, including unassigned images (matches ADR 0004). | 04_TRD DEF-01 | P1-07 | Owner | **RESOLVED 2026-11-03** |
 | OD-02 | May EDITORs retry or recover email and edit customer contact data? | 05_Schema §6.3 | — | Owner | OPEN |
 | OD-03 | Password reset and MFA for administrators | 01_PRD | P1-08 | Owner + security | OPEN |
 | OD-04 | Align technical names with the brand (package, `appName`, fallback studio name) | 04_TRD TD-05 | — | Owner | OPEN |

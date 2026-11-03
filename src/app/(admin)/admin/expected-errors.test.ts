@@ -153,6 +153,19 @@ describe("role-aware admin controls", () => {
     });
   }
 
+  it("media: Delete is offered only to administrators, and the action requires ADMIN", () => {
+    const source = read("media/page.tsx");
+    assert.match(source, /const canDelete = isAdministrative\(user\.role\);/);
+    assert.match(source, /\{canDelete \? \(\s*<AdminForm action=\{deleteMediaAction\}/);
+    assert.equal((source.match(/<AdminForm action=\{deleteMediaAction\}/g) ?? []).length, 1, "no ungated delete control");
+    const actions = read("media/actions.ts");
+    const fn = body(actions, "deleteMediaAction");
+    assert.match(fn, /const actor = await requireAdmin\(ADMIN_MEDIA_PATH\);/);
+    assert.ok(fn.indexOf("requireAdmin(") < fn.indexOf("deleteMedia("), "authorization runs before deletion");
+    // Editing metadata stays open to every role.
+    assert.match(body(actions, "updateMediaMetadataAction"), /requireUser\(ADMIN_MEDIA_PATH\)/);
+  });
+
   it("inquiries: Export CSV is offered only to administrators", () => {
     assert.match(read("inquiries/page.tsx"), /\{isAdministrative\(user\.role\)\?<Link [^>]*href="\/admin\/inquiries\/export">Export CSV<\/Link>:null\}/);
   });

@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/05_Schema.md` |
-| Version | 1.0.0 |
+| Version | 1.1.0 (DEF-01 fix and DEF-04 registration) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `4f7f564`: `prisma/schema.prisma` and 7 migrations |
+| Reviewed against | commit `2e3419a` plus uncommitted DEF-01 changes on `fix/media-delete-admin-only` |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose
@@ -606,6 +606,10 @@ inquiry keeps `serviceNameSnapshot`.
   and cascades its variants. The application deletes the R2 objects before the row.
 - `media.createdByUserId` is `RESTRICT`, so a user who uploaded media cannot be
   deleted while that media exists.
+- The reference check and the deletion are not atomic: `deleteMedia` counts
+  `project_media`, deletes the R2 objects, then deletes the row. A concurrent
+  assignment makes the row delete fail on the `RESTRICT` key after the objects
+  are gone (DEF-04, open).
 
 ### 5.5 Customers: `customer`, `customer_note`
 
@@ -679,7 +683,7 @@ No RLS policy is described here, because none exists.
 | Read admin pages, dashboard, inquiries, customers | yes | yes | yes |
 | Create and edit projects, categories, services, testimonials, pages | yes | yes | yes |
 | Upload media, edit alt text and captions | yes | yes | yes |
-| **Delete media** | **yes (DEF-01)** | yes | yes |
+| Delete media (including unassigned images) | **no** (OD-01; LOCAL ONLY fix of DEF-01, published build still allows it) | yes | yes |
 | Delete projects, categories, services, testimonials, social links | no | yes | yes |
 | Edit site settings and social links | no | yes | yes |
 | Change inquiry status, add notes, edit customer contact data | yes | yes | yes |
@@ -733,6 +737,7 @@ than adding a table (ADR 0011).
 | SCH-GAP-05 | `verification` exists with no flow using it. | OD-03, OD-15 |
 | SCH-GAP-06 | `MediaKind` and `StorageProvider` have a single value each; video files cannot be stored. | 01_PRD known limitations |
 | SCH-GAP-07 | Inquiry status transitions are not constrained in the database or the application. | OD-05 |
+| SCH-GAP-08 | No database-level guard ties `media` deletion to its R2 objects; the reference check, object deletion, and row deletion can interleave with a project assignment. | DEF-04 |
 
 ## Open decisions
 

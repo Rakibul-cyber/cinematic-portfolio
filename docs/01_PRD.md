@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/01_PRD.md` |
-| Version | 1.0.0 |
+| Version | 1.1.0 (DEF-01 fix and DEF-04 registration) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `4f7f564` (branch `docs/context-architecture`) |
+| Reviewed against | commit `2e3419a` plus uncommitted DEF-01 changes on `fix/media-delete-admin-only` |
 | Document status | Draft for owner review. Not committed. |
 | Product owner | Studio owner, Munir Visuals |
 
@@ -425,9 +425,11 @@ the behaviour the code already implements unless the status says otherwise.
   protected page and mutation checks on the server (`requireUser`,
   `requireAdmin`, `requireSuperAdmin`). Middleware only checks that a cookie is
   present and is never relied on for authorization.
-- **Status:** IMPLEMENTED, with one confirmed defect: EDITORs can delete media
-  (04_TRD, DEF-01).
-- **Release:** PUBLISHED.
+- **Status:** IMPLEMENTED. Defect DEF-01 (EDITORs could delete media) is
+  **fixed locally, not deployed** (04_TRD, DEF-01).
+- **Release:** PUBLISHED. The DEF-01 fix is LOCAL ONLY (branch
+  `fix/media-delete-admin-only`, uncommitted); the published and `main` builds
+  still let an EDITOR delete media.
 - **Evidence:** `src/server/auth/session.ts`, `src/server/auth/roles.ts`,
   `src/middleware.ts`, `src/server/auth/action-guards.test.ts`, ADR 0004.
 
@@ -499,11 +501,19 @@ the behaviour the code already implements unless the status says otherwise.
 
 #### FR-MED-02 — Media metadata and deletion
 
-- **Acceptance criteria:** alt text (≤500) and caption (≤2000) editable.
-  Deletion refuses while a project uses the image, removes every R2 object, and
-  only then deletes the row.
-- **Status:** IMPLEMENTED with defect DEF-01: no ADMIN check on delete.
-- **Release:** PUBLISHED. **Routes:** `/admin/media`.
+- **Acceptance criteria:**
+  1. Alt text (≤500) and caption (≤2000) are editable by every role.
+  2. Only ADMIN and SUPER_ADMIN may permanently delete media, including
+     unassigned images (OD-01, resolved 2026-11-03). The Delete control is
+     shown only to them, and the Server Action refuses an EDITOR who calls it
+     directly.
+  3. Deletion refuses while a project uses the image, removes every R2 object,
+     and only then deletes the row. A concurrent assignment can break this
+     ordering (DEF-04, open).
+- **Status:** IMPLEMENTED. DEF-01 fixed locally, not deployed; DEF-04 open.
+- **Release:** PUBLISHED (EDITOR deletion still allowed there). The ADMIN-only
+  rule is LOCAL ONLY (branch `fix/media-delete-admin-only`, uncommitted).
+  **Routes:** `/admin/media`.
 
 #### FR-CRM-01 — Inquiry management
 
@@ -562,7 +572,7 @@ the behaviour the code already implements unless the status says otherwise.
 | NFR-PERF-01 | Performance | Public pages are statically rendered with hourly ISR plus tag revalidation; images use pre-sized R2 variants; fonts are self-hosted by `next/font`. | IMPLEMENTED | `src/server/public/cache-tags.ts`, ADR 0005 |
 | NFR-PERF-02 | Performance | Core Web Vitals targets are set from real measurements after launch. | PLANNED (Roadmap Phase 11) | `docs/ROADMAP.md` |
 | NFR-A11Y-01 | Accessibility | Design toward WCAG 2.2 AA: skip link, visible focus, labelled controls, live regions, keyboard-operable admin, reduced motion. | IMPLEMENTED, not externally audited | `src/app/globals.css`, `admin-a11y.render-test.ts`, `153cd19` |
-| NFR-SEC-01 | Security | Server-side authorization on every privileged operation. | IMPLEMENTED (DEF-01 open) | 04_TRD §7 |
+| NFR-SEC-01 | Security | Server-side authorization on every privileged operation. | IMPLEMENTED (DEF-01 fixed locally, not deployed) | 04_TRD §7 |
 | NFR-SEC-02 | Security | Security headers including CSP, `nosniff`, `no-referrer`, and Permissions-Policy, owned by `securityHeaders()`. | IMPLEMENTED | `src/lib/security-headers.ts` |
 | NFR-SEC-03 | Security | Abuse-prone endpoints are rate limited and fail closed without configuration. | IMPLEMENTED; production-build fail-closed is LOCAL ONLY | ADR 0008, ADR 0011 |
 | NFR-PRIV-01 | Privacy | Data minimization, pseudonymous rate-limit keys, no third-party requests before consent for video, cookieless analytics only. | IMPLEMENTED | ADR 0008, ADR 0009 |
@@ -632,7 +642,7 @@ Controlled release status: **NOT AUTHORIZED.**
 
 | ID | Decision | Owner |
 | --- | --- | --- |
-| OD-01 | Should EDITORs be able to delete media? Code allows it; ADR 0004 says destructive actions need ADMIN (DEF-01). | Owner |
+| OD-01 | **RESOLVED 2026-11-03:** only ADMIN and SUPER_ADMIN may permanently delete media; EDITORs may not, including unassigned images. Matches ADR 0004. Fix: DEF-01. | Owner |
 | OD-02 | Should EDITORs be able to retry or recover email and edit customer contact data? Code allows both. | Owner |
 | OD-03 | Password reset and MFA for administrators: neither exists. | Owner + security |
 | OD-04 | Brand naming in technical identifiers: package `cinematic-portfolio`, Better Auth `appName` "Cinematic Portfolio Admin", fallback studio name "Portfolio". | Owner |

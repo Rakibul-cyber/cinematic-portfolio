@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/02_AppFlow.md` |
-| Version | 1.0.0 |
+| Version | 1.1.0 (DEF-01 fix and DEF-04 registration) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `4f7f564` (branch `docs/context-architecture`) |
+| Reviewed against | commit `2e3419a` plus uncommitted DEF-01 changes on `fix/media-delete-admin-only` |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose
@@ -82,7 +82,7 @@ All are `force-dynamic` and require a valid session.
 | `/admin/testimonials` | EDITOR (delete: ADMIN) | FR-CMS-04 |
 | `/admin/pages` | EDITOR | FR-CMS-05 |
 | `/admin/settings` | ADMIN | FR-CMS-06 |
-| `/admin/media` | EDITOR (delete: EDITOR, see DEF-01) | FR-MED-01, FR-MED-02 |
+| `/admin/media` | EDITOR (delete: ADMIN, fixed locally under DEF-01; published build: EDITOR) | FR-MED-01, FR-MED-02 |
 | `/admin/inquiries`, `/admin/inquiries/[id]` | EDITOR | FR-CRM-01, FR-EML-01 |
 | `/admin/inquiries/export` | ADMIN | FR-CRM-03 |
 | `/admin/customers`, `/admin/customers/[id]` | EDITOR (anonymize: SUPER_ADMIN) | FR-CRM-02, FR-CRM-04 |
@@ -246,7 +246,14 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
   before deleting it." beside it.
 - **Empty:** "No media uploaded yet."
 - **Success:** "Image uploaded successfully."; the list refreshes.
-- **Gap:** delete is offered to and accepted from EDITORs (DEF-01).
+- **Unauthorized (delete):** the Delete control is rendered only for ADMIN and
+  SUPER_ADMIN (`canDelete = isAdministrative(user.role)`). An EDITOR who calls
+  `deleteMediaAction` directly gets `AuthorizationError`, which shows the admin
+  error page, and nothing is deleted. LOCAL ONLY (DEF-01 fix, branch
+  `fix/media-delete-admin-only`, uncommitted); the published build still offers
+  and accepts EDITOR deletion.
+- **Known race:** a project assignment made between the reference check and the
+  row deletion can leave a database reference to deleted R2 objects (DEF-04).
 
 #### SCR-ADM-08 — Inquiries list `/admin/inquiries`
 
@@ -293,7 +300,7 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 | `deleteAction` | list pages, settings | Server Action | ADMIN | deletes the entity | `cms.deleted` |
 | upload | media | `POST /api/media` | EDITOR | media, media_variant, R2 objects | `media.uploaded` |
 | `updateMediaMetadataAction` | media | Server Action | EDITOR | media | `media.updated` |
-| `deleteMediaAction` | media | Server Action | **EDITOR (DEF-01)** | R2 objects, media | `media.deleted` |
+| `deleteMediaAction` | media | Server Action | ADMIN (LOCAL ONLY, DEF-01; published build: EDITOR) | R2 objects, media | `media.deleted` |
 | `changeInquiryStatusAction` | inquiry detail | Server Action | EDITOR | inquiry, inquiry_status_history | `inquiry.status_changed` |
 | `retryInquiryEmailAction` | inquiry detail | Server Action | EDITOR | email_delivery | `email.delivery_retried`, `email.*` |
 | `recoverMissingInquiryEmailsAction` | inquiry detail | Server Action | EDITOR | email_delivery | `email.delivery_recovery_requested`, `email.*` |
@@ -510,7 +517,8 @@ footer and the sitemap. `npm run deploy:verify` fails while any draft remains.
 | --- | --- | --- |
 | GAP-01 | No route-level loading UI (`loading.tsx`). For the **public** group this is deliberate: a streaming boundary commits HTTP 200 before `notFound()` runs and would turn draft URLs into soft 404s (`README.md`, "Caching"). The admin group has no such constraint recorded; whether it should get loading UI is undecided. | FLOW-G-01 |
 | GAP-02 | Inquiry status transitions are unrestricted. | SM-06, OD-05 |
-| GAP-03 | EDITORs can delete media. | DEF-01, OD-01 |
+| GAP-03 | EDITORs could delete media. Closed locally (DEF-01 fix, not deployed); OD-01 resolved: ADMIN and SUPER_ADMIN only. | DEF-01, OD-01 |
+| GAP-08 | Media deletion is check-then-delete across R2 and PostgreSQL with no lock, so a concurrent project assignment can leave a reference to deleted objects. | DEF-04 |
 | GAP-04 | No password reset or MFA flow. | OD-03 |
 | GAP-05 | No automated retention or expiry of inquiry data. | OD-07 |
 | GAP-06 | No toast or modal system; delete confirmation uses `window.confirm`. | 03_UI_Spec |
@@ -518,7 +526,7 @@ footer and the sitemap. `npm run deploy:verify` fails while any draft remains.
 
 ## Open decisions
 
-OD-01, OD-02, OD-03, OD-05, and OD-07 affect these flows. See the
+OD-02, OD-03, OD-05, and OD-07 affect these flows (OD-01 is resolved). See the
 [decision register](06_Plan.md#decision-register).
 
 ## Known limitations

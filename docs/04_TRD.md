@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/04_TRD.md` |
-| Version | 1.0.0 |
+| Version | 1.1.0 (DEF-01 fix and DEF-04 registration) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `4f7f564` (branch `docs/context-architecture`) |
+| Reviewed against | commit `2e3419a` plus uncommitted DEF-01 changes on `fix/media-delete-admin-only` |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose
@@ -327,7 +327,7 @@ re-checks the session on the server. "Audit" lists `audit_log.action` values.
 | `saveCategoryAction`, `saveServiceAction`, `saveTestimonialAction`, `savePageAction` | entity fields | form state | EDITOR | `cms.ts` schemas | — | entity, revalidation, audit `cms.*` | field errors |
 | `saveSettingsAction`, `saveSocialAction` | settings, social link | form state | ADMIN | `cms.ts` schemas | — | site_setting, social_link, revalidation | `AuthorizationError` for EDITOR |
 | `deleteAction` | entity type, id | form state | ADMIN | id schema | — | entity deleted, revalidation, audit `cms.deleted` | refusal when referenced |
-| `deleteMediaAction` (`media/actions.ts`) | id (uuid) | form state | **EDITOR (DEF-01)** | uuid | — | R2 objects then row, audit `media.deleted` | in-use refusal |
+| `deleteMediaAction` (`media/actions.ts`) | id (uuid) | form state | ADMIN (`requireAdmin`, LOCAL ONLY; published build: EDITOR, DEF-01) | role checked before the uuid is parsed | — | R2 objects then row, audit `media.deleted` | `AuthorizationError` for EDITOR (admin error page); in-use refusal as form state; DEF-04 race |
 | `updateMediaMetadataAction` | id, altText ≤ 500, caption ≤ 2000 | void | EDITOR | zod | — | media, revalidation, audit `media.updated` | throws on invalid input |
 | `changeInquiryStatusAction` (`crm-actions.ts`) | id, status | redirect `?saved=Status+updated` | EDITOR | `statusSchema` | — | inquiry, history, audit `inquiry.status_changed` | validation error |
 | `addCustomerNoteAction` | customerId, body | redirect `?saved=Note+added` | EDITOR | zod | — | customer_note, audit `customer_note.created` | validation error |
@@ -355,7 +355,7 @@ re-checks the session on the server. "Audit" lists `audit_log.action` values.
 | ID | Control | Implementation | Status |
 | --- | --- | --- | --- |
 | SEC-01 | Authentication | Better Auth email and password, sign-up disabled, 12–128 character passwords, generic failure message. Email verification is not required (`requireEmailVerification: false`; the config comment dates from before Phase 7, OD-15). | IMPLEMENTED |
-| SEC-02 | Authorization | Server-side `requireUser`, `requireAdmin`, `requireSuperAdmin` on every protected page, action, and export. Middleware checks only cookie presence. Role is server-owned (`input: false`). | IMPLEMENTED; DEF-01 |
+| SEC-02 | Authorization | Server-side `requireUser`, `requireAdmin`, `requireSuperAdmin` on every protected page, action, and export. Middleware checks only cookie presence. Role is server-owned (`input: false`). | IMPLEMENTED; DEF-01 fixed locally, not deployed |
 | SEC-03 | Sessions | 8 h expiry, 1 h update age, no cookie cache (database read per request), `HttpOnly`, `SameSite=Lax`, `Secure` in production, `useSecureCookies` decided from the build-time `NODE_ENV`. | IMPLEMENTED |
 | SEC-04 | Password hashing | Better Auth's default hasher; the config sets no custom one. The admin bootstrap uses the same hasher from `auth.$context`. The algorithm is not stated in the repository (UNVERIFIED here). | IMPLEMENTED |
 | SEC-05 | Login rate limiting | `hooks.before` guard: account and client fixed windows in `rate_limit_bucket`, HMAC-pseudonymized keys, fails closed. Only the Netlify header `x-nf-client-connection-ip` is trusted. | IMPLEMENTED, LOCAL ONLY |
@@ -482,9 +482,10 @@ The full register is in [06_Plan.md](06_Plan.md#decision-register).
 
 | ID | Defect | Evidence | Severity | Status |
 | --- | --- | --- | --- | --- |
-| DEF-01 | EDITORs can delete media and its R2 objects. ADR 0004 requires ADMIN for destructive actions. | `deleteMediaAction` uses `requireUser`; `deleteMedia` has no role check; `/admin/media` offers delete to every role. | Medium | OPEN (OD-01) |
+| DEF-01 | EDITORs could delete media and its R2 objects. ADR 0004 requires ADMIN for destructive actions. | Before: `deleteMediaAction` used `requireUser` and `/admin/media` offered Delete to every role. After: `requireAdmin(ADMIN_MEDIA_PATH)` and `canDelete = isAdministrative(user.role)`; `delete-authorization.test.ts` runs the real action and guard chain. `deleteMedia` itself still has no role check, by design (verify scripts call it with EDITOR actors). | Medium | **FIXED LOCALLY, not deployed** (branch `fix/media-delete-admin-only`, uncommitted). OD-01 resolved. HTTP-level proof pending (P4-03). |
 | DEF-02 | Server-side Sentry decides "production" from the runtime `NODE_ENV`. If a deployed function runs without it, error reporting is silently off. | `src/lib/monitoring/options.ts:60`, `src/sentry.server.config.ts` passes `process.env` | Low (observability, fails quiet) | OPEN |
 | DEF-03 | Published and `main` builds decide the inquiry limiter's predictable fallback key and the Turnstile development bypass from the runtime `NODE_ENV`, so a function with `NODE_ENV` unset fails open. | `git show 288fde6:src/server/security/rate-limit.ts` line 25; `turnstile.ts` line 27 | High in principle; **not reachable** while intake is closed | FIXED LOCALLY (`ce81964`, `be10fb4`); not deployed |
+| DEF-04 | `deleteMedia` counts `project_media` references, deletes the R2 objects, then deletes the row, with no transaction or lock. A project assignment committed between the count and the row delete leaves the row in place (the `RESTRICT` foreign key refuses the delete) while its R2 objects are already gone: a published project can then show broken images, and the admin sees a generic error. | `src/server/media/service.ts:27-36`; no test covers delete-versus-assign concurrency (the `verify-cms-flow.ts` race covers project saves only). | Medium impact, low likelihood: needs an ADMIN deleting an unassigned image while someone assigns that same image within the same short window. Any role that can assign media and any role that can delete can trigger it. Data: R2 objects irreversibly deleted (bucket versioning UNVERIFIED); `media` and `media_variant` rows left pointing at missing keys. | OPEN. Needs a separate design and verification task (P2-11); not implemented. |
 
 ### 9.5 Technical debt
 

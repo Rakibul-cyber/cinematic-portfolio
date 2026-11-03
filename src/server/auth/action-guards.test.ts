@@ -41,7 +41,7 @@ const EXPECTED: Record<string, Record<string, Guard>> = {
     recoverMissingInquiryEmailsAction: "requireUser",
   },
   "media/actions.ts": {
-    deleteMediaAction: "requireUser",
+    deleteMediaAction: "requireAdmin",
     updateMediaMetadataAction: "requireUser",
   },
 };
