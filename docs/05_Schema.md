@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/05_Schema.md` |
-| Version | 1.1.0 (DEF-01 fix and DEF-04 registration) |
+| Version | 1.1.1 (DEF-01 commit recorded) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `2e3419a` plus uncommitted DEF-01 changes on `fix/media-delete-admin-only` |
+| Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose

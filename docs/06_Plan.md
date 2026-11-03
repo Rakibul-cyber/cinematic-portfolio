@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.1.0 (DEF-01 fix and DEF-04 registration) |
+| Version | 1.1.1 (DEF-01 commit recorded) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `2e3419a` plus uncommitted DEF-01 changes on `fix/media-delete-admin-only` |
+| Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose
@@ -54,7 +54,7 @@ never marked deployed.**
 | Legal approvals | Pending (all four `null`) |
 | Production administrators | 0; creation not authorized |
 | Database-backed integration testing | **POSTPONED by owner (BLOCKED)** |
-| DEF-01 media-deletion fix | LOCAL ONLY, uncommitted (`fix/media-delete-admin-only`) |
+| DEF-01 media-deletion fix | LOCAL ONLY: commit `379e53b` on `fix/media-delete-admin-only`; not pushed, merged, or deployed |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -179,7 +179,7 @@ the owner's descriptions to commits.
 - **Security impact:** core. **Production impact:** live.
 
 #### P1-07 — Fix media deletion authorization (DEF-01)
-- **Status:** DONE (offline verification) · **Completed:** 2026-11-03 · **Release:** LOCAL ONLY. **Uncommitted** on branch `fix/media-delete-admin-only` (from `2e3419a`); not deployed.
+- **Status:** DONE (offline verification) · **Completed:** 2026-11-03 · **Release:** LOCAL ONLY. Committed as `379e53b` on branch `fix/media-delete-admin-only` (parent `2e3419a`); not pushed, merged, or deployed.
 - **Depends on:** OD-01 (resolved 2026-11-03: ADMIN and SUPER_ADMIN only) · **Requirements:** FR-MED-02, FR-ADM-04
 - **Files:** `src/app/(admin)/admin/media/actions.ts` (guard `requireAdmin(ADMIN_MEDIA_PATH)`),
   `src/app/(admin)/admin/media/page.tsx` (`canDelete = isAdministrative(user.role)`),
@@ -197,10 +197,11 @@ the owner's descriptions to commits.
   and deleted-user callers redirected, ADMIN and SUPER_ADMIN allowed, EDITOR
   metadata edit still allowed. Against the original code, 5 tests fail. Full
   run: `npm test` 481 passed, 0 failed, 2 skipped; render 264 passed;
-  typecheck, lint, and `git diff --check` clean.
+  typecheck, lint, and `git diff --check` clean. Authorization tests: 69
+  passed, 0 skipped (re-run before the commit).
 - **Pending:** proof over a real HTTP Server Action call with a real session
-  and database is part of P4-03 (BLOCKED, postponed).
-- **Evidence:** working-tree diff on `fix/media-delete-admin-only` (no commit SHA yet).
+  and database is part of P4-03 (BLOCKED, postponed by owner).
+- **Evidence:** commit `379e53b761446af062e58364988b3c6151a3d9ac` (`fix(security): restrict media deletion to administrators`).
 - **Security impact:** medium (an EDITOR can no longer destroy media).
 - **Production impact:** none until published. After release, EDITORs lose
   media deletion: mistaken uploads wait for an ADMIN, and in ADR 0003's

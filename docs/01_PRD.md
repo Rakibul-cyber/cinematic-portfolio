@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/01_PRD.md` |
-| Version | 1.1.0 (DEF-01 fix and DEF-04 registration) |
+| Version | 1.1.1 (DEF-01 commit recorded) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `2e3419a` plus uncommitted DEF-01 changes on `fix/media-delete-admin-only` |
+| Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Draft for owner review. Not committed. |
 | Product owner | Studio owner, Munir Visuals |
 
@@ -428,7 +428,8 @@ the behaviour the code already implements unless the status says otherwise.
 - **Status:** IMPLEMENTED. Defect DEF-01 (EDITORs could delete media) is
   **fixed locally, not deployed** (04_TRD, DEF-01).
 - **Release:** PUBLISHED. The DEF-01 fix is LOCAL ONLY (branch
-  `fix/media-delete-admin-only`, uncommitted); the published and `main` builds
+  `fix/media-delete-admin-only`, commit `379e53b`, not pushed, merged, or
+  deployed); the published and `main` builds
   still let an EDITOR delete media.
 - **Evidence:** `src/server/auth/session.ts`, `src/server/auth/roles.ts`,
   `src/middleware.ts`, `src/server/auth/action-guards.test.ts`, ADR 0004.
@@ -512,7 +513,8 @@ the behaviour the code already implements unless the status says otherwise.
      ordering (DEF-04, open).
 - **Status:** IMPLEMENTED. DEF-01 fixed locally, not deployed; DEF-04 open.
 - **Release:** PUBLISHED (EDITOR deletion still allowed there). The ADMIN-only
-  rule is LOCAL ONLY (branch `fix/media-delete-admin-only`, uncommitted).
+  rule is LOCAL ONLY (branch `fix/media-delete-admin-only`, commit `379e53b`,
+  not pushed, merged, or deployed).
   **Routes:** `/admin/media`.
 
 #### FR-CRM-01 — Inquiry management

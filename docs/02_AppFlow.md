@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/02_AppFlow.md` |
-| Version | 1.1.0 (DEF-01 fix and DEF-04 registration) |
+| Version | 1.1.1 (DEF-01 commit recorded) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `2e3419a` plus uncommitted DEF-01 changes on `fix/media-delete-admin-only` |
+| Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose
@@ -250,7 +250,8 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
   SUPER_ADMIN (`canDelete = isAdministrative(user.role)`). An EDITOR who calls
   `deleteMediaAction` directly gets `AuthorizationError`, which shows the admin
   error page, and nothing is deleted. LOCAL ONLY (DEF-01 fix, branch
-  `fix/media-delete-admin-only`, uncommitted); the published build still offers
+  `fix/media-delete-admin-only`, commit `379e53b`, not pushed, merged, or
+  deployed); the published build still offers
   and accepts EDITOR deletion.
 - **Known race:** a project assignment made between the reference check and the
   row deletion can leave a database reference to deleted R2 objects (DEF-04).

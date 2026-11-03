@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/04_TRD.md` |
-| Version | 1.1.0 (DEF-01 fix and DEF-04 registration) |
+| Version | 1.1.1 (DEF-01 commit recorded) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `2e3419a` plus uncommitted DEF-01 changes on `fix/media-delete-admin-only` |
+| Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose
@@ -482,7 +482,7 @@ The full register is in [06_Plan.md](06_Plan.md#decision-register).
 
 | ID | Defect | Evidence | Severity | Status |
 | --- | --- | --- | --- | --- |
-| DEF-01 | EDITORs could delete media and its R2 objects. ADR 0004 requires ADMIN for destructive actions. | Before: `deleteMediaAction` used `requireUser` and `/admin/media` offered Delete to every role. After: `requireAdmin(ADMIN_MEDIA_PATH)` and `canDelete = isAdministrative(user.role)`; `delete-authorization.test.ts` runs the real action and guard chain. `deleteMedia` itself still has no role check, by design (verify scripts call it with EDITOR actors). | Medium | **FIXED LOCALLY, not deployed** (branch `fix/media-delete-admin-only`, uncommitted). OD-01 resolved. HTTP-level proof pending (P4-03). |
+| DEF-01 | EDITORs could delete media and its R2 objects. ADR 0004 requires ADMIN for destructive actions. | Before: `deleteMediaAction` used `requireUser` and `/admin/media` offered Delete to every role. After: `requireAdmin(ADMIN_MEDIA_PATH)` and `canDelete = isAdministrative(user.role)`; `delete-authorization.test.ts` runs the real action and guard chain. `deleteMedia` itself still has no role check, by design (verify scripts call it with EDITOR actors). | Medium | **FIXED LOCALLY, not deployed**: committed locally as `379e53b` on `fix/media-delete-admin-only`, not pushed, merged, or deployed (`379e53b761446af062e58364988b3c6151a3d9ac`). Offline: 481 unit tests passed, 2 skipped; 264 render tests passed; 69 authorization tests passed. OD-01 resolved. Database-backed HTTP proof postponed (P4-03 BLOCKED). |
 | DEF-02 | Server-side Sentry decides "production" from the runtime `NODE_ENV`. If a deployed function runs without it, error reporting is silently off. | `src/lib/monitoring/options.ts:60`, `src/sentry.server.config.ts` passes `process.env` | Low (observability, fails quiet) | OPEN |
 | DEF-03 | Published and `main` builds decide the inquiry limiter's predictable fallback key and the Turnstile development bypass from the runtime `NODE_ENV`, so a function with `NODE_ENV` unset fails open. | `git show 288fde6:src/server/security/rate-limit.ts` line 25; `turnstile.ts` line 27 | High in principle; **not reachable** while intake is closed | FIXED LOCALLY (`ce81964`, `be10fb4`); not deployed |
 | DEF-04 | `deleteMedia` counts `project_media` references, deletes the R2 objects, then deletes the row, with no transaction or lock. A project assignment committed between the count and the row delete leaves the row in place (the `RESTRICT` foreign key refuses the delete) while its R2 objects are already gone: a published project can then show broken images, and the admin sees a generic error. | `src/server/media/service.ts:27-36`; no test covers delete-versus-assign concurrency (the `verify-cms-flow.ts` race covers project saves only). | Medium impact, low likelihood: needs an ADMIN deleting an unassigned image while someone assigns that same image within the same short window. Any role that can assign media and any role that can delete can trigger it. Data: R2 objects irreversibly deleted (bucket versioning UNVERIFIED); `media` and `media_variant` rows left pointing at missing keys. | OPEN. Needs a separate design and verification task (P2-11); not implemented. |
