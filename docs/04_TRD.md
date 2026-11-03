@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/04_TRD.md` |
-| Version | 1.1.1 (DEF-01 commit recorded) |
+| Version | 1.2.0 (DEF-02 fix; OBS-01–03 and SEC-CAND-01 registered) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
+| Reviewed against | commit `99bc3dc` plus uncommitted DEF-02 changes on `fix/sentry-production-initialization` |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose
@@ -100,10 +100,13 @@ declared range, so the lockfile is the contract. A version change is a task in
 **Overrides:** `postcss` 8.5.26, `deepmerge-ts` 8.0.2, `mysql2` 3.24.3
 (security patches, `1c772b3`).
 
-**Test inventory at `4f7f564`:** 28 unit test files (`*.test.ts`), 17 render
+**Test inventory:** at `4f7f564`, 28 unit test files (`*.test.ts`), 17 render
 test files (`*.render-test.ts`), and 3 database-backed integration suites
-(`scripts/integration/*.integration.ts`). The last full run gave 472 unit tests
-passing with 2 skipped, and 264 render tests passing.
+(`scripts/integration/*.integration.ts`); that run gave 472 unit tests passing
+with 2 skipped, and 264 render tests passing. The DEF-01 and DEF-02 fixes each
+added one unit test file (30 in total). The latest run, with the uncommitted
+DEF-02 change, gave 499 unit tests: 497 passed, 0 failed, 2 skipped; render 264
+passed.
 
 ## 2. System architecture
 
@@ -346,7 +349,7 @@ re-checks the session on the server. "Audit" lists `audit_log.action` values.
 | Cloudflare Turnstile | Inquiry bot check | `src/server/security/turnstile.ts`, `turnstile-widget.tsx` | `TURNSTILE_*` | IMPLEMENTED; production configuration UNVERIFIED |
 | Netlify | Build, hosting, CDN | `netlify.toml`, `.node-version` | Netlify UI only | Production published at `288fde6` (owner-reported); Auto Publishing LOCKED |
 | Better Auth | Authentication library (in-process, not a hosted service) | `src/server/auth/config.ts` | `BETTER_AUTH_*` | IMPLEMENTED |
-| Sentry | Optional errors | `src/instrumentation*.ts`, `src/lib/monitoring/*` | `NEXT_PUBLIC_SENTRY_*`, `SENTRY_*` | Code IMPLEMENTED; account UNVERIFIED |
+| Sentry | Optional errors | `src/instrumentation*.ts`, `src/lib/monitoring/*` | `NEXT_PUBLIC_SENTRY_*`, `SENTRY_*` | Code IMPLEMENTED; account UNVERIFIED; server initialization fixed locally (DEF-02) |
 | Umami | Optional cookieless analytics | `src/components/analytics/umami-analytics.tsx` | `UMAMI_*` | Code IMPLEMENTED; account UNVERIFIED |
 | YouTube-nocookie, Vimeo | Click-to-load embeds | `src/lib/video.ts` | none | IMPLEMENTED |
 
@@ -475,6 +478,7 @@ so commits `288fde6`…`4f7f564` need no schema change.
 | OD-15 | Whether to require email verification for administrators now that Resend exists. |
 | OD-16 | Whether the HTTP sign-in route should also write `admin.signed_in` and `admin.sign_in_failed` audit rows (TD-09). |
 | OD-17 | CI provider and required checks. |
+| OD-18 | Whether production should log once when monitoring is disabled by a missing or malformed DSN (OBS-03), instead of staying silent by design. |
 
 The full register is in [06_Plan.md](06_Plan.md#decision-register).
 
@@ -483,7 +487,7 @@ The full register is in [06_Plan.md](06_Plan.md#decision-register).
 | ID | Defect | Evidence | Severity | Status |
 | --- | --- | --- | --- | --- |
 | DEF-01 | EDITORs could delete media and its R2 objects. ADR 0004 requires ADMIN for destructive actions. | Before: `deleteMediaAction` used `requireUser` and `/admin/media` offered Delete to every role. After: `requireAdmin(ADMIN_MEDIA_PATH)` and `canDelete = isAdministrative(user.role)`; `delete-authorization.test.ts` runs the real action and guard chain. `deleteMedia` itself still has no role check, by design (verify scripts call it with EDITOR actors). | Medium | **FIXED LOCALLY, not deployed**: committed locally as `379e53b` on `fix/media-delete-admin-only`, not pushed, merged, or deployed (`379e53b761446af062e58364988b3c6151a3d9ac`). Offline: 481 unit tests passed, 2 skipped; 264 render tests passed; 69 authorization tests passed. OD-01 resolved. Database-backed HTTP proof postponed (P4-03 BLOCKED). |
-| DEF-02 | Server-side Sentry decides "production" from the runtime `NODE_ENV`. If a deployed function runs without it, error reporting is silently off. | `src/lib/monitoring/options.ts:60`, `src/sentry.server.config.ts` passes `process.env` | Low (observability, fails quiet) | OPEN |
+| DEF-02 | Server-side Sentry decided "production" from the runtime `NODE_ENV`, so a production build initialized server reporting only when the deployed function saw exactly `production`. Unset, empty, `development`, `test`, or `staging` left it silently off, and every Server Component, Server Action, and Route Handler error went unreported (see OBS-01). | Before: `src/sentry.server.config.ts` passed `process.env` to `sentryInitOptions`, read at `src/lib/monitoring/options.ts:60`. After: `sentryInitOptions({ ...process.env, NODE_ENV: process.env.NODE_ENV })`, which the build turns into `{...process.env,NODE_ENV:"production"}`; DSN, environment, and release stay runtime-controlled. `server-init-production-build.test.ts` (16 tests; 11 fail against the old code). | Low to medium (observability, fails quiet); no current impact, as production has no Sentry DSN (UNVERIFIED) | **FIXED LOCALLY, not deployed**: LOCAL ONLY, uncommitted on `fix/sentry-production-initialization` (from `99bc3dc`); not pushed, merged, or deployed. Production event delivery unverified (P5-04). |
 | DEF-03 | Published and `main` builds decide the inquiry limiter's predictable fallback key and the Turnstile development bypass from the runtime `NODE_ENV`, so a function with `NODE_ENV` unset fails open. | `git show 288fde6:src/server/security/rate-limit.ts` line 25; `turnstile.ts` line 27 | High in principle; **not reachable** while intake is closed | FIXED LOCALLY (`ce81964`, `be10fb4`); not deployed |
 | DEF-04 | `deleteMedia` counts `project_media` references, deletes the R2 objects, then deletes the row, with no transaction or lock. A project assignment committed between the count and the row delete leaves the row in place (the `RESTRICT` foreign key refuses the delete) while its R2 objects are already gone: a published project can then show broken images, and the admin sees a generic error. | `src/server/media/service.ts:27-36`; no test covers delete-versus-assign concurrency (the `verify-cms-flow.ts` race covers project saves only). | Medium impact, low likelihood: needs an ADMIN deleting an unassigned image while someone assigns that same image within the same short window. Any role that can assign media and any role that can delete can trigger it. Data: R2 objects irreversibly deleted (bucket versioning UNVERIFIED); `media` and `media_variant` rows left pointing at missing keys. | OPEN. Needs a separate design and verification task (P2-11); not implemented. |
 
@@ -500,6 +504,18 @@ The full register is in [06_Plan.md](06_Plan.md#decision-register).
 | TD-07 | `neon.ts` declares Neon tooling settings (AI gateway preview, 7-day TTL for new branches) with no documented purpose (OD-11). |
 | TD-08 | A full production build needs a live database, so offline CI cannot build. |
 | TD-09 | Sign-in audit rows are written by the Server Action path only. |
+
+### 9.6 Registered observability and configuration risks
+
+These are **not confirmed production defects**. Each is either a dependency
+worth knowing or a configuration risk that only the owner can check in Netlify.
+
+| ID | Risk | Evidence | Status |
+| --- | --- | --- | --- |
+| OBS-01 | Browser error boundaries skip any error with a digest, on the assumption that `onRequestError` already reported it on the server (`src/lib/monitoring/report.ts:25-32`, `:43-49`). Server errors are therefore visible **only** if server reporting is initialized; the browser never fills the gap. This is what made DEF-02 a total loss of server errors. | `server-init-production-build.test.ts`, "documents the dependency" | By design; keep. Covered by a test. |
+| OBS-02 | The server reads `NEXT_PUBLIC_SENTRY_DSN`, the environment, and the release from the **runtime** environment; the browser has them inlined at **build** time. If a value is available to Netlify builds but not to functions, server reporting is off while the browser works, and release labels can differ between the two. | `src/sentry.server.config.ts`; `src/instrumentation-client.ts:22-27` | UNVERIFIED configuration risk. Check Netlify variable scopes (P5-02). |
+| OBS-03 | Monitoring turns off silently when the DSN is missing or malformed (`src/lib/monitoring/options.ts:53-57`: "Neither state warns"). A misconfigured production looks the same as one without monitoring. | `options.ts`, `dsn.ts` | Deliberate design; changing it needs decision OD-18. |
+| SEC-CAND-01 | `securityHeaders(process.env)` (`next.config.ts:16`) reads `NODE_ENV` for `unsafe-eval`, `upgrade-insecure-requests`, and HSTS (`src/lib/security-headers.ts:39`, `:53`, `:61`). The production server takes headers from the build manifest (`routesManifest.headers`), so they are fixed at build time. A build run with `NODE_ENV=development` would bake a weaker CSP and no HSTS into the deploy, because Next.js keeps a preset `NODE_ENV` during `next build` and only warns. | `node_modules/next/dist/bin/next:68`; `node_modules/next/dist/server/lib/router-utils/filesystem.js:267` | UNVERIFIED; no evidence Netlify sets `NODE_ENV` for builds. Check the build environment (P5-02). Not a confirmed defect. |
 
 ## Known limitations
 

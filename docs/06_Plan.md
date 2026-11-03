@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.1.1 (DEF-01 commit recorded) |
+| Version | 1.2.0 (DEF-02 fix; OBS-01–03 and SEC-CAND-01 registered) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
+| Reviewed against | commit `99bc3dc` plus uncommitted DEF-02 changes on `fix/sentry-production-initialization` |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose
@@ -55,6 +55,7 @@ never marked deployed.**
 | Production administrators | 0; creation not authorized |
 | Database-backed integration testing | **POSTPONED by owner (BLOCKED)** |
 | DEF-01 media-deletion fix | LOCAL ONLY: commit `379e53b` on `fix/media-delete-admin-only`; not pushed, merged, or deployed |
+| DEF-02 server-Sentry fix | LOCAL ONLY, uncommitted (`fix/sentry-production-initialization`) |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -267,11 +268,22 @@ the owner's descriptions to commits.
 - **Evidence:** `8d1de49`, `29c5b6c`, `028beaa`, `74bc665`; `expected-errors.test.ts`.
 
 #### P2-09 — Server-side monitoring runtime check (DEF-02)
-- **Status:** TODO
-- **Files:** `src/lib/monitoring/options.ts`, `src/sentry.server.config.ts`
-- **Acceptance:** server reporting does not depend on the runtime `NODE_ENV` in
-  a production build; a production-build test proves it.
-- **Security impact:** low (observability). **Production impact:** monitoring behaviour.
+- **Status:** DONE (offline verification) · **Completed:** 2026-11-03 · **Release:** LOCAL ONLY, uncommitted on `fix/sentry-production-initialization` (from `99bc3dc`); not pushed, merged, or deployed.
+- **Requirements:** NFR-OBS-01
+- **Files:** `src/sentry.server.config.ts` (one line: `sentryInitOptions({ ...process.env, NODE_ENV: process.env.NODE_ENV })`),
+  `src/lib/monitoring/server-init-production-build.test.ts` (new). `options.ts`, sampling,
+  privacy settings, scrubbing, DSN validation, browser reporting, and Edge are unchanged.
+- **Acceptance:** a production build initializes server reporting with a valid
+  DSN under any runtime `NODE_ENV`; it stays off without a DSN, with a malformed
+  DSN, and in a development build; DSN, environment, and release stay
+  runtime-controlled; server and browser get identical privacy options; one
+  server error is reported exactly once.
+- **Tests:** 16 new production-build tests (11 fail against the old code);
+  monitoring suites 45 passed; `npm test` 499 tests, 497 passed, 0 failed,
+  2 skipped; render 264 passed; typecheck, lint, and offline `analytics:verify` pass.
+- **Pending:** real event delivery is unverified until a Sentry account exists (P5-04).
+- **Evidence:** working-tree diff on `fix/sentry-production-initialization` (no commit SHA yet).
+- **Security impact:** low (observability). **Production impact:** none until published and a DSN is configured.
 
 #### P2-10 — Audit catalogue consistency (TD-01, TD-09)
 - **Status:** TODO (decision OD-16 for the HTTP sign-in path)
@@ -418,6 +430,9 @@ the owner's descriptions to commits.
 - **Acceptance:** the owner confirms in the Netlify UI, without revealing
   values, that `RATE_LIMIT_HMAC_SECRET` (≥ 32), Better Auth, database, R2, and
   origin variables exist for production. Turnstile and Resend are confirmed before P5-09.
+  When monitoring is enabled, `NEXT_PUBLIC_SENTRY_*` are available to Functions
+  (runtime), not only Builds (OBS-02). The build environment does not set
+  `NODE_ENV` (SEC-CAND-01).
 - **Production impact:** read only.
 
 #### P5-03 — Legal approvals
@@ -426,7 +441,7 @@ the owner's descriptions to commits.
 
 #### P5-04 — Monitoring accounts
 - **Status:** TODO (Roadmap Phase 10)
-- **Acceptance:** Sentry and Umami accounts decided and configured; DEF-02 fixed (P2-09); uptime monitoring decided.
+- **Acceptance:** Sentry and Umami accounts decided and configured; DEF-02 fixed (P2-09, locally); uptime monitoring decided. On an **unpublished** deploy with its own environment label, one controlled server error arrives exactly once and scrubbed, its boundary re-render adds no second event (OBS-01), and a browser-only error arrives once. Decide OD-18.
 
 #### P5-05 — Deployment verification
 - **Status:** TODO
@@ -490,6 +505,7 @@ the owner's descriptions to commits.
 | OD-15 | Require administrator email verification | 04_TRD SEC-01 | P1-09 | Owner | OPEN |
 | OD-16 | Audit sign-ins through the HTTP route | 04_TRD TD-09 | P2-10 | Owner | OPEN |
 | OD-17 | CI provider and required checks | 04_TRD TD-03 | P4-13 | Owner | OPEN |
+| OD-18 | Log once when production monitoring is disabled by a missing or malformed DSN (OBS-03) | 04_TRD §9.6 | P5-04 | Owner | OPEN |
 
 ## Mandatory task-update procedure
 

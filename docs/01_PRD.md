@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/01_PRD.md` |
-| Version | 1.1.1 (DEF-01 commit recorded) |
+| Version | 1.2.0 (DEF-02 fix; OBS-01–03 and SEC-CAND-01 registered) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
+| Reviewed against | commit `99bc3dc` plus uncommitted DEF-02 changes on `fix/sentry-production-initialization` |
 | Document status | Draft for owner review. Not committed. |
 | Product owner | Studio owner, Munir Visuals |
 
@@ -585,7 +585,7 @@ the behaviour the code already implements unless the status says otherwise.
 | NFR-RESP-01 | Responsive | Layouts adapt at Tailwind `sm`/`md`/`lg`, with a mobile navigation and admin mobile layout. | IMPLEMENTED | 03_UI_Spec §6 |
 | NFR-MAINT-01 | Maintainability | Strict TypeScript, ESLint, focused modules, ADRs for architectural change. | IMPLEMENTED | `tsconfig.json`, `docs/DEVELOPMENT.md` |
 | NFR-MAINT-02 | Maintainability | CI that runs lint, type check, tests, and build. | PLANNED; no `.github/` directory exists | `docs/ARCHITECTURE.md` (Deployment direction) |
-| NFR-OBS-01 | Observability | Optional Sentry (production and DSN-gated, PII scrubbed) and optional Umami. | IMPLEMENTED in code; accounts not configured (UNVERIFIED) | ADR 0009 |
+| NFR-OBS-01 | Observability | Optional Sentry (production and DSN-gated, PII scrubbed) and optional Umami. | IMPLEMENTED in code; accounts not configured (UNVERIFIED). Server initialization no longer depends on the runtime `NODE_ENV` (DEF-02, fixed locally, not deployed). | ADR 0009 |
 | NFR-OBS-02 | Observability | Uptime and log monitoring. | PLANNED (Roadmap Phase 10) | `docs/ARCHITECTURE.md` |
 
 ## 5. Success metrics
