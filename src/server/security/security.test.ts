@@ -107,10 +107,20 @@ describe("Turnstile configuration modes", () => {
     });
   }
 
+  // The mode comes from process.env.NODE_ENV, which a production build fixes at
+  // compile time; see turnstile-production-build.test.ts for that build.
   it("bypasses in development only when both keys are absent", async () => {
-    assert.deepEqual(await verifyTurnstile({ token: "" }, { env: { NODE_ENV: "development" }, fetcher: ok }), { ok: true, bypassed: true });
-    // A half-configured development environment must not silently bypass.
-    assert.equal((await verifyTurnstile({ token: "" }, { env: { NODE_ENV: "development", TURNSTILE_SITE_KEY: "site" }, fetcher: ok })).ok, false);
+    const runtime = process.env as Record<string, string | undefined>;
+    const previous = runtime.NODE_ENV;
+    runtime.NODE_ENV = "development";
+    try {
+      assert.deepEqual(await verifyTurnstile({ token: "" }, { env: {}, fetcher: ok }), { ok: true, bypassed: true });
+      // A half-configured development environment must not silently bypass.
+      assert.equal((await verifyTurnstile({ token: "" }, { env: { TURNSTILE_SITE_KEY: "site" }, fetcher: ok })).ok, false);
+    } finally {
+      if (previous === undefined) delete runtime.NODE_ENV;
+      else runtime.NODE_ENV = previous;
+    }
   });
 });
 

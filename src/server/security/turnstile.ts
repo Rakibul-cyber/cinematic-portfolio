@@ -23,12 +23,15 @@ export async function verifyTurnstile(input: {
   const fetcher = dependencies.fetcher ?? fetch;
   const siteKey = env.TURNSTILE_SITE_KEY?.trim();
   const secret = env.TURNSTILE_SECRET_KEY?.trim();
-
-  if (!siteKey && !secret && env.NODE_ENV !== "production") {
+  // The literal `process.env.NODE_ENV` is replaced with "production" by the
+  // production build, so the bypass below is compiled out of it whatever NODE_ENV
+  // the deployed function sees. An unset or unexpected mode gets no bypass. The
+  // checks stay inline, not in a variable, so the minifier can drop the branch.
+  if (!siteKey && !secret && (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test")) {
     return { ok: true, bypassed: true };
   }
   if (!siteKey || !secret || !input.token || input.token.length > 2048) {
-    if ((!siteKey || !secret) && env.NODE_ENV === "production" && !warnedMissingConfiguration) {
+    if ((!siteKey || !secret) && process.env.NODE_ENV !== "development" && process.env.NODE_ENV !== "test" && !warnedMissingConfiguration) {
       warnedMissingConfiguration = true;
       console.error("[security] Turnstile is not configured. Check TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY.");
     }
