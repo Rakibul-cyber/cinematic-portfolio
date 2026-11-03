@@ -25,7 +25,10 @@
     "security:verify": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/verify-security-flow.ts",
     "seo:verify": "tsx --env-file-if-exists=.env.local scripts/verify-seo-flow.ts",
     "analytics:verify": "tsx --env-file-if-exists=.env.local scripts/verify-analytics-flow.ts",
-    "deploy:verify": "tsx --env-file-if-exists=.env.local scripts/verify-deploy-flow.ts"
+    "deploy:verify": "tsx --env-file-if-exists=.env.local scripts/verify-deploy-flow.ts",
+    "integration:preflight": "tsx scripts/integration/run.ts preflight",
+    "integration:identity": "tsx scripts/integration/run.ts identity",
+    "integration:run": "tsx scripts/integration/run.ts run"
   },
   "overrides": {
     "postcss": "8.5.26",
