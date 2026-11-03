@@ -1,0 +1,50 @@
+# Munir Visuals: Cursor rules
+# Mirrors CLAUDE.md. If the two ever differ, CLAUDE.md is authoritative; report
+# the difference rather than choosing silently.
+
+## Read before any change
+Read all six Context Architecture documents before implementing anything:
+- docs/01_PRD.md      requirements and release gates
+- docs/02_AppFlow.md  routes, screens, state machines
+- docs/03_UI_Spec.md  design tokens and components
+- docs/04_TRD.md      stack, endpoints, security, deployment, defects
+- docs/05_Schema.md   tables and authorization model
+- docs/06_Plan.md     task tracker and decision register
+Also follow docs/DEVELOPMENT.md and the ADRs in docs/DECISIONS/.
+
+## How to work
+- Work only on an approved task ID from docs/06_Plan.md. If there is none, stop and ask.
+- Ground every change in the repository: inspect the relevant source files first.
+- Confirm the task's dependencies, check git status and the current branch, and
+  review security and production risks.
+- State a short plan, then make the smallest change that completes the task.
+- Run the relevant tests: npm test, npm run typecheck, npm run lint,
+  git diff --check, plus task-specific checks.
+- After verified completion, update docs/06_Plan.md per its task-update
+  procedure, and update docs 01-05 if a contract, route, schema, token, or flow changed.
+- Report changed files, test counts, blockers, and git status. Never claim
+  unverified success; write NOT RUN, BLOCKED, or UNVERIFIED.
+
+## Never, without explicit owner authorization in the current task
+- Access or write the production database, even read only.
+- Create a production administrator.
+- git push, merge branches, rewrite history, or force-push.
+- Deploy, publish, or change Netlify configuration or its Auto Publishing lock.
+- Record a legal approval in src/content/legal.tsx, or open inquiry intake.
+- Read .env.local, .env, or any .env.* other than .env.example.
+- Expose secret values anywhere.
+- Make architecture changes outside the task scope (propose an ADR instead).
+- Commit, unless the task authorizes it.
+- Send real email or real Turnstile requests.
+- Run integration:identity or integration:run (database work is postponed).
+
+## Facts that are easy to get wrong
+- Published = main@288fde6 (owner-reported); main = 1797766 (unpublished);
+  10f09b4..4f7f564 are local only. Never call a local fix deployed.
+- Authorization is server-side only; middleware checks cookie presence only;
+  no PostgreSQL row-level security exists.
+- Build-time environment checks must use the literal process.env.NODE_ENV.
+- Inquiry intake opens only through legal approvals; there is no switch.
+- Never add loading.tsx to the public route group (soft-404 risk).
+- A full next build needs a reachable database; never use production for it.
+- Dark-only design, square corners, no shadows; use the tokens in src/app/globals.css.
