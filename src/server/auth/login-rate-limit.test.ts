@@ -375,11 +375,18 @@ describe("client address handling", () => {
 });
 
 describe("the pseudonymization key", () => {
-  it("is required in production, and short values do not count", () => {
-    assert.equal(rateLimitHmacKey({ NODE_ENV: "production" }), null);
-    assert.equal(rateLimitHmacKey({ NODE_ENV: "production", RATE_LIMIT_HMAC_SECRET: "too-short" }), null);
-    assert.equal(rateLimitHmacKey({ NODE_ENV: "production", RATE_LIMIT_HMAC_SECRET: HMAC_KEY }), HMAC_KEY);
-    assert.ok(rateLimitHmacKey({ NODE_ENV: "development" }));
+  // Production-build behaviour, and every runtime NODE_ENV, is covered in
+  // src/server/security/rate-limit-production-build.test.ts.
+  it("prefers a configured secret, and short values do not count", () => {
+    assert.equal(rateLimitHmacKey({ RATE_LIMIT_HMAC_SECRET: HMAC_KEY }), HMAC_KEY);
+    assert.notEqual(rateLimitHmacKey({ RATE_LIMIT_HMAC_SECRET: "too-short" }), "too-short");
+  });
+
+  it("ignores a NODE_ENV passed in the env argument", () => {
+    // Only the build-time-replaceable process.env.NODE_ENV decides the mode.
+    const expected = rateLimitHmacKey({});
+    assert.equal(rateLimitHmacKey({ NODE_ENV: "development" }), expected);
+    assert.equal(rateLimitHmacKey({ NODE_ENV: "production" }), expected);
   });
 });
 

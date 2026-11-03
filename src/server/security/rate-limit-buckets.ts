@@ -78,9 +78,20 @@ export function pruneExpiredBucketsSql(now: Date): Prisma.Sql {
   `;
 }
 
-/** The pseudonymization key, or null in a production deployment that lacks a usable one. */
+/**
+ * The pseudonymization key, or null when no usable one is configured outside
+ * local development and tests. Callers refuse the protected operation on null.
+ *
+ * The mode is read as the literal `process.env.NODE_ENV`, which the production
+ * build replaces with `"production"`. That makes the fallback below dead code in
+ * a production bundle, whatever NODE_ENV the deployed function sees at runtime.
+ * An unset or unexpected mode also gets no fallback.
+ */
 export function rateLimitHmacKey(env: Record<string, string | undefined> = process.env): string | null {
   const configured = env.RATE_LIMIT_HMAC_SECRET?.trim();
   if (configured && configured.length >= 32) return configured;
-  return env.NODE_ENV === "production" ? null : "development-only-rate-limit-secret";
+  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+    return "development-only-rate-limit-secret";
+  }
+  return null;
 }

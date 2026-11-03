@@ -177,33 +177,53 @@ if (!sessionCookie) {
   process.exit(1);
 }
 
-// 6. The protected route now renders, and exposes the user's role.
+// 6. The protected route now renders the signed-in account's name and role.
+//    The dashboard shows name and role, not the email, so the email is checked
+//    against the session instead.
 {
+  const session = await request("/api/auth/get-session", {
+    headers: { cookie: sessionCookie },
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+  const name = session?.user?.name;
+  const role = session?.user?.role;
+
+  check(
+    "session belongs to the signed-in account",
+    typeof session?.user?.email === "string" &&
+      session.user.email.toLowerCase() === email.trim().toLowerCase(),
+  );
+  check(
+    "session endpoint reports the role",
+    typeof role === "string" && role.length > 0,
+    `role ${JSON.stringify(role)}`,
+  );
+
   const response = await request("/admin", {
     headers: { cookie: sessionCookie },
   });
   const body = await response.text();
+  const html = (value) =>
+    String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#x27;");
 
   check(
     "authenticated /admin returns 200",
     response.status === 200,
     `status ${response.status}`,
   );
-  check("authenticated /admin shows the signed-in account", body.includes(email));
   check(
-    "authenticated /admin resolves the role from the server",
-    /Super admin|Admin|Editor/.test(body),
+    "authenticated /admin shows the signed-in account's name",
+    typeof name === "string" && name.length > 0 && body.includes(html(name)),
   );
-
-  const session = await request("/api/auth/get-session", {
-    headers: { cookie: sessionCookie },
-  })
-    .then((r) => r.json())
-    .catch(() => null);
   check(
-    "session endpoint reports the role",
-    typeof session?.user?.role === "string",
-    `role ${JSON.stringify(session?.user?.role)}`,
+    "authenticated /admin shows the role resolved by the server",
+    typeof role === "string" && role.length > 0 && body.includes(html(role)),
   );
 }
 
