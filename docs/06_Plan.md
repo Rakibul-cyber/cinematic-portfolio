@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.2.0 (DEF-02 fix; OBS-01–03 and SEC-CAND-01 registered) |
+| Version | 1.2.1 (DEF-02 and Context Architecture commits recorded) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `99bc3dc` plus uncommitted DEF-02 changes on `fix/sentry-production-initialization` |
+| Reviewed against | commit `b517fce` (branch `fix/sentry-production-initialization`) |
 | Document status | Draft for owner review. Not committed. |
 
 ## Purpose
@@ -55,7 +55,7 @@ never marked deployed.**
 | Production administrators | 0; creation not authorized |
 | Database-backed integration testing | **POSTPONED by owner (BLOCKED)** |
 | DEF-01 media-deletion fix | LOCAL ONLY: commit `379e53b` on `fix/media-delete-admin-only`; not pushed, merged, or deployed |
-| DEF-02 server-Sentry fix | LOCAL ONLY, uncommitted (`fix/sentry-production-initialization`) |
+| DEF-02 server-Sentry fix | LOCAL ONLY: commit `b517fce` on `fix/sentry-production-initialization`; not pushed, merged, or deployed |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -101,14 +101,14 @@ the owner's descriptions to commits.
 - **Security impact:** none. **Production impact:** none.
 
 #### P0-03 — Context Architecture (six documents, `CLAUDE.md`, `.cursorrules`)
-- **Status:** IN PROGRESS. Written and self-checked; awaiting owner review and commit authorization.
+- **Status:** DONE · **Completed:** 2026-11-03 · owner reviewed and authorized the commit; committed locally as `2e3419a`, not pushed, merged, or deployed. Later revisions are recorded in each document's version header.
 - **Depends on:** P0-01
 - **Files:** `docs/01_PRD.md` … `docs/06_Plan.md`, `CLAUDE.md`, `.cursorrules`
 - **Acceptance:** all eight files exist, cross-links resolve, IDs are
   consistent, the facts match the repository, and the owner approves.
 - **Tests:** cross-document consistency checks (link, ID, route, version,
   schema, and secret scans).
-- **Evidence:** consistency report delivered with the documents.
+- **Evidence:** commit `2e3419ac93e9a0d6c7743b14ac88747a31791d56` (`docs(architecture): establish Munir Visuals context baseline`); cross-document consistency checks 27 passed, 0 failed before that commit.
 - **Security impact:** none. **Production impact:** none.
 
 #### P0-04 — Resolve open decisions
@@ -268,7 +268,7 @@ the owner's descriptions to commits.
 - **Evidence:** `8d1de49`, `29c5b6c`, `028beaa`, `74bc665`; `expected-errors.test.ts`.
 
 #### P2-09 — Server-side monitoring runtime check (DEF-02)
-- **Status:** DONE (offline verification) · **Completed:** 2026-11-03 · **Release:** LOCAL ONLY, uncommitted on `fix/sentry-production-initialization` (from `99bc3dc`); not pushed, merged, or deployed.
+- **Status:** DONE (offline verification) · **Completed:** 2026-11-03 · **Release:** LOCAL ONLY, committed locally as `b517fce` on `fix/sentry-production-initialization` (parent `99bc3dc`); not pushed, merged, or deployed.
 - **Requirements:** NFR-OBS-01
 - **Files:** `src/sentry.server.config.ts` (one line: `sentryInitOptions({ ...process.env, NODE_ENV: process.env.NODE_ENV })`),
   `src/lib/monitoring/server-init-production-build.test.ts` (new). `options.ts`, sampling,
@@ -282,7 +282,7 @@ the owner's descriptions to commits.
   monitoring suites 45 passed; `npm test` 499 tests, 497 passed, 0 failed,
   2 skipped; render 264 passed; typecheck, lint, and offline `analytics:verify` pass.
 - **Pending:** real event delivery is unverified until a Sentry account exists (P5-04).
-- **Evidence:** working-tree diff on `fix/sentry-production-initialization` (no commit SHA yet).
+- **Evidence:** commit `b517fce2f2acc24b16e23aba615e144e7895486e` (`fix(observability): stabilize production Sentry initialization`); the 16 regression tests passed again before the commit.
 - **Security impact:** low (observability). **Production impact:** none until published and a DSN is configured.
 
 #### P2-10 — Audit catalogue consistency (TD-01, TD-09)

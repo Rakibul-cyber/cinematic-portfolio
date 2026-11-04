@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/01_PRD.md` |
-| Version | 1.2.0 (DEF-02 fix; OBS-01–03 and SEC-CAND-01 registered) |
+| Version | 1.2.1 (DEF-02 and Context Architecture commits recorded) |
 | Last reviewed | 2026-11-03 |
-| Reviewed against | commit `99bc3dc` plus uncommitted DEF-02 changes on `fix/sentry-production-initialization` |
+| Reviewed against | commit `b517fce` (branch `fix/sentry-production-initialization`) |
 | Document status | Draft for owner review. Not committed. |
 | Product owner | Studio owner, Munir Visuals |
 
