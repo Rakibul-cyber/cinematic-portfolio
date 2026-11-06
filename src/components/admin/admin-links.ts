@@ -1,8 +1,8 @@
 import { isAdministrative, type AdminRole } from "@/server/auth/roles";
 
 /**
- * Admin navigation. `adminOnly` mirrors the server guard: the Settings page and
- * its actions call `requireAdmin`, so an EDITOR is not offered the link. Hiding
+ * Admin navigation. `adminOnly` mirrors the server guard: the Settings and
+ * Videos pages call `requireAdmin`, so an EDITOR is not offered those links. Hiding
  * it is a courtesy only; the guard still decides.
  */
 const LINKS: readonly { label: string; href: string; adminOnly?: true }[] = [
@@ -12,6 +12,7 @@ const LINKS: readonly { label: string; href: string; adminOnly?: true }[] = [
   { label: "Projects", href: "/admin/projects" },
   { label: "Categories", href: "/admin/categories" },
   { label: "Media", href: "/admin/media" },
+  { label: "Videos", href: "/admin/videos", adminOnly: true },
   { label: "Services", href: "/admin/services" },
   { label: "Testimonials", href: "/admin/testimonials" },
   { label: "Pages", href: "/admin/pages" },

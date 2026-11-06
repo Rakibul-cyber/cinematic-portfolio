@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/02_AppFlow.md` |
-| Version | 1.1.1 (DEF-01 commit recorded) |
-| Last reviewed | 2026-11-03 |
+| Version | 1.2.0 (P3-11D admin video library recorded, LOCAL ONLY, uncommitted) |
+| Last reviewed | 2026-11-06 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -83,6 +83,7 @@ All are `force-dynamic` and require a valid session.
 | `/admin/pages` | EDITOR | FR-CMS-05 |
 | `/admin/settings` | ADMIN | FR-CMS-06 |
 | `/admin/media` | EDITOR (delete: ADMIN, fixed locally under DEF-01; published build: EDITOR) | FR-MED-01, FR-MED-02 |
+| `/admin/videos` (P3-11D, LOCAL ONLY) | ADMIN (EDITOR: 403) | Uploaded video (MH-03) |
 | `/admin/inquiries`, `/admin/inquiries/[id]` | EDITOR | FR-CRM-01, FR-EML-01 |
 | `/admin/inquiries/export` | ADMIN | FR-CRM-03 |
 | `/admin/customers`, `/admin/customers/[id]` | EDITOR (anonymize: SUPER_ADMIN) | FR-CRM-02, FR-CRM-04 |
@@ -232,6 +233,36 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 - **Actions:** `saveSettingsAction`, `saveSocialAction`, `deleteAction` for
   social links.
 - **Side effects:** public layout, metadata, and contact details revalidated.
+
+#### SCR-ADM-07V — Videos `/admin/videos` (P3-11D, LOCAL ONLY, uncommitted)
+
+- **Role:** ADMIN or SUPER_ADMIN (`requireAdmin`); an EDITOR receives 403
+  (`forbidden()`) and is not offered the navigation link. Every action is a
+  video API route that repeats the origin, session, and role checks.
+- **Upload:** title and file (MP4, MOV, M4V, MKV, WebM; declared size up to
+  10 GiB, a preliminary check only) → `POST /api/videos/uploads` → resumable
+  chunked transfer straight to Mux (`@mux/upchunk`, 30 MiB chunks). A progress
+  bar and percentage, then "Upload complete. Mux is processing the video…".
+  **Cancel upload** aborts the transfer and calls the cancel route. The upload
+  URL must be on `VIDEO_UPLOAD_ORIGIN`; until that is configured (host
+  UNVERIFIED), or while video is not configured, the form is replaced by a
+  plain explanation.
+- **List:** title, status (Uploading, Processing, Ready, Failed, Cancelled,
+  Deleting, Delete failed), duration, resolution, file name, number of
+  projects, and a status detail (a known failure message, never provider
+  text). The page refreshes every 5 s while any video is uploading,
+  processing, or deleting, or an upload runs in this tab.
+- **Preview:** READY only; click-to-load player (`HlsPlayer`); no playback
+  token is requested before Play.
+- **Delete:** offered for READY, PROCESSING, FAILED, and CANCELLED videos used
+  by no project; `window.confirm` names the video and says it cannot be
+  recovered (OD-14 open). An assigned video shows "This video is used by a
+  project…" instead of a Delete control, and the server refuses it with 409.
+  A provider or database failure leaves the video "Delete failed" with an
+  alert, and the row offers **Retry delete**. An upload in progress offers
+  **Cancel upload** instead.
+- **Empty:** "No videos uploaded yet."
+- **Unchanged:** the image library (SCR-ADM-07) and its deletion workflow.
 
 #### SCR-ADM-07 — Media `/admin/media`
 

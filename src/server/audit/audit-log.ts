@@ -47,6 +47,8 @@ export const AuditAction = {
   VideoUploadCancelled: "video.upload_cancelled",
   VideoReady: "video.ready",
   VideoProcessingFailed: "video.processing_failed",
+  VideoDeleted: "video.deleted",
+  VideoDeleteFailed: "video.delete_failed",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

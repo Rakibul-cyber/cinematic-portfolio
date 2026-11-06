@@ -53,6 +53,18 @@ export type VideoProjectAssignment = {
   categoryActive: boolean;
 };
 
+/** One row of the admin video library: the record and how many projects use it. */
+export type AdminVideoListItem = VideoRecord & { assignmentCount: number };
+
+/**
+ * The outcome of `beginDeletion`. On `started`, the record is DELETING and the
+ * caller owns the deletion until it removes the row or marks DELETE_FAILED.
+ */
+export type BeginDeletionResult =
+  | { outcome: "started"; record: VideoRecord }
+  | { outcome: "not_found" }
+  | { outcome: "refused"; reason: "delete_assigned" | "delete_upload_in_progress" | "delete_in_progress" };
+
 export interface VideoRepository {
   findById(id: string): Promise<VideoRecord | null>;
   findByMuxUploadId(muxUploadId: string): Promise<VideoRecord | null>;
@@ -78,4 +90,22 @@ export interface VideoRepository {
   updateIfStatus(id: string, expectedStatus: VideoStatus, patch: VideoPatch, now: Date): Promise<VideoRecord | null>;
 
   listProjectAssignments(videoId: string): Promise<VideoProjectAssignment[]>;
+
+  /** Every video, newest first, with its assignment count (admin library, P3-11D). */
+  listForAdmin(): Promise<AdminVideoListItem[]>;
+
+  /**
+   * Atomically checks and claims a video for permanent deletion (P3-11D): in
+   * one transaction, lock the row, refuse an active upload or any project
+   * assignment, and move the status to DELETING. A DELETING record whose last
+   * change is older than `staleBefore` (an interrupted attempt) may be claimed
+   * again; a fresh one is refused as `delete_in_progress`.
+   */
+  beginDeletion(id: string, now: Date, staleBefore: Date): Promise<BeginDeletionResult>;
+
+  /**
+   * Removes the row only while it is still DELETING. Returns false when it is
+   * gone or no longer DELETING. Must fail (not cascade) if an assignment exists.
+   */
+  deleteIfDeleting(id: string): Promise<boolean>;
 }

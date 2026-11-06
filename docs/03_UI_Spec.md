@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/03_UI_Spec.md` |
-| Version | 1.0.0 |
-| Last reviewed | 2026-11-03 |
+| Version | 1.1.0 (P3-11D uploaded-video player recorded, LOCAL ONLY) |
+| Last reviewed | 2026-11-06 |
 | Reviewed against | commit `4f7f564` (branch `docs/context-architecture`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -257,6 +257,15 @@ polite live region; the submit button is disabled while pending.
 | Active | Replaced by an `iframe` with `allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"`, in a `role="group"` labelled with the video name. |
 | Error / unsupported | `EXTERNAL` provider: no embed URL, so the player is not rendered. |
 | Responsive | Fills its container (`absolute inset-0`), inside an `aspect-video` frame. |
+
+### 4.6a Uploaded-video player (`src/components/video/hls-player.tsx`, P3-11D, LOCAL ONLY)
+
+| State | Behaviour |
+| --- | --- |
+| Default (inactive) | An `aspect-video` frame with a square-cornered **Play** button (admin button type style, border, no shadow); the title is a visually hidden suffix. **No request** is made: no playback token, playlist, or player library. |
+| Loading | Button disabled, "Loading…". |
+| Active | A native `<video controls playsInline>` labelled "Video: <title>". Safari plays the signed HLS URL natively; other browsers load `hls.js` on demand (no Web Worker). |
+| Error | `role="alert"` line under the frame: not available (404), still processing (409), no permission (403), session ended (401), too many requests (429), or a generic failure; an unsupported browser says so. Play is offered again. |
 
 ### 4.7 Dialogs and toasts
 

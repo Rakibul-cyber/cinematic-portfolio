@@ -25,6 +25,7 @@ import { computeMuxSignature } from "@/server/video/webhook-signature";
 type Http = typeof import("@/server/video/http");
 let handleCancelUpload: Http["handleCancelUpload"];
 let handleCreateUpload: Http["handleCreateUpload"];
+let handleDeleteVideo: Http["handleDeleteVideo"];
 let handleMuxWebhookRequest: Http["handleMuxWebhookRequest"];
 let handlePlayback: Http["handlePlayback"];
 let MAX_UPLOAD_REQUEST_BYTES: number;
@@ -32,7 +33,7 @@ let buildVideoRuntime: typeof import("@/server/video/runtime").buildVideoRuntime
 
 before(async () => {
   (globalThis as unknown as { cinematicPortfolioPrisma: unknown }).cinematicPortfolioPrisma = {};
-  ({ handleCancelUpload, handleCreateUpload, handleMuxWebhookRequest, handlePlayback, MAX_UPLOAD_REQUEST_BYTES } = await import("@/server/video/http"));
+  ({ handleCancelUpload, handleCreateUpload, handleDeleteVideo, handleMuxWebhookRequest, handlePlayback, MAX_UPLOAD_REQUEST_BYTES } = await import("@/server/video/http"));
   ({ buildVideoRuntime } = await import("@/server/video/runtime"));
 });
 
@@ -492,9 +493,13 @@ describe("GET /api/videos/[id]/playback", () => {
     assert.deepEqual(notReady.body, { error: "not_found", message: "Video not found." }, "same answer as an unknown video");
   });
 
-  it("gives any authenticated administrator a preview, including of draft videos", async () => {
+  it("gives an ADMIN or SUPER_ADMIN a preview, including of draft videos, and refuses an EDITOR (P3-11D)", async () => {
     const videoId = await readyVideo([{ projectId: DRAFT, projectStatus: "DRAFT", categoryActive: true }]);
     user = EDITOR;
+    const refused = await send(handlePlayback(playbackRequest(videoId), videoId, deps));
+    assert.equal(refused.status, 403);
+    assert.equal(refused.body.error, "forbidden");
+    user = ADMIN;
     const preview = await send(handlePlayback(playbackRequest(videoId), videoId, deps));
     assert.equal(preview.status, 200);
     assert.ok(Date.parse(String(preview.body.expiresAt)) - Date.now() <= 15 * 60_000 + 1000, "short-lived");
@@ -514,6 +519,124 @@ describe("GET /api/videos/[id]/playback", () => {
     runtime = null;
     assert.equal((await send(handlePlayback(playbackRequest(videoId, PUBLISHED), videoId, deps))).status, 503);
     assert.equal((await send(handlePlayback(playbackRequest(videoId), videoId, deps))).status, 503);
+  });
+});
+
+// ------------------------------------------------------------------ DELETE /api/videos/[id] (P3-11D)
+
+const deleteRequest = (id: string, headers: Record<string, string> = {}) =>
+  new Request(`${ORIGIN}/api/videos/${id}`, { method: "DELETE", headers: { origin: ORIGIN, "sec-fetch-site": "same-origin", ...headers } });
+
+describe("DELETE /api/videos/[id]", () => {
+  it("deletes an unassigned READY video for ADMIN, removes the asset, and audits it", async () => {
+    const videoId = await readyVideo([]);
+    user = ADMIN;
+    audits.length = 0;
+    const result = await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps));
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body, { deleted: true });
+    assert.equal(await repository.findById(videoId), null);
+    assert.equal(mux.assets.size, 0);
+    assert.deepEqual(audits, [{ action: "video.deleted", entityType: "video", entityId: videoId, actorUserId: ADMIN.id, actorEmail: ADMIN.email, metadata: { source: "admin" } }]);
+    assert.equal(rateCalls.at(-1)?.name, "delete");
+  });
+
+  it("refuses an EDITOR, an anonymous caller, and a cross-site request before any work", async () => {
+    const videoId = await readyVideo([]);
+    const callsBefore = mux.calls;
+    rateCalls.length = 0;
+    user = EDITOR;
+    assert.equal((await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps))).status, 403);
+    user = null;
+    assert.equal((await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps))).status, 401);
+    user = SUPER;
+    const crossSite = await send(handleDeleteVideo(deleteRequest(videoId, { origin: "https://evil.example" }), videoId, deps));
+    assert.equal(crossSite.status, 403);
+    assert.equal(crossSite.body.error, "origin_not_allowed");
+    assert.equal((await send(handleDeleteVideo(deleteRequest(videoId, { "sec-fetch-site": "cross-site" }), videoId, deps))).status, 403);
+    assert.equal(await statusOf(videoId), "READY");
+    assert.equal(mux.calls, callsBefore);
+    assert.deepEqual(rateCalls, [], "refused before counting against the limit");
+  });
+
+  it("refuses to delete a video assigned to a project, with a plain reason", async () => {
+    const videoId = await readyVideo([{ projectId: DRAFT, projectStatus: "DRAFT", categoryActive: true }]);
+    const result = await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps));
+    assert.equal(result.status, 409);
+    assert.deepEqual(result.body, { error: "delete_assigned", message: "This video is used by a project. Remove it from every project before deleting it." });
+    assert.equal(await statusOf(videoId), "READY");
+    assert.equal(mux.assets.size, 1);
+  });
+
+  it("refuses an upload still in progress and points to cancellation", async () => {
+    const { videoId } = await startUpload();
+    const result = await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps));
+    assert.equal(result.status, 409);
+    assert.equal(result.body.error, "delete_upload_in_progress");
+  });
+
+  it("answers 503 delete_failed when the provider fails, leaves DELETE_FAILED, audits, and Retry succeeds", async () => {
+    const videoId = await readyVideo([]);
+    const realDelete = mux.deleteAsset.bind(mux);
+    mux.deleteAsset = async () => {
+      throw new VideoProviderError("provider_unavailable", 503);
+    };
+    audits.length = 0;
+    const failed = await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps));
+    assert.equal(failed.status, 503);
+    assert.deepEqual(failed.body, { error: "delete_failed", message: "The video could not be deleted. Try again in a moment." });
+    assert.equal(await statusOf(videoId), "DELETE_FAILED");
+    assert.deepEqual(audits.map((entry) => [entry.action, entry.metadata]), [["video.delete_failed", { retryable: true }]]);
+
+    // A redelivered READY webhook cannot resurrect it, and preview is refused.
+    const record = (await repository.findById(videoId))!;
+    const asset = mux.assets.get(record.muxAssetId!)!;
+    await send(handleMuxWebhookRequest(webhookRequest(assetEvent("video.asset.ready", asset)), deps));
+    assert.equal(await statusOf(videoId), "DELETE_FAILED");
+    assert.equal((await send(handlePlayback(playbackRequest(videoId), videoId, deps))).status, 409);
+
+    mux.deleteAsset = realDelete;
+    const retried = await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps));
+    assert.equal(retried.status, 200);
+    assert.equal(await repository.findById(videoId), null);
+  });
+
+  it("answers 502 for a provider refusal that will not succeed on retry", async () => {
+    const videoId = await readyVideo([]);
+    mux.deleteAsset = async () => {
+      throw new VideoProviderError("unauthorized", 401);
+    };
+    const result = await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps));
+    assert.equal(result.status, 502);
+    assert.equal(result.body.error, "delete_failed");
+  });
+
+  it("rate-limits, fails closed without configuration, and 404s malformed or unknown ids", async () => {
+    const videoId = await readyVideo([]);
+    limit = "limited";
+    assert.equal((await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps))).status, 429);
+    limit = "unavailable";
+    assert.equal((await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps))).status, 503);
+    limit = "allowed";
+    assert.equal((await send(handleDeleteVideo(deleteRequest("../etc"), "../etc", deps))).status, 404);
+    assert.equal((await send(handleDeleteVideo(deleteRequest(HIDDEN), HIDDEN, deps))).status, 404);
+    runtime = null;
+    assert.equal((await send(handleDeleteVideo(deleteRequest(videoId), videoId, deps))).status, 503);
+    assert.equal(await statusOf(videoId), "READY");
+  });
+});
+
+describe("draft playback protection (P3-11D)", () => {
+  it("never issues a public playback URL for a video whose only project is a draft, even to a signed-in admin", async () => {
+    const videoId = await readyVideo([{ projectId: DRAFT, projectStatus: "DRAFT", categoryActive: true }]);
+    for (const as of [null, SUPER]) {
+      user = as;
+      const result = await send(handlePlayback(playbackRequest(videoId, DRAFT), videoId, deps));
+      assert.equal(result.status, 404);
+      assert.equal("url" in result.body, false);
+    }
+    user = null;
+    assert.equal((await send(handlePlayback(playbackRequest(videoId), videoId, deps))).status, 401, "no preview without a session");
   });
 });
 

@@ -1,7 +1,7 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
-import { securityHeaders } from "./src/lib/security-headers";
+import { securityHeaders, videoAdminSecurityHeaders } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
   experimental: {
@@ -13,7 +13,12 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders(process.env) }];
+    return [
+      { source: "/:path*", headers: securityHeaders(process.env) },
+      // Later entries win for the same header key: only the video library gets
+      // the widened video policy (P3-11D); every other route is unchanged.
+      { source: "/admin/videos", headers: videoAdminSecurityHeaders(process.env) },
+    ];
   },
 };
 

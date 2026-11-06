@@ -618,10 +618,10 @@ describe("issuePlaybackToken", () => {
   const decode = (part: string) => JSON.parse(Buffer.from(part, "base64url").toString("utf8"));
   const tokenOf = (url: string) => new URL(url).searchParams.get("token") ?? "";
 
-  it("gives an authenticated admin a short-lived signed HTTPS URL for a READY draft video", async () => {
+  it("gives an ADMIN or SUPER_ADMIN a short-lived signed HTTPS URL for a READY draft video", async () => {
     const video = seedReady();
     repository.setAssignments(video.id, [{ projectId: DRAFT, projectStatus: "DRAFT", categoryActive: true }]);
-    for (const actor of [EDITOR_B, ADMIN]) {
+    for (const actor of [ADMIN, { id: "user-super", role: "SUPER_ADMIN" } as VideoActor]) {
       const result = await service.issuePlaybackToken(video.id, { kind: "admin", actor });
       assert.equal(result.ok, true);
       if (!result.ok) return;
@@ -636,9 +636,14 @@ describe("issuePlaybackToken", () => {
     }
   });
 
+  it("refuses an EDITOR preview (P3-11D), even of a READY video", async () => {
+    const video = seedReady();
+    assert.deepEqual(await service.issuePlaybackToken(video.id, { kind: "admin", actor: EDITOR_B }), { ok: false, error: "forbidden", retryable: false });
+  });
+
   it("tells an admin a video is not ready, and refuses an invalid actor", async () => {
     const video = seedReady({ status: "PROCESSING", playbackId: null });
-    assert.deepEqual(await service.issuePlaybackToken(video.id, { kind: "admin", actor: EDITOR_A }), { ok: false, error: "not_ready", retryable: false });
+    assert.deepEqual(await service.issuePlaybackToken(video.id, { kind: "admin", actor: ADMIN }), { ok: false, error: "not_ready", retryable: false });
     assert.deepEqual(await service.issuePlaybackToken(video.id, { kind: "admin", actor: { id: "", role: "ADMIN" } }), { ok: false, error: "forbidden", retryable: false });
   });
 

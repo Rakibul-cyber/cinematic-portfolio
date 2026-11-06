@@ -40,6 +40,8 @@ export const DEFAULT_UPLOAD_TIMEOUT_SECONDS = 6 * 3600;
 export const DEFAULT_PLAYBACK_TOKEN_TTL_SECONDS = 15 * 60;
 /** Larger webhook bodies are refused before any work is done. */
 export const MAX_WEBHOOK_BODY_BYTES = 1024 * 1024;
+/** A DELETING claim older than this is treated as an interrupted attempt and may be retried. */
+export const DELETION_STALE_AFTER_MS = 5 * 60_000;
 export const ALLOWED_VIDEO_EXTENSIONS = ["mp4", "mov", "m4v", "mkv", "webm"] as const;
 const FILENAME_MAX_LENGTH = 255;
 const MAX_CAS_ATTEMPTS = 3;
@@ -121,6 +123,10 @@ export type WebhookResult =
 
 export type PlaybackViewer = { kind: "admin"; actor: VideoActor } | { kind: "public"; projectId: string };
 
+export type DeleteVideoResult =
+  | { ok: true }
+  | Failure<"forbidden" | "not_found" | "delete_assigned" | "delete_upload_in_progress" | "delete_in_progress" | "delete_failed">;
+
 export type PlaybackResult =
   | { ok: true; url: string; expiresAt: Date }
   | Failure<"forbidden" | "not_found" | "not_ready" | "playback_unavailable">;
@@ -130,6 +136,7 @@ export type VideoService = {
   cancelUploadSession(actor: VideoActor, videoId: string): Promise<CancelUploadResult>;
   handleMuxWebhook(input: WebhookInput): Promise<WebhookResult>;
   issuePlaybackToken(videoId: string, viewer: PlaybackViewer): Promise<PlaybackResult>;
+  deleteVideo(actor: VideoActor, videoId: string): Promise<DeleteVideoResult>;
 };
 
 // ------------------------------------------------------------------ input validation
@@ -540,7 +547,8 @@ export function createVideoService(deps: VideoServiceDeps): VideoService {
   async function issuePlaybackToken(videoId: string, viewer: PlaybackViewer): Promise<PlaybackResult> {
     const fail = (error: Extract<PlaybackResult, { ok: false }>["error"], retryable = false) => ({ ok: false, error, retryable }) as const;
     const isAdmin = viewer?.kind === "admin";
-    if (isAdmin && !isActor(viewer.actor)) return fail("forbidden");
+    // Preview is limited to ADMIN and SUPER_ADMIN, like the video library (P3-11D).
+    if (isAdmin && (!isActor(viewer.actor) || !isAdministrative(viewer.actor.role))) return fail("forbidden");
     if (!isAdmin && (viewer?.kind !== "public" || typeof viewer.projectId !== "string" || viewer.projectId === "")) return fail("not_found");
     if (typeof videoId !== "string" || !UUID.test(videoId)) return fail("not_found");
 
@@ -578,5 +586,88 @@ export function createVideoService(deps: VideoServiceDeps): VideoService {
     }
   }
 
-  return { createUploadSession, cancelUploadSession, handleMuxWebhook, issuePlaybackToken };
+  // ---------------------------------------------------------------- delete
+
+  /**
+   * Permanent deletion (P3-11D), ADMIN or SUPER_ADMIN only (ADR 0004).
+   *
+   * 1. Claim: the repository atomically refuses an active upload or any
+   *    project assignment and moves the record to DELETING. From then on no
+   *    webhook can change it and playback is refused.
+   * 2. Provider: the asset is deleted at Mux (an asset that is already gone
+   *    counts as deleted). When the record has no asset ID, the upload is read
+   *    once so an asset created after a cancellation is not orphaned.
+   * 3. Row: removed only while still DELETING.
+   *
+   * Any failure after the claim leaves DELETE_FAILED, which the admin can
+   * retry; nothing is half-deleted silently. A provider failure never deletes
+   * the row, so the asset can always be found again.
+   */
+  async function deleteVideo(actor: VideoActor, videoId: string): Promise<DeleteVideoResult> {
+    const fail = (error: Extract<DeleteVideoResult, { ok: false }>["error"], retryable = false) => ({ ok: false, error, retryable }) as const;
+    if (!isActor(actor) || !isAdministrative(actor.role)) return fail("forbidden");
+    if (typeof videoId !== "string" || !UUID.test(videoId)) return fail("not_found");
+
+    const startedAt = now();
+    let claim: Awaited<ReturnType<VideoRepository["beginDeletion"]>>;
+    try {
+      claim = await repository.beginDeletion(videoId, startedAt, new Date(startedAt.getTime() - DELETION_STALE_AFTER_MS));
+    } catch {
+      logger.warn("video.delete.persistence_failed", { videoId, reason: "claim" });
+      return fail("delete_failed", true);
+    }
+    if (claim.outcome === "not_found") return fail("not_found");
+    if (claim.outcome === "refused") return fail(claim.reason);
+    const record = claim.record;
+
+    const markFailed = async (reason: string, fields: VideoLogFields = {}) => {
+      logger.warn("video.delete.failed", { videoId, reason, ...fields });
+      try {
+        await repository.updateIfStatus(videoId, "DELETING", { status: "DELETE_FAILED" }, now());
+      } catch {
+        // Stays DELETING; it becomes retryable once the claim is stale.
+        logger.warn("video.delete.persistence_failed", { videoId, reason: "mark_failed" });
+      }
+    };
+
+    let assetId = record.muxAssetId;
+    if (!assetId) {
+      try {
+        assetId = (await mux.getDirectUpload(record.muxUploadId)).assetId;
+      } catch (error) {
+        if (!(error instanceof VideoProviderError && (error.code === "not_found" || error.code === "invalid_request"))) {
+          await markFailed("provider_read", providerFields(error));
+          return fail("delete_failed", isRetryableProviderError(error) || !(error instanceof VideoProviderError));
+        }
+        assetId = null;
+      }
+    }
+
+    if (assetId) {
+      try {
+        await mux.deleteAsset(assetId);
+      } catch (error) {
+        if (!(error instanceof VideoProviderError && error.code === "not_found")) {
+          await markFailed("provider_delete", providerFields(error));
+          return fail("delete_failed", isRetryableProviderError(error) || !(error instanceof VideoProviderError));
+        }
+      }
+    }
+
+    try {
+      if (!(await repository.deleteIfDeleting(videoId))) {
+        const current = await repository.findById(videoId);
+        if (current) {
+          await markFailed("row_changed");
+          return fail("delete_failed", true);
+        }
+      }
+    } catch {
+      await markFailed("row_delete");
+      return fail("delete_failed", true);
+    }
+    return { ok: true };
+  }
+
+  return { createUploadSession, cancelUploadSession, handleMuxWebhook, issuePlaybackToken, deleteVideo };
 }

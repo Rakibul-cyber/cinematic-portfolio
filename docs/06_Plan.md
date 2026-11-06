@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.3.5 (P3-11B committed; P3-11C video database adapter and routes recorded, uncommitted) |
+| Version | 1.3.6 (P3-11C committed as `b440dcf`; P3-11D admin video library recorded, uncommitted) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -61,7 +61,8 @@ never marked deployed.**
 | Video foundation helpers (P3-10) | LOCAL ONLY: committed on `feature/video-mvp-foundation` (parent `6b4f75d`); not integrated, pushed, merged, or deployed. |
 | Video provider boundary (P3-11A) | LOCAL ONLY: committed on `feature/video-upload-backend` (parent `e681ffa`) as `18a6f76`; not integrated, pushed, merged, or deployed. |
 | Video services (P3-11B) | LOCAL ONLY: committed as `6868cbe` on `feature/video-upload-backend` (parent `18a6f76`); not integrated, pushed, merged, or deployed. |
-| Video database adapter and routes (P3-11C) | LOCAL ONLY: uncommitted on `feature/video-upload-backend`; migration `20261106120000_add_uploaded_video` NOT APPLIED to any database; not pushed, merged, or deployed. |
+| Video database adapter and routes (P3-11C) | LOCAL ONLY: committed as `b440dcf` on `feature/video-upload-backend` (parent `6868cbe`); migration `20261106120000_add_uploaded_video` NOT APPLIED to any database; not pushed, merged, or deployed. |
+| Admin video library (P3-11D) | LOCAL ONLY: committed on `feature/video-upload-backend` (parent `b440dcf`; hash under P3-11E); uploads disabled until the Mux upload host is confirmed; not pushed, merged, or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -502,7 +503,7 @@ the owner's descriptions to commits.
 - **Security impact:** none until routes exist. **Production impact:** none.
 
 #### P3-11C — Video database adapter and API routes (MH-06, MH-07)
-- **Status:** DONE (automated, offline: mocked Prisma client, in-memory repository, fake Mux); database integration **BLOCKED by P4-03** · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. **Uncommitted** on branch `feature/video-upload-backend` (on top of `6868cbe`, P3-11B); not pushed, merged, or deployed.
+- **Status:** DONE (automated, offline: mocked Prisma client, in-memory repository, fake Mux); database integration **BLOCKED by P4-03** · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed as `b440dcf` on branch `feature/video-upload-backend` (parent `6868cbe`, P3-11B); not pushed, merged, or deployed. The migration file's trailing blank line was removed before the commit (content unchanged; never applied).
 - **Depends on:** P3-11B · **Blocks:** P3-11D, the admin video UI, and any release containing these routes (the migration must be applied first)
 - **Files (new):** `prisma/migrations/20261106120000_add_uploaded_video/migration.sql`;
   `src/server/video/prisma-repository.ts`, `rate-limit.ts`, `runtime.ts`,
@@ -564,6 +565,84 @@ the owner's descriptions to commits.
 - **Security impact:** new authenticated and public endpoints, inert until all
   five `MUX_*` variables are configured. **Production impact:** none until
   released; releasing requires the migration first.
+
+#### P3-11D — Admin video library: upload, preview, cancel, and delete (MH-03, MH-06, MH-07)
+- **Status:** DONE (automated, offline: in-memory repository, fake Mux, fake UpChunk and hls.js, jsdom); real browsers, real Mux, and database integration UNVERIFIED (MH-02D trial; **P4-03 BLOCKED**) · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed on `feature/video-upload-backend` (parent `b440dcf`, P3-11C; the hash is recorded under P3-11E); not pushed, merged, or deployed.
+- **Pre-commit review (P3-11E Part A, 2026-11-06):** retrying deletion after a provider 404 is safe: the asset ID stays on the row until the row is removed, so a retry calls the provider again and its 404 counts as already deleted (the test now asserts both provider calls). Residual risk: a 404 caused by credentials for the wrong Mux environment would also count as deleted and leave the asset at Mux (signed playback only, so not viewable). Re-run: `npm test` 763 tests, 761 passed, 0 failed, 2 skipped; render 288 passed; typecheck, lint, `git diff --check` clean; `npm run test:bundle` PASSED first time (56/56, 32/32, 0 network attempts; Node 22 PENDING).
+- **Depends on:** P3-11C (done) · **Blocks:** project assignment of videos and public video on project pages (not started; no task yet)
+- **Dependencies added (owner-authorized in the task):** `@mux/upchunk` 3.5.0 and `hls.js` 1.7.4, pinned exactly. Reviewed: licences MIT and Apache-2.0; UpChunk pulls `xhr` (`global` → `min-document`, `process`; `once`; `parse-headers`) and `event-target-shim`, all MIT; hls.js has no runtime dependencies; `npm audit` reports no advisory for any of them. Both load on demand only (upload start, Play).
+- **Files (new):** `src/app/(admin)/admin/videos/page.tsx`, `video-library.tsx`, `video-library.render-test.ts`;
+  `src/app/api/videos/[id]/route.ts` (`DELETE`); `src/components/video/hls-player.tsx`;
+  `src/lib/video-csp.ts`, `video-library.ts`, `video-upload.ts` and their tests;
+  `src/server/video/admin-library.ts`, `admin-library.test.ts`, `delete.test.ts`, `prisma-repository-delete.test.ts`.
+- **Files (changed):** `src/server/video/repository.ts`, `in-memory-repository.ts`,
+  `prisma-repository.ts` (`listForAdmin`, `beginDeletion`, `deleteIfDeleting`;
+  `lockVideoRowSql` also selects `updatedAt`); `service.ts` (`deleteVideo`;
+  admin preview limited to ADMIN/SUPER_ADMIN); `http.ts` (`handleDeleteVideo`;
+  EDITOR preview 403); `rate-limit.ts` (`delete` 30/10 min); `route-deps.ts`
+  (`loadAdminVideoLibrary`); `src/server/audit/audit-log.ts` (`video.deleted`,
+  `video.delete_failed`); `src/lib/security-headers.ts` and `next.config.ts`
+  (policy for `/admin/videos` only); `src/components/admin/admin-links.ts`
+  (Videos link, ADMIN only); `service.test.ts` and `http.test.ts` (preview rule,
+  new cases); `.env.example` (`VIDEO_UPLOAD_ORIGIN`, `VIDEO_PLAYBACK_ORIGINS`,
+  empty); `package.json`, `package-lock.json`; 02_AppFlow, 03_UI_Spec, 04_TRD,
+  05_Schema.
+- **Schema:** unchanged. Safe deletion needed only repository changes (row
+  lock + assignment count + DELETING claim in one transaction; conditional row
+  delete), described in [05_Schema.md](05_Schema.md) §8.
+- **Behaviour:** see [02_AppFlow.md](02_AppFlow.md) SCR-ADM-07V and
+  [04_TRD.md](04_TRD.md) §5.1. Deletion order: claim DELETING → delete the Mux
+  asset (found through the upload when no asset ID is stored; already gone
+  counts as deleted) → remove the row. Any failure after the claim leaves
+  DELETE_FAILED (Retry delete); a stale DELETING claim (5 min) may be retried.
+  Webhooks never change DELETING or DELETE_FAILED; playback refuses them.
+- **Behaviour change to P3-11C:** admin preview (`GET /api/videos/[id]/playback`
+  without `projectId`) now requires ADMIN or SUPER_ADMIN; an EDITOR gets 403.
+  Two P3-11B/C tests were updated to the new rule and assert the refusal.
+- **CSP:** the global policy is byte-for-byte unchanged (tested against a fixed
+  baseline). `/admin/videos` alone adds `https://stream.mux.com` and
+  `VIDEO_PLAYBACK_ORIGINS` to `connect-src` and `media-src` (plus `blob:` for
+  Media Source Extensions) and `VIDEO_UPLOAD_ORIGIN` to `connect-src`; no
+  wildcard, no `worker-src` (hls.js runs without a worker). The Mux CSP guide
+  URL returned 404 and the direct-upload guide names no host, so the upload and
+  segment hosts are **UNVERIFIED**: uploads stay disabled until
+  `VIDEO_UPLOAD_ORIGIN` is set, and the browser refuses an upload URL on any
+  other origin.
+- **Tests:** video and video-UI tests 221 passed in `src/server/video` and
+  `src/lib/video*` (new or extended: `delete` 17, `http` 30 (+8),
+  `prisma-repository-delete` 7, `service` 36 (+1), `video-library` 6,
+  `video-upload` 12, `video-csp` 8, `admin-library` 7) and render
+  `video-library.render-test.ts` 18. Mutation checks: skipping the delete
+  confirmation failed 1 render test; removing the assigned-video refusal failed
+  2 deletion tests. `npm test`: 763 tests, 761 passed, 0 failed, 2 skipped;
+  render 288 passed; typecheck and lint clean; `git diff --check` clean;
+  `npm run test:bundle` (Node.js 24.13.0): first run FAILED 55 of 56 in the
+  bundle suite (SD-13E "six failed attempts, then refuses the seventh"); it
+  finished at about 17:45:00, a 15-minute window boundary, and the test's fake
+  bucket counter keys on the real clock's window start, so the seventh attempt
+  fell into a new window (pre-existing timing flake, no auth or limiter file
+  changed; recorded as a defect candidate for the test, not fixed here).
+  Immediate re-run PASSED: 56 and 32 passed, 0 skipped, 0 network attempts.
+  The compiled output contains `/api/videos/[id]/route` and the
+  `/admin/videos` page; `routes-manifest.json` holds the global policy for
+  `/:path*` unchanged and the widened policy for `/admin/videos` after it; no
+  client chunk names a `MUX_` variable. Node.js 22 run PENDING. No database,
+  no Mux, no real upload.
+- **Remaining before the client can use it:** (1) apply the P3-11C migration
+  (P4-03, then production with authorization); (2) provider trial MH-02D:
+  confirm the direct-upload host and segment hosts, set `VIDEO_UPLOAD_ORIGIN`
+  and, if needed, `VIDEO_PLAYBACK_ORIGINS` (build-time), confirm that the later
+  header entry replaces the global CSP on a deploy preview, and check event
+  types and token expiry mid-playback; (3) configure the five `MUX_*`
+  variables and the Mux webhook to `/api/webhooks/mux`; (4) real-browser checks
+  (Chrome, Firefox, Safari, iOS Safari: chunked upload of a multi-GB file,
+  cancel, resume after a network drop, preview); (5) owner review, commit,
+  merge, and release. Not built here: assigning videos to projects and public
+  video on project pages (the player supports `projectId`, and the route
+  already refuses draft projects).
+- **Security impact:** one new authenticated destructive endpoint behind the
+  same gate as uploads; an admin page; a wider CSP on that page only.
+  **Production impact:** none until released; inert without `MUX_*`.
 
 ## Phase 4 — Edge cases and testing
 

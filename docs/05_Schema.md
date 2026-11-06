@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/05_Schema.md` |
-| Version | 1.2.0 (P3-11C video tables recorded; migration not applied) |
+| Version | 1.2.1 (P3-11C committed as `b440dcf`; P3-11D deletion locking recorded; no schema change; migration not applied) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -739,6 +739,18 @@ project cascades to its assignments, while a video cannot be deleted while
 assigned (`RESTRICT`). Authorization stays in the application: the two-upload
 limit uses a transaction-scoped advisory lock per uploader, and state changes
 are conditional updates on the expected status (`src/server/video/prisma-repository.ts`).
+
+**P3-11D deletion (LOCAL ONLY, no schema change).** Permanent deletion claims
+the row in one transaction: `SELECT … FOR UPDATE` on the video, count its
+`project_video` rows, refuse an assigned video or an active upload, then set
+`DELETING`. The Mux asset is deleted next; the row is removed only by
+`DELETE … WHERE id AND status = 'DELETING'`, and the `RESTRICT` key refuses it
+if an assignment exists. Any failure after the claim leaves `DELETE_FAILED`
+(retryable); a `DELETING` row untouched for 5 minutes is treated as an
+interrupted attempt and may be claimed again. **Requirement on the future
+assignment feature:** it must assign only READY videos, checked under a lock on
+the video row, so a `DELETING` video can never gain a project. UNVERIFIED
+against PostgreSQL until P4-03.
 
 ## 9. Schema gaps
 

@@ -18,6 +18,8 @@ export const VIDEO_RATE_LIMITS = {
   upload: { scope: "video:upload", windowMs: 60 * 60_000, limit: 10 },
   /** Cancelling uploads, per administrator. */
   cancel: { scope: "video:cancel", windowMs: 10 * 60_000, limit: 30 },
+  /** Permanent deletions and their retries, per administrator (P3-11D). */
+  delete: { scope: "video:delete", windowMs: 10 * 60_000, limit: 30 },
   /** Admin preview tokens, per administrator. */
   playbackAdmin: { scope: "video:playback-admin", windowMs: 10 * 60_000, limit: 120 },
   /** Public playback tokens, per client (Netlify client address or the shared unknown bucket). */

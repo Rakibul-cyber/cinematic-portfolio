@@ -1,7 +1,15 @@
 import "server-only";
 
-import type { VideoPatch, VideoProjectAssignment, VideoRecord, VideoRepository } from "@/server/video/repository";
+import { deletionEligibility } from "@/lib/video-eligibility";
 import type { VideoStatus } from "@/lib/video-status";
+import type {
+  AdminVideoListItem,
+  BeginDeletionResult,
+  VideoPatch,
+  VideoProjectAssignment,
+  VideoRecord,
+  VideoRepository,
+} from "@/server/video/repository";
 
 /**
  * An in-memory `VideoRepository` for tests and local experiments. Not for
@@ -55,6 +63,36 @@ export class InMemoryVideoRepository implements VideoRepository {
 
   async listProjectAssignments(videoId: string): Promise<VideoProjectAssignment[]> {
     return structuredClone(this.#assignments.get(videoId) ?? []);
+  }
+
+  async listForAdmin(): Promise<AdminVideoListItem[]> {
+    return [...this.#records.values()]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((record) => ({ ...structuredClone(record), assignmentCount: this.#assignments.get(record.id)?.length ?? 0 }));
+  }
+
+  async beginDeletion(id: string, now: Date, staleBefore: Date): Promise<BeginDeletionResult> {
+    const stored = this.#records.get(id);
+    if (!stored) return { outcome: "not_found" };
+    const resumable = stored.status === "DELETING" && stored.updatedAt.getTime() < staleBefore.getTime();
+    if (!resumable) {
+      const eligibility = deletionEligibility(stored, this.#assignments.get(id)?.length ?? 0);
+      if (!eligibility.allowed) return { outcome: "refused", reason: eligibility.reason };
+    } else if ((this.#assignments.get(id)?.length ?? 0) > 0) {
+      return { outcome: "refused", reason: "delete_assigned" };
+    }
+    const updated: VideoRecord = { ...stored, status: "DELETING", updatedAt: new Date(now) };
+    this.#records.set(id, updated);
+    return { outcome: "started", record: structuredClone(updated) };
+  }
+
+  async deleteIfDeleting(id: string): Promise<boolean> {
+    const stored = this.#records.get(id);
+    if (!stored || stored.status !== "DELETING") return false;
+    // Mirrors the RESTRICT foreign key: an assigned video is never removed.
+    if ((this.#assignments.get(id)?.length ?? 0) > 0) throw new Error("Video is still assigned.");
+    this.#records.delete(id);
+    return true;
   }
 
   // ---------------------------------------------------------------- test setup

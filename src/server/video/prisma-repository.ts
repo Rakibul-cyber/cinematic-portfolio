@@ -4,8 +4,16 @@ import { createHash } from "node:crypto";
 
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { toVideoFailureCode } from "@/lib/video-messages";
+import { deletionEligibility } from "@/lib/video-eligibility";
 import { isVideoStatus, type VideoStatus } from "@/lib/video-status";
-import type { VideoPatch, VideoProjectAssignment, VideoRecord, VideoRepository } from "@/server/video/repository";
+import type {
+  AdminVideoListItem,
+  BeginDeletionResult,
+  VideoPatch,
+  VideoProjectAssignment,
+  VideoRecord,
+  VideoRepository,
+} from "@/server/video/repository";
 
 /**
  * PostgreSQL implementation of `VideoRepository` (P3-11C).
@@ -25,11 +33,15 @@ import type { VideoPatch, VideoProjectAssignment, VideoRecord, VideoRepository }
  *    `UPDATE ... WHERE id = $1 AND status = $2`: a stale webhook whose expected
  *    status no longer matches changes nothing and gets `null` back.
  *
- * Deletion and assignment (P3-11D) must coordinate through
- * `lockVideoRowSql` inside their own transaction: lock the video row, check
- * its status and assignments, then act. Row locks also make `updateIfStatus`
- * wait, and the `project_video → video` foreign key is `RESTRICT`, so an
- * assigned video cannot be deleted even by a buggy caller.
+ 3. Deletion (P3-11D). `beginDeletion` locks the video row (`FOR UPDATE`),
+ *    counts its assignments, and moves it to DELETING in one transaction. The
+ *    row lock makes a concurrent `updateIfStatus` or assignment insert (whose
+ *    foreign-key check takes `FOR KEY SHARE` on the video row) wait until the
+ *    claim commits. A future assignment feature must refuse any video that is
+ *    not READY, under the same row lock, so a DELETING video cannot gain a
+ *    project. `deleteIfDeleting` removes the row only while it is DELETING,
+ *    and the `project_video → video` foreign key is `RESTRICT`, so an assigned
+ *    video can never be removed, even by a buggy caller.
  *
  * UNVERIFIED: none of this has run against PostgreSQL yet; database-backed
  * tests are BLOCKED by P4-03. The unit tests check the statements and their
@@ -37,7 +49,7 @@ import type { VideoPatch, VideoProjectAssignment, VideoRecord, VideoRepository }
  */
 
 export type VideoPrismaClient = Pick<PrismaClient, "$transaction" | "video" | "projectVideo">;
-type TransactionClient = Pick<Prisma.TransactionClient, "$queryRaw" | "video">;
+type TransactionClient = Pick<Prisma.TransactionClient, "$queryRaw" | "video" | "projectVideo">;
 
 const ADVISORY_LOCK_NAMESPACE = "munir-visuals:video-upload:";
 
@@ -50,10 +62,12 @@ export function uploaderLockSql(uploaderId: string): Prisma.Sql {
   return Prisma.sql`SELECT 1 AS "locked" FROM pg_advisory_xact_lock(${uploaderLockKey(uploaderId)})`;
 }
 
-/** For P3-11D: locks one video row for the rest of the caller's transaction. */
+/** Locks one video row for the rest of the caller's transaction (deletion, P3-11D). */
 export function lockVideoRowSql(videoId: string): Prisma.Sql {
-  return Prisma.sql`SELECT "id", "status" FROM "video" WHERE "id" = ${videoId} FOR UPDATE`;
+  return Prisma.sql`SELECT "id", "status", "updatedAt" FROM "video" WHERE "id" = ${videoId} FOR UPDATE`;
 }
+
+type LockedVideoRow = { id: string; status: string; updatedAt: Date };
 
 const activeUploadsWhere = (uploaderId: string, now: Date) =>
   ({ uploaderId, status: "UPLOAD_PENDING", uploadExpiresAt: { gt: now } }) as const;
@@ -188,5 +202,39 @@ export class PrismaVideoRepository implements VideoRepository {
       orderBy: { projectId: "asc" },
     });
     return rows.map((row) => ({ projectId: row.projectId, projectStatus: row.project.status, categoryActive: row.project.category.isActive }));
+  }
+
+  async listForAdmin(): Promise<AdminVideoListItem[]> {
+    const rows = await this.client.video.findMany({
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      include: { _count: { select: { projects: true } } },
+    });
+    return rows.map(({ _count, ...row }) => ({ ...toVideoRecord(row), assignmentCount: _count.projects }));
+  }
+
+  async beginDeletion(id: string, now: Date, staleBefore: Date): Promise<BeginDeletionResult> {
+    return this.client.$transaction(async (tx: TransactionClient) => {
+      const locked = await tx.$queryRaw<LockedVideoRow[]>(lockVideoRowSql(id));
+      const row = locked[0];
+      if (!row) return { outcome: "not_found" } as const;
+      if (!isVideoStatus(row.status)) throw new Error("Stored video has an unknown status.");
+      const assignmentCount = await tx.projectVideo.count({ where: { videoId: id } });
+      const resumable = row.status === "DELETING" && new Date(row.updatedAt).getTime() < staleBefore.getTime();
+      if (resumable) {
+        if (assignmentCount > 0) return { outcome: "refused", reason: "delete_assigned" } as const;
+      } else {
+        const eligibility = deletionEligibility({ status: row.status }, assignmentCount);
+        if (!eligibility.allowed) return { outcome: "refused", reason: eligibility.reason } as const;
+      }
+      const updated = await tx.video.update({ where: { id }, data: { status: "DELETING", updatedAt: now } });
+      return { outcome: "started", record: toVideoRecord(updated) } as const;
+    });
+  }
+
+  async deleteIfDeleting(id: string): Promise<boolean> {
+    // DELETE ... WHERE "id" = $1 AND "status" = 'DELETING'. A remaining
+    // assignment makes the RESTRICT foreign key fail the statement.
+    const result = await this.client.video.deleteMany({ where: { id, status: "DELETING" } });
+    return result.count === 1;
   }
 }

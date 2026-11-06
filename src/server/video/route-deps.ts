@@ -4,6 +4,7 @@ import { recordAuditLog } from "@/server/audit/audit-log";
 import { getCurrentUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
 import { incrementBuckets, pruneExpiredBucketsSql, rateLimitHmacKey } from "@/server/security/rate-limit-buckets";
+import { buildAdminVideoLibrary, type AdminVideoLibrary } from "@/server/video/admin-library";
 import type { VideoRouteDependencies } from "@/server/video/http";
 import { PrismaVideoRepository } from "@/server/video/prisma-repository";
 import { consumeVideoRateLimit } from "@/server/video/rate-limit";
@@ -45,4 +46,9 @@ export function videoRouteDependencies(): VideoRouteDependencies {
       }),
     audit: recordAuditLog,
   };
+}
+
+/** The admin video library page's data (P3-11D); the page has already required ADMIN. */
+export function loadAdminVideoLibrary(): Promise<AdminVideoLibrary> {
+  return buildAdminVideoLibrary({ repository: new PrismaVideoRepository(prisma), videoConfigured: runtime() !== null, env: process.env });
 }

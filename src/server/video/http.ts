@@ -198,6 +198,41 @@ export async function handleCancelUpload(request: Request, videoId: string, deps
   return json({ status: result.status }, 200);
 }
 
+// ------------------------------------------------------------------ DELETE /api/videos/[id]
+
+/**
+ * Permanent deletion (P3-11D): same gate as uploads (origin, session,
+ * ADMIN/SUPER_ADMIN, configuration, rate limit). Refusals carry the reason
+ * code so the library can explain them; a provider or database failure leaves
+ * the video DELETE_FAILED and answers 502/503 so the admin can retry.
+ */
+export async function handleDeleteVideo(request: Request, videoId: string, deps: VideoRouteDependencies): Promise<Response> {
+  const gate = await adminWriteGate(request, deps, "delete");
+  if (!gate.ok) return gate.response;
+  if (!UUID.test(videoId)) return error("not_found", 404);
+
+  const { user, runtime } = gate;
+  const result = await runtime.service.deleteVideo({ id: user.id, role: user.role }, videoId);
+  const auditBase = { entityType: AuditEntityType.Video, entityId: videoId, actorUserId: user.id, actorEmail: user.email };
+  if (!result.ok) {
+    switch (result.error) {
+      case "forbidden":
+        return error("forbidden", 403);
+      case "not_found":
+        return error("not_found", 404);
+      case "delete_assigned":
+      case "delete_upload_in_progress":
+      case "delete_in_progress":
+        return error(result.error, 409);
+      default:
+        await deps.audit({ ...auditBase, action: AuditAction.VideoDeleteFailed, metadata: { retryable: result.retryable } });
+        return error("delete_failed", result.retryable ? 503 : 502);
+    }
+  }
+  await deps.audit({ ...auditBase, action: AuditAction.VideoDeleted, metadata: { source: "admin" } });
+  return json({ deleted: true }, 200);
+}
+
 // ------------------------------------------------------------------ POST /api/webhooks/mux
 
 export async function handleMuxWebhookRequest(request: Request, deps: Pick<VideoRouteDependencies, "runtime">): Promise<Response> {
@@ -225,7 +260,8 @@ export async function handleMuxWebhookRequest(request: Request, deps: Pick<Video
  * assigned to that project, which must be PUBLISHED in an active category.
  * A session does not widen public access. Every public refusal is the same 404.
  *
- * Without `projectId` it is an admin preview and needs a session.
+ * Without `projectId` it is an admin preview and needs an ADMIN or
+ * SUPER_ADMIN session.
  */
 export async function handlePlayback(request: Request, videoId: string, deps: VideoRouteDependencies): Promise<Response> {
   const runtime = deps.runtime();
@@ -244,6 +280,8 @@ export async function handlePlayback(request: Request, videoId: string, deps: Vi
 
   const user = await deps.getUser();
   if (!user) return error("unauthenticated", 401);
+  // Preview belongs to the video library, which is ADMIN/SUPER_ADMIN only (P3-11D).
+  if (!isAdministrative(user.role)) return error("forbidden", 403);
   if (!runtime) return error("not_configured", 503);
   if (!UUID.test(videoId)) return error("not_found", 404);
   const decision = await deps.rateLimit("playbackAdmin", `user:${user.id}`);
