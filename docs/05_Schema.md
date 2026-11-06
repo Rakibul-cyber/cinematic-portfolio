@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/05_Schema.md` |
-| Version | 1.1.1 (DEF-01 commit recorded) |
-| Last reviewed | 2026-11-03 |
+| Version | 1.2.0 (P3-11C video tables recorded; migration not applied) |
+| Last reviewed | 2026-11-06 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -720,11 +720,25 @@ down script.
 | 5 | `20260908190000_add_inquiry_crm` | 2026-09-08 | `InquiryStatus`; `customer`, `inquiry`, `inquiry_status_history`, `customer_note` | 1 (`user`), 3 (`service`) |
 | 6 | `20260910224253_add_email_delivery` | 2026-09-10 | `EmailDeliveryType`, `EmailDeliveryStatus`; `email_delivery` | 5 (`inquiry`) |
 | 7 | `20260912090000_add_security_privacy` | 2026-09-12 | `rate_limit_bucket`; `anonymizedAt` on `customer` and `inquiry` | 5 |
+| 8 | `20261106120000_add_uploaded_video` (P3-11C, LOCAL ONLY, **NOT APPLIED** anywhere; database testing BLOCKED by P4-03) | 2026-11-06 | `VideoStatus`; `video`, `project_video` | 1 (`user`), 3 (`project`) |
 
 **Compatibility.** Every application commit from `288fde6` (published) to
 `4f7f564` uses this same schema. Publishing any of them needs no migration. The
 login limiter (`10f09b4`) reuses `rate_limit_bucket` with new scopes rather
 than adding a table (ADR 0011).
+
+**P3-11C video tables (LOCAL ONLY, not applied).** `video` holds one Mux direct
+upload: title, original file name, `declaredSizeBytes` (`BIGINT`; the browser's
+declaration, not proof of bytes received), `status` (`VideoStatus`, seven
+values, forward-only), `uploaderId` (→ `user`, `RESTRICT`), unique
+`muxUploadId`, `muxAssetId`, and signed `playbackId`, display metadata, a
+`failureCode` that is always a known code, and `uploadExpiresAt`. The signed
+upload URL is never stored. `project_video` (`projectId`, `videoId`,
+`sortOrder`; key `(projectId, videoId)`) assigns videos to projects: deleting a
+project cascades to its assignments, while a video cannot be deleted while
+assigned (`RESTRICT`). Authorization stays in the application: the two-upload
+limit uses a transaction-scoped advisory lock per uploader, and state changes
+are conditional updates on the expected status (`src/server/video/prisma-repository.ts`).
 
 ## 9. Schema gaps
 

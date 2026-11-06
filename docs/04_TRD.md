@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/04_TRD.md` |
-| Version | 1.3.0 (RR-02 bundle verification and RR-03 offline bundle tests recorded) |
+| Version | 1.4.0 (P3-11C video routes, `MUX_*` variables, and the unapplied video migration recorded) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -314,8 +314,9 @@ docs/                   This Context Architecture, earlier docs, ADRs.
 
 ## 4. Environment variables
 
-Names only. Values are never written in documentation. `.env.example` (29
-names, empty values) is the committed contract.
+Names only. Values are never written in documentation. `.env.example` (the 29
+names counted before P3-11C plus the five `MUX_*` names, empty values) is the
+committed contract.
 
 | Group | Variables | Required |
 | --- | --- | --- |
@@ -326,6 +327,7 @@ names, empty values) is the committed contract.
 | Rate limiting | `RATE_LIMIT_HMAC_SECRET` (≥ 32 chars) | Every non-development environment. Without it, sign-in (LOCAL ONLY) and inquiries refuse. |
 | Media | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_BASE_URL` | Admin uploads; public delivery needs only `R2_PUBLIC_BASE_URL` |
 | Email | `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`, `EMAIL_ADMIN_RECIPIENTS` | Optional; without them deliveries are `SKIPPED` |
+| Video (P3-11C, LOCAL ONLY) | `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`, `MUX_WEBHOOK_SECRET`, `MUX_SIGNING_KEY_ID`, `MUX_SIGNING_PRIVATE_KEY` (server-only) | Optional. All five valid plus a valid `BETTER_AUTH_URL` enable uploaded video; none set disables it; a partial or malformed set fails closed (routes answer 503, names-only log). |
 | Turnstile | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAME` | Production inquiry intake |
 | Analytics | `UMAMI_WEBSITE_ID`, `NEXT_PUBLIC_UMAMI_WEBSITE_ID`, `NEXT_PUBLIC_UMAMI_SCRIPT_URL` | Optional |
 | Monitoring | `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT`, `NEXT_PUBLIC_SENTRY_RELEASE`, `SENTRY_ORG`, `SENTRY_PROJECT`; `SENTRY_AUTH_TOKEN` (Netlify or CI only, documented in a comment) | Optional |
@@ -342,6 +344,10 @@ re-checks the session on the server. "Audit" lists `audit_log.action` values.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `/api/auth/[...all]` | Better Auth routes (`sign-in/email`, `sign-out`, `get-session`, and others) | JSON | JSON and `Set-Cookie` | Public. Sign-up disabled (`disableSignUp`). Origin must be `BETTER_AUTH_URL`. | Better Auth; guard normalizes email | Login guard on `/sign-in/email`: account 6/15 min, client 20/15 min (LOCAL ONLY). Better Auth's in-memory limiter, 3/10 s per address. | session rows, rate buckets, audit `admin.sign_in_throttled` | 401 generic; 429 + `Retry-After`; 503 when the limiter is unavailable |
 | `/api/media` | `POST` | multipart `file`, `altText` (≤ 500) | 201 `{ id }` | Session (any role) | Content-Length ≤ 15 MB + 64 KB; Sharp content check; ≤ 12,000 px | none | R2 objects, `media`, `media_variant`, audit `media.uploaded` | 401, 413, 400 with message, 500 generic; partial uploads cleaned up |
+| `/api/videos/uploads` (P3-11C, LOCAL ONLY) | `POST` | JSON `{ title, filename, fileSizeBytes }`, ≤ 4 KB | 201 `{ videoId, uploadUrl, expiresAt }`, `private, no-store` | `Origin` = `BETTER_AUTH_URL` and `Sec-Fetch-Site` same-origin; session; ADMIN | title 1–160; file name mp4/mov/m4v/mkv/webm, no path; declared size 1 B–10 GiB (not proof of bytes received); two active uploads per user (DB-atomic) | 10/h per user | Mux direct upload (signed playback), `video` row before the URL is returned; audit `video.upload_started` | 401, 403, 415, 413, 400 with code; 409 `too_many_uploads`; 429; 503 not configured or limiter unavailable; 502/503 provider; provider upload cancelled if persistence fails |
+| `/api/videos/uploads/[id]/cancel` (P3-11C, LOCAL ONLY) | `POST` | `id` (uuid) | 200 `{ status: "CANCELLED" }` | as above; ADMIN | uuid | 30/10 min per user | Mux cancel, conditional update; audit `video.upload_cancelled` (first time only) | idempotent; 404; 409 once processing; 503 |
+| `/api/webhooks/mux` (P3-11C, LOCAL ONLY) | `POST` | raw body ≤ 1 MiB, `mux-signature` | `{ ok }` | HMAC-SHA256 over the exact raw bytes, 300 s tolerance | payload used for type and IDs only; state re-read from Mux; asset `passthrough` and `upload_id` must match | none (signed) | forward-only conditional updates; orphan asset of a cancelled upload deleted; audit `video.ready`, `video.processing_failed`, `video.upload_cancelled` | 401 forged; 413; 200 for duplicate, late, unknown, or unowned events; 503 (redelivered) for provider, database, conflict, or missing configuration |
+| `/api/videos/[id]/playback` (P3-11C, LOCAL ONLY) | `GET` | `id`; optional `projectId` | 200 `{ url, expiresAt }` (HTTPS `stream.mux.com`, RS256 token, 15 min), `private, no-store` | With `projectId`: public, video READY and assigned to that project, PUBLISHED with an active category; a session does not widen this. Without: session (any role) preview. | uuids | public 60/10 min per client; admin 120/10 min per user | none | public refusals are one identical 404; admin 409 not ready; 401; 429; 503 |
 | `/admin/inquiries/export` | `GET` | none | `text/csv`, `private, no-store` | ADMIN | — | none | audit `crm.exported` | 403 `Forbidden` (`text/plain`) |
 | `/admin/customers/[id]/export` | `GET` | `id` | JSON attachment `customer-<id>.json`, `private, no-store` | SUPER_ADMIN | — | none | audit `privacy.customer_exported` | 403 `Forbidden` |
 | `/sitemap.xml`, `/robots.txt`, `/opengraph-image` | `GET` | none | XML, text, image | Public | — | none | none | Empty sitemap and no sitemap line when no origin is configured |
@@ -379,6 +385,7 @@ re-checks the session on the server. "Audit" lists `audit_log.action` values.
 | Sentry | Optional errors | `src/instrumentation*.ts`, `src/lib/monitoring/*` | `NEXT_PUBLIC_SENTRY_*`, `SENTRY_*` | Code IMPLEMENTED; account UNVERIFIED; server initialization fixed locally (DEF-02) |
 | Umami | Optional cookieless analytics | `src/components/analytics/umami-analytics.tsx` | `UMAMI_*` | Code IMPLEMENTED; account UNVERIFIED |
 | YouTube-nocookie, Vimeo | Click-to-load embeds | `src/lib/video.ts` | none | IMPLEMENTED |
+| Mux Video | Uploaded video: direct uploads, signed HLS playback, webhooks | `src/server/video/*` (`mux-client.ts` is the only provider boundary) | `MUX_*` | Code LOCAL ONLY (P3-11A–C); never contacted; account and trial UNVERIFIED (MH-02D) |
 
 ## 7. Security
 
@@ -446,6 +453,13 @@ uses it (§1.3). A compile-only build is not a releasable artifact.
 production it requires `--allow-production` plus a typed endpoint confirmation.
 All 7 migrations are additive, and no migration exists after `20260912090000`,
 so commits `288fde6`…`4f7f564` need no schema change.
+
+P3-11C adds an eighth migration, `20261106120000_add_uploaded_video` (enum
+`VideoStatus`, tables `video` and `project_video`; additive only), on
+`feature/video-upload-backend` (LOCAL ONLY). It was generated offline with
+`prisma migrate diff --from-schema --to-schema` and has **not been applied to
+any database**; applying and testing it on a disposable database is BLOCKED by
+P4-03. It must be deployed before any build that includes the video routes.
 
 ### 8.5 Configuration prerequisites for the next release
 

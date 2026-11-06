@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.3.4 (P3-11A and P3-11B video provider boundary and services recorded) |
+| Version | 1.3.5 (P3-11B committed; P3-11C video database adapter and routes recorded, uncommitted) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -60,7 +60,8 @@ never marked deployed.**
 | Photo upload resize (P3-09) | LOCAL ONLY: `6b4f75d` on `feature/media-upload-resize`; not pushed, merged, or deployed. Real-browser checks PENDING. |
 | Video foundation helpers (P3-10) | LOCAL ONLY: committed on `feature/video-mvp-foundation` (parent `6b4f75d`); not integrated, pushed, merged, or deployed. |
 | Video provider boundary (P3-11A) | LOCAL ONLY: committed on `feature/video-upload-backend` (parent `e681ffa`) as `18a6f76`; not integrated, pushed, merged, or deployed. |
-| Video services (P3-11B) | LOCAL ONLY: committed on `feature/video-upload-backend` (parent `18a6f76`); not integrated, pushed, merged, or deployed. |
+| Video services (P3-11B) | LOCAL ONLY: committed as `6868cbe` on `feature/video-upload-backend` (parent `18a6f76`); not integrated, pushed, merged, or deployed. |
+| Video database adapter and routes (P3-11C) | LOCAL ONLY: uncommitted on `feature/video-upload-backend`; migration `20261106120000_add_uploaded_video` NOT APPLIED to any database; not pushed, merged, or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -456,7 +457,7 @@ the owner's descriptions to commits.
 - **Security impact:** none until integrated (no route uses it). **Production impact:** none.
 
 #### P3-11B — Video upload, cancellation, webhook, and playback services (MH-06)
-- **Status:** DONE (unit level, mocked provider, in-memory repository); not integrated · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed on branch `feature/video-upload-backend` (parent `18a6f76`, P3-11A); not pushed, merged, or deployed.
+- **Status:** DONE (unit level, mocked provider, in-memory repository); not integrated · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed as `6868cbe` on branch `feature/video-upload-backend` (parent `18a6f76`, P3-11A); not pushed, merged, or deployed.
 - **Depends on:** P3-10, P3-11A · **Requirements:** future video requirements (MH-03)
 - **Files (all new, server-only):** `src/server/video/repository.ts`
   (`VideoRecord`, `VideoRepository` interface), `src/server/video/in-memory-repository.ts`
@@ -497,10 +498,72 @@ the owner's descriptions to commits.
   trial (MH-02D); the Prisma repository needs the `Video`/`ProjectVideo`
   schema (P4-03 BLOCKED) and must keep the atomic limit and compare-and-set
   guarantees; no routes, rate limiting, audit logging, or admin UI yet.
-- **Next:** P3-11C: route handlers (upload session, cancel, webhook with raw
-  body, playback) using `requireUser`/`requireAdmin`, rate limits, and audit
-  entries; add the `MUX_*` variables to `.env.example` and 04_TRD.
+- **Next:** P3-11C (below).
 - **Security impact:** none until routes exist. **Production impact:** none.
+
+#### P3-11C — Video database adapter and API routes (MH-06, MH-07)
+- **Status:** DONE (automated, offline: mocked Prisma client, in-memory repository, fake Mux); database integration **BLOCKED by P4-03** · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. **Uncommitted** on branch `feature/video-upload-backend` (on top of `6868cbe`, P3-11B); not pushed, merged, or deployed.
+- **Depends on:** P3-11B · **Blocks:** P3-11D, the admin video UI, and any release containing these routes (the migration must be applied first)
+- **Files (new):** `prisma/migrations/20261106120000_add_uploaded_video/migration.sql`;
+  `src/server/video/prisma-repository.ts`, `rate-limit.ts`, `runtime.ts`,
+  `http.ts`, `route-deps.ts`; routes `src/app/api/videos/uploads/route.ts`,
+  `src/app/api/videos/uploads/[id]/cancel/route.ts`,
+  `src/app/api/videos/[id]/playback/route.ts`, `src/app/api/webhooks/mux/route.ts`;
+  tests `http.test.ts`, `prisma-repository.test.ts`, `runtime.test.ts`,
+  `rate-limit.test.ts`, `video-schema.test.ts` (all in `src/server/video/`).
+- **Files (changed):** `prisma/schema.prisma` (enum `VideoStatus`; models
+  `Video`, `ProjectVideo`; relation fields on `User` and `Project`, no column
+  changes); `src/server/video/service.ts` (`onTransition` audit hook);
+  `src/server/video/repository.ts` (`fileSizeBytes` → `declaredSizeBytes`) and
+  `service.test.ts` (same rename); `src/server/audit/audit-log.ts` (actions
+  `video.upload_started`, `video.upload_cancelled`, `video.ready`,
+  `video.processing_failed`; entity `video`); `.env.example` (five `MUX_*`
+  names, empty); [04_TRD.md](04_TRD.md) §4, §5.1, §6, §8.4;
+  [05_Schema.md](05_Schema.md) §8 (minimal, required by the task-update procedure).
+- **Schema:** additive only (one enum, two tables, indexes, three foreign
+  keys); generated offline with `prisma migrate diff --from-schema --to-schema`
+  and a scratch Prisma config that loads no environment file and points at an
+  unreachable placeholder URL. **Not applied; `migrate dev`/`deploy` not run.**
+- **Repository guarantees:** two-active-upload limit enforced in one
+  transaction under `pg_advisory_xact_lock` keyed per uploader (count, then
+  insert); transitions are a single `UPDATE … WHERE id AND status` (stale
+  webhooks change nothing); identity and ownership columns cannot be patched;
+  `lockVideoRowSql` (`SELECT … FOR UPDATE`) and the `project_video → video`
+  `RESTRICT` key prepare deletion and assignment (P3-11D). The in-memory
+  repository's guarantees are unchanged. Implemented by the standard pattern;
+  **UNVERIFIED against PostgreSQL** until P4-03.
+- **Routes:** see [04_TRD.md](04_TRD.md) §5.1. Upload and cancel: exact
+  `Origin` = `BETTER_AUTH_URL` (and same-origin `Sec-Fetch-Site`), session,
+  ADMIN/SUPER_ADMIN, configuration, rate limit, then JSON body ≤ 4 KB.
+  Webhook: exact raw bytes verified before parsing. Playback: public only with
+  `projectId` of a PUBLISHED project in an active category, one identical 404
+  otherwise; admin preview with a session. All responses `private, no-store`.
+  Missing or partial `MUX_*` configuration fails closed (503).
+- **Tests:** video tests 119 passed (new: `http` 22, `prisma-repository` 13,
+  `runtime` 5, `rate-limit` 4, `video-schema` 3). A deliberate mutation
+  (count before lock) failed the two lock tests, so the concurrency test
+  detects that regression. `npm test`: 697 tests, 695 passed, 0 failed, 2
+  skipped; render 270 passed; typecheck and lint clean; `git diff --check`
+  clean; `npm run test:bundle` PASSED (56 and 32 passed, 0 skipped, 0 network
+  attempts; full log captured). Pre-commit re-run (P3-11D Part A, same
+  counts): `npm test` 697 / 695 passed / 0 failed / 2 skipped, render 270
+  passed, typecheck, lint, `git diff --check` clean, `test:bundle` PASSED (56
+  and 32, 0 network attempts). The four compiled route outputs were inspected
+  in a kept bundle workspace: each is `force-dynamic` on the Node.js runtime;
+  the shared handler chunk reads the `MUX_*` names from `process.env` at
+  runtime (no inlined values), keeps the origin and `mux-signature` checks, and
+  sets `private, no-store, max-age=0`. Node.js 22 run PENDING. No database, no Mux.
+- **Blockers and limitations:** P4-03 (apply the migration and run the
+  repository against a disposable database, including concurrent inserts and
+  stale updates); provider trial MH-02D (event types, `errors.type`,
+  `upload_id` on assets, token expiry mid-playback, Netlify delivering raw
+  webhook bytes unchanged); the declared file size is not enforced by Mux;
+  the admin UI must add the Mux upload host to the CSP `connect-src`
+  (UNVERIFIED host); public playback needs the project id from the page;
+  webhook deduplication remains by reconciliation.
+- **Security impact:** new authenticated and public endpoints, inert until all
+  five `MUX_*` variables are configured. **Production impact:** none until
+  released; releasing requires the migration first.
 
 ## Phase 4 — Edge cases and testing
 

@@ -43,6 +43,10 @@ export const AuditAction = {
   EmailDeliveryResultSuperseded: "email.delivery_result_superseded",
   PrivacyCustomerExported: "privacy.customer_exported",
   PrivacyCustomerAnonymized: "privacy.customer_anonymized",
+  VideoUploadStarted: "video.upload_started",
+  VideoUploadCancelled: "video.upload_cancelled",
+  VideoReady: "video.ready",
+  VideoProcessingFailed: "video.processing_failed",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
@@ -63,6 +67,7 @@ export const AuditEntityType = {
   Customer: "customer",
   CustomerNote: "customer_note",
   EmailDelivery: "email_delivery",
+  Video: "video",
 } as const;
 
 export type AuditEntityType =

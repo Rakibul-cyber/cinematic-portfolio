@@ -200,7 +200,7 @@ function seedReady(overrides: Partial<VideoRecord> = {}): VideoRecord {
     id: "11111111-1111-4111-8111-111111111111",
     title: "Brand film",
     originalFilename: "brand.mov",
-    fileSizeBytes: 900_000_000,
+    declaredSizeBytes: 900_000_000,
     status: "READY",
     uploaderId: EDITOR_A.id,
     muxUploadId: "UploadIdSeeded0001",

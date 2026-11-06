@@ -77,6 +77,20 @@ export type VideoServiceDeps = {
   now?: () => Date;
   newId?: () => string;
   logger?: VideoLogger;
+  /**
+   * Told after a webhook moves a video to READY, FAILED, or CANCELLED (for the
+   * audit log). Its failures are swallowed: an audit problem never changes the
+   * webhook's answer.
+   */
+  onTransition?: (event: VideoTransitionEvent) => Promise<void> | void;
+};
+
+export type VideoTransitionEvent = {
+  videoId: string;
+  uploaderId: string;
+  from: VideoStatus;
+  to: "READY" | "FAILED" | "CANCELLED";
+  failureCode: VideoMessageCode | null;
 };
 
 // ------------------------------------------------------------------ results
@@ -188,6 +202,16 @@ export function createVideoService(deps: VideoServiceDeps): VideoService {
   const newId = deps.newId ?? randomUUID;
   const logger = deps.logger ?? silentLogger;
 
+  async function notifyTransition(from: VideoStatus, record: VideoRecord): Promise<void> {
+    if (!deps.onTransition) return;
+    if (record.status !== "READY" && record.status !== "FAILED" && record.status !== "CANCELLED") return;
+    try {
+      await deps.onTransition({ videoId: record.id, uploaderId: record.uploaderId, from, to: record.status, failureCode: record.failureCode });
+    } catch {
+      logger.warn("video.webhook.transition_hook_failed", { videoId: record.id });
+    }
+  }
+
   const providerFields = (error: unknown): VideoLogFields =>
     error instanceof VideoProviderError ? { providerCode: error.code, httpStatus: error.status } : { providerCode: "unexpected" };
 
@@ -235,7 +259,7 @@ export function createVideoService(deps: VideoServiceDeps): VideoService {
       id: videoId,
       title: title.value,
       originalFilename: filename.value,
-      fileSizeBytes: size,
+      declaredSizeBytes: size,
       status: "UPLOAD_PENDING",
       uploaderId: actor.id,
       muxUploadId: upload.id,
@@ -445,10 +469,12 @@ export function createVideoService(deps: VideoServiceDeps): VideoService {
         if (decision === "reject" && next.status === "READY") logger.warn("video.webhook.transition_refused", { videoId: record.id, reason: record.status });
         return { status: 200, outcome: changed ? "updated" : "unchanged" };
       }
-      const updated = await repository.updateIfStatus(record.id, record.status, next.patch, now());
+      const from = record.status;
+      const updated = await repository.updateIfStatus(record.id, from, next.patch, now());
       if (updated) {
         changed = true;
         record = updated;
+        await notifyTransition(from, record);
         if (record.status === target.status) return { status: 200, outcome: "updated" };
         attempt -= 1; // an intermediate step is not a conflict
         continue;

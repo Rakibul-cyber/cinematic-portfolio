@@ -22,7 +22,7 @@ export type VideoRecord = {
   /** The uploader's file name, for display only (base name, validated). */
   originalFilename: string;
   /** The size the uploader declared; the provider does not enforce it (UNVERIFIED). */
-  fileSizeBytes: number;
+  declaredSizeBytes: number;
   status: VideoStatus;
   uploaderId: string;
   muxUploadId: string;
