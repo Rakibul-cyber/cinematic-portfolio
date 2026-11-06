@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.3.1 (P3-09 photo-upload resize recorded) |
+| Version | 1.3.2 (P3-10 video foundation helpers recorded) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -57,7 +57,8 @@ never marked deployed.**
 | DEF-01 media-deletion fix | LOCAL ONLY: commit `379e53b` on `fix/media-delete-admin-only`; not pushed, merged, or deployed |
 | DEF-02 server-Sentry fix | LOCAL ONLY: commit `b517fce` on `fix/sentry-production-initialization`; not pushed, merged, or deployed |
 | Production-bundle verification | Compile-only bundle verified at `b1a579d` (RR-02); offline bundle tests added, uncommitted (RR-03, P4-14). Node.js 22 run PENDING. Full build UNVERIFIED (needs a database, P4-03). |
-| Photo upload resize (P3-09) | LOCAL ONLY: committed on `feature/media-upload-resize` (parent `b84ab11`); not pushed, merged, or deployed. Real-browser checks PENDING. |
+| Photo upload resize (P3-09) | LOCAL ONLY: `6b4f75d` on `feature/media-upload-resize`; not pushed, merged, or deployed. Real-browser checks PENDING. |
+| Video foundation helpers (P3-10) | LOCAL ONLY: committed on `feature/video-mvp-foundation` (parent `6b4f75d`); not integrated, pushed, merged, or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -353,7 +354,7 @@ the owner's descriptions to commits.
 - **Production impact:** opens the legal pages and, through the gate, inquiry intake.
 
 #### P3-09 — Reliable admin photo upload: browser-side resize (MH-03 P0-2)
-- **Status:** DONE (automated verification); real-browser checks PENDING · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed on branch `feature/media-upload-resize` (parent `b84ab11`); not pushed, merged, or deployed.
+- **Status:** DONE (automated verification); real-browser checks PENDING · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed as `6b4f75d` on branch `feature/media-upload-resize` (parent `b84ab11`); not pushed, merged, or deployed.
 - **Depends on:** — (client-side only) · **Requirements:** FR-MED-01
 - **Files:** `src/lib/media-upload.ts` (new), `src/lib/media-upload.test.ts` (new),
   `src/app/(admin)/admin/media/upload-form.tsx`,
@@ -385,6 +386,38 @@ the owner's descriptions to commits.
   images, so the canvas codec is not covered by automated tests.
 - **Security impact:** none; uploads still go through the authenticated route
   and server-side validation. **Production impact:** none until released.
+
+#### P3-10 — Video MVP foundation: provider-independent helpers (MH-06)
+- **Status:** DONE (unit level); not integrated · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed on branch `feature/video-mvp-foundation` (parent `6b4f75d`, P3-09); not pushed, merged, or deployed.
+- **Depends on:** — (pure TypeScript; no Prisma, provider, or Netlify) · **Requirements:** FR-PUB-05; future video requirements (MH-03)
+- **Files:** `src/lib/video-url.ts`, `src/lib/video-status.ts`,
+  `src/lib/video-eligibility.ts`, `src/lib/video-messages.ts`, and one
+  `*.test.ts` per module (all new). `src/lib/video.ts` is unchanged.
+- **Scope:** YouTube and Vimeo link parsing (exact hosts, http(s) only, no
+  credentials or ports, length cap; only provider, ID, and Vimeo hash leave
+  it); the statuses UPLOAD_PENDING, PROCESSING, READY, FAILED, CANCELLED,
+  DELETING, DELETE_FAILED with forward-only transitions (a repeated status is
+  a no-op); title and provider-ID validation; public eligibility (READY and in
+  at least one PUBLISHED project with an active category, mirroring
+  `PUBLISHED_PROJECT_WHERE`); deletion eligibility; plain admin messages that
+  never echo unknown or provider text.
+- **Decisions (owner, MH-07):** a PROCESSING video may be deleted; an active
+  upload (UPLOAD_PENDING) must be cancelled first; FAILED and CANCELLED videos
+  may be deleted; http YouTube/Vimeo links may be parsed but generated playback
+  URLs must use HTTPS; the provider-ID shape (alphanumeric, 10–128) and Vimeo
+  hash shape (alphanumeric, 6–40) stay provisional until the provider trial.
+- **Tests:** 36 passed (`video-url` 10, `video-status` 10, `video-eligibility`
+  10, `video-messages` 6 tests). `npm test`: 578 tests, 576 passed, 0 failed,
+  2 skipped; render 270 passed; typecheck and lint clean; `npm run test:bundle`
+  PASSED (56 and 32 passed, 0 skipped, 0 network attempts; Node.js 22 run PENDING).
+- **Remaining integration dependencies:** provider trial (MH-02D Task 5) to
+  confirm Mux and the provisional ID and hash shapes; owner approval of
+  dependencies (`@mux/upchunk`, `hls.js`); the `Video` and `ProjectVideo`
+  schema and migration, tested on a disposable database (**P4-03 BLOCKED**);
+  reconcile `src/lib/video.ts` (YouTube IDs stored as 6–32 characters vs the
+  parser's 11, and the Vimeo embed does not yet pass the unlisted hash); wire
+  the parser into the project form (MH-03 P0-10).
+- **Security impact:** none until integrated. **Production impact:** none.
 
 ## Phase 4 — Edge cases and testing
 
