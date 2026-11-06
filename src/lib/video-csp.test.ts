@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { securityHeaders, videoAdminSecurityHeaders } from "@/lib/security-headers";
+import { securityHeaders, videoAdminSecurityHeaders, videoPlaybackSecurityHeaders } from "@/lib/security-headers";
 import { VIDEO_PLAYLIST_ORIGIN, parseHttpsOrigin, videoPlaybackOrigins, videoUploadOrigin } from "@/lib/video-csp";
 
 /** Content-Security-Policy for uploaded video (P3-11D). */
@@ -95,5 +95,32 @@ describe("policies", () => {
     const global = config.indexOf('{ source: "/:path*", headers: securityHeaders(process.env) }');
     const video = config.indexOf('{ source: "/admin/videos", headers: videoAdminSecurityHeaders(process.env) }');
     assert.ok(global > -1 && video > global, "later entries win for the same header key");
+  });
+
+  it("gives public project pages playback only, never the upload origin (P3-11E)", () => {
+    const env = { NODE_ENV: "production", VIDEO_UPLOAD_ORIGIN: "https://uploads.example.test", VIDEO_PLAYBACK_ORIGINS: "https://a.example.test" };
+    const headers = videoPlaybackSecurityHeaders(env);
+    assert.deepEqual(headers.map((header) => header.key), ["Content-Security-Policy"]);
+    const policy = csp(headers);
+    assert.equal(
+      directive(policy, "connect-src"),
+      "connect-src 'self' https://challenges.cloudflare.com https://stream.mux.com https://a.example.test",
+    );
+    assert.equal(directive(policy, "media-src"), "media-src 'self' blob: https://stream.mux.com https://a.example.test");
+    assert.equal(policy.includes("uploads.example.test"), false, "visitors never get the upload origin");
+    for (const name of ["default-src", "script-src", "img-src", "frame-src", "object-src", "frame-ancestors", "form-action", "style-src", "font-src"]) {
+      assert.equal(directive(policy, name), directive(BASELINE, name), name);
+    }
+    assert.match(directive(policy, "frame-src"), /youtube-nocookie\.com .*player\.vimeo\.com/, "YouTube and Vimeo embeds unchanged");
+    assert.equal(policy.includes("*"), false, "no wildcard source");
+    assert.equal(policy.includes("worker-src"), false);
+  });
+
+  it("applies the playback policy after the global entry, for /work/:slug only", () => {
+    const config = readFileSync("next.config.ts", "utf8");
+    const global = config.indexOf('{ source: "/:path*", headers: securityHeaders(process.env) }');
+    const work = config.indexOf('{ source: "/work/:slug", headers: videoPlaybackSecurityHeaders(process.env) }');
+    assert.ok(global > -1 && work > global, "later entries win for the same header key");
+    assert.equal(config.match(/source: "\/work/g)?.length, 1, "no other public route is widened");
   });
 });

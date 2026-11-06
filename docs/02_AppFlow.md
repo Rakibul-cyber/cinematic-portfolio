@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/02_AppFlow.md` |
-| Version | 1.2.0 (P3-11D admin video library recorded, LOCAL ONLY, uncommitted) |
+| Version | 1.3.0 (P3-11D committed as `cd79df9`; P3-11E project videos and public Films recorded, LOCAL ONLY, uncommitted) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -131,6 +131,12 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 - **Data:** `getPublishedProjectBySlug(slug)`.
 - **Actions:** gallery viewing; the video play button builds the embed URL from
   provider and ID.
+- **Films (P3-11E, LOCAL ONLY):** READY uploaded videos assigned to the project,
+  in saved order, each behind the click-to-load `HlsPlayer`. The HTML holds only
+  the video and project ids and the title; Play calls
+  `/api/videos/[id]/playback?projectId=`, which re-checks PUBLISHED, active
+  category, and READY on every request. The YouTube/Vimeo "Film" section is
+  unchanged and shown above it.
 - **Error / not found:** a draft project, a project in an inactive category, or
   an unknown slug all call `notFound()` and return the same 404.
 
@@ -211,7 +217,15 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 - **Empty:** "No projects yet."
 - **Success:** a saved notice; public cache tags revalidated.
 - **Side effects:** audit `cms.created`, `cms.updated`, `cms.deleted`,
-  `project.published`, `project.unpublished`.
+  `project.published`, `project.unpublished`, `project.videos_changed`
+  (P3-11E: added, removed, reordered, count).
+- **Videos (P3-11E, LOCAL ONLY):** ADMIN or SUPER_ADMIN see a Videos section
+  (`ProjectVideoPicker`): attached videos in order with Up, Down, Remove, and
+  READY library videos with Add. Remove only drops the assignment. The save
+  locks the submitted video rows and refuses a missing or non-READY video with
+  a message naming it; the whole save (fields, images, videos) rolls back. An
+  EDITOR sees a read-only list; an EDITOR's save never changes assignments,
+  even if video ids are submitted.
 
 #### SCR-ADM-04 — Categories, Services, Testimonials
 

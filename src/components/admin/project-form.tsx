@@ -6,6 +6,8 @@ import {
   inputClass,
 } from "@/components/admin/admin-shell";
 import { ProjectMediaPicker } from "@/components/admin/project-media-picker";
+import { ProjectVideoPicker } from "@/components/admin/project-video-picker";
+import type { ProjectFormVideosView } from "@/lib/cms/project-videos";
 type Category = { id: string; name: string };
 type Media = { id: string; originalName: string; altText: string | null };
 type Project = {
@@ -29,14 +31,21 @@ type Project = {
   updatedAt: Date;
   media: { mediaId: string }[];
 };
+/**
+ * The uploaded-video section (P3-11E): editable for ADMIN and SUPER_ADMIN,
+ * a read-only list for an EDITOR, whose save leaves assignments unchanged.
+ */
+export type ProjectFormVideos = ProjectFormVideosView;
 export function ProjectForm({
   project,
   categories,
   media,
+  videos,
 }: {
   project?: Project;
   categories: Category[];
   media: Media[];
+  videos?: ProjectFormVideos;
 }) {
   const selectedMediaIds = project?.media.map((item) => item.mediaId) ?? [];
   return (
@@ -215,6 +224,31 @@ export function ProjectForm({
         initialMediaIds={selectedMediaIds}
         media={media}
       />
+      {videos?.mode === "manage" ? (
+        <ProjectVideoPicker
+          initialVideoIds={videos.selectedIds}
+          videos={videos.options}
+        />
+      ) : videos?.mode === "readonly" ? (
+        <section className="grid gap-2 border border-border p-4" aria-labelledby="project-videos-readonly">
+          <h2 className="font-semibold" id="project-videos-readonly">Videos</h2>
+          <p className="text-sm text-muted-foreground">
+            An administrator manages the uploaded videos of a project. Saving
+            here keeps them as they are.
+          </p>
+          {videos.titles.length ? (
+            <ol className="grid gap-1 text-sm">
+              {videos.titles.map((title, index) => (
+                <li key={`${index}-${title}`}>
+                  {index + 1}. {title}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm">No videos.</p>
+          )}
+        </section>
+      ) : null}
       <button className={buttonClass}>Save project</button>
     </AdminForm>
   );

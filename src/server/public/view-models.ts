@@ -27,6 +27,20 @@ export type PublicProjectSummary = {
   cover: PublicImage | null;
 };
 
+/**
+ * One uploaded video in a project's Films section (P3-11E). The two ids are
+ * the documented exception to "no database identifiers": public playback is
+ * requested by them, and the playback route re-checks that the project is
+ * published in an active category and the video is READY.
+ */
+export type PublicFilm = {
+  videoId: string;
+  projectId: string;
+  title: string;
+  /** "4:05", or null when the duration is unknown. */
+  durationLabel: string | null;
+};
+
 export type PublicProjectDetail = PublicProjectSummary & {
   description: string[];
   clientName: string | null;
@@ -35,6 +49,8 @@ export type PublicProjectDetail = PublicProjectSummary & {
   seoTitle: string | null;
   seoDescription: string | null;
   video: VideoRef | null;
+  /** Uploaded videos, in saved order; empty when none are assigned. */
+  films: PublicFilm[];
   gallery: PublicImage[];
   /** Absolute URL of the cover image, for Open Graph metadata. */
   shareImageUrl: string | null;

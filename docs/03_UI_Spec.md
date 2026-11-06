@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/03_UI_Spec.md` |
-| Version | 1.1.0 (P3-11D uploaded-video player recorded, LOCAL ONLY) |
+| Version | 1.2.0 (P3-11E project video picker and public Films section recorded, LOCAL ONLY) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `4f7f564` (branch `docs/context-architecture`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -266,6 +266,19 @@ polite live region; the submit button is disabled while pending.
 | Loading | Button disabled, "Loading…". |
 | Active | A native `<video controls playsInline>` labelled "Video: <title>". Safari plays the signed HLS URL natively; other browsers load `hls.js` on demand (no Web Worker). |
 | Error | `role="alert"` line under the frame: not available (404), still processing (409), no permission (403), session ended (401), too many requests (429), or a generic failure; an unsupported browser says so. Play is offered again. |
+
+### 4.6b Project videos and Films (P3-11E, LOCAL ONLY)
+
+- **Editor picker** (`src/components/admin/project-video-picker.tsx`): the same
+  fieldset pattern as the image picker: an ordered list (number, title, "Ready ·
+  duration · resolution", Up, Down, Remove) and a "Ready videos" list with Add.
+  A non-READY attached video shows "Not ready. Remove it before saving." Moves
+  and removals are announced in a polite live region. Square corners, borders,
+  no shadows.
+- **Public Films** (`src/components/public/project-films.tsx`): an eyebrow
+  heading "Films" in the accent style used by "Film", then one `HlsPlayer` per
+  video with its title and duration above, in saved order. Rendered nothing when
+  there are no films.
 
 ### 4.7 Dialogs and toasts
 

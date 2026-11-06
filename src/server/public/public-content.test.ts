@@ -61,6 +61,8 @@ function media(overrides: Partial<MediaRow> = {}): MediaRow {
 
 function project(overrides: Partial<ProjectRow> = {}): ProjectRow {
   return {
+    id: "00000000-0000-4000-8000-0000000000a1",
+    videos: [],
     slug: "harbour-light",
     title: "Harbour Light",
     summary: "A summary.",
@@ -355,5 +357,56 @@ describe("metadata fallbacks", () => {
       title: "Studio",
       description: "Fallback description.",
     });
+  });
+});
+
+describe("project Films (P3-11E)", () => {
+  const PROJECT_ID = "00000000-0000-4000-8000-0000000000a1";
+  const film = (id: string, sortOrder: number, status = "READY", durationSeconds: number | null = 125) => ({
+    sortOrder,
+    video: { id, title: `Film ${id}`, status, durationSeconds },
+  });
+
+  it("lists READY videos in saved order, sortOrder then id", () => {
+    const detail = toProjectDetail(
+      project({ videos: [film("v3", 1), film("v1", 0), film("v2", 1)] }),
+      resolveUrl,
+    );
+    assert.deepEqual(detail.films.map((entry) => entry.videoId), ["v1", "v2", "v3"]);
+    assert.deepEqual(detail.films[0], { videoId: "v1", projectId: PROJECT_ID, title: "Film v1", durationLabel: "2:05" });
+  });
+
+  it("drops any video that is not READY, even if a query returned it", () => {
+    const statuses = ["UPLOAD_PENDING", "PROCESSING", "FAILED", "CANCELLED", "DELETING", "DELETE_FAILED"];
+    const detail = toProjectDetail(
+      project({ videos: [film("ready", 0), ...statuses.map((status, index) => film(`x${index}`, index + 1, status))] }),
+      resolveUrl,
+    );
+    assert.deepEqual(detail.films.map((entry) => entry.videoId), ["ready"]);
+  });
+
+  it("carries no provider identifier, playback id, or token, and no id on the detail itself", () => {
+    const row = project({ videos: [film("v1", 0)] });
+    (row.videos[0].video as Record<string, unknown>).playbackId = "PlaybackSecret01";
+    (row.videos[0].video as Record<string, unknown>).muxAssetId = "AssetSecret01";
+    const detail = toProjectDetail(row, resolveUrl);
+    const text = JSON.stringify(detail);
+    for (const leak of ["Secret", "token", "stream.mux.com", "m3u8"]) assert.equal(text.includes(leak), false, leak);
+    assert.equal("id" in detail, false);
+    assert.deepEqual(Object.keys(detail.films[0]).sort(), ["durationLabel", "projectId", "title", "videoId"]);
+  });
+
+  it("keeps the YouTube or Vimeo film beside uploaded films", () => {
+    const detail = toProjectDetail(
+      project({ videoProvider: "YOUTUBE", videoId: "aqz-KE-bpKQ", videoTitle: "Trailer", videos: [film("v1", 0, "READY", null)] }),
+      resolveUrl,
+    );
+    assert.equal(detail.video?.provider, "YOUTUBE");
+    assert.equal(detail.films.length, 1);
+    assert.equal(detail.films[0].durationLabel, null);
+  });
+
+  it("has no films when none are assigned", () => {
+    assert.deepEqual(toProjectDetail(project(), resolveUrl).films, []);
   });
 });

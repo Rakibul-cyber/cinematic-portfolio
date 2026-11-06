@@ -92,9 +92,27 @@ function projectSummarySelect() {
   };
 }
 
+/**
+ * Uploaded videos of a project (P3-11E): READY only, in saved order, display
+ * facts only. Assigned videos cannot leave READY (deletion refuses them), and
+ * any change of assignment is a project save, which revalidates this read.
+ */
+function projectVideoSelect() {
+  return {
+    where: { video: { status: "READY" as const } },
+    orderBy: [{ sortOrder: "asc" as const }, { videoId: "asc" as const }],
+    select: {
+      sortOrder: true,
+      video: { select: { id: true, title: true, status: true, durationSeconds: true } },
+    },
+  };
+}
+
 function projectDetailSelect() {
   return {
     ...projectSummarySelect(),
+    id: true,
+    videos: projectVideoSelect(),
     description: true,
     clientName: true,
     location: true,

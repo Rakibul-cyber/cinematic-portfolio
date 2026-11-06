@@ -22,7 +22,7 @@ function origin(value: string | undefined): string | null {
   } catch { return null; }
 }
 
-/** Extra sources for one route's policy; only `/admin/videos` uses this (P3-11D). */
+/** Extra sources for one route's policy: `/admin/videos` (P3-11D) and `/work/:slug` (P3-11E). */
 type PolicyExtras = { connect: string[]; media: string[] };
 
 function contentSecurityPolicy(env: Record<string, string | undefined>, extras: PolicyExtras = { connect: [], media: [] }): string {
@@ -87,4 +87,16 @@ export function videoAdminSecurityHeaders(env: Record<string, string | undefined
   const upload = videoUploadOrigin(env);
   const connect = [...new Set([...playback, ...(upload ? [upload] : [])])];
   return [{ key: "Content-Security-Policy", value: contentSecurityPolicy(env, { connect, media: ["blob:", ...playback] }) }];
+}
+
+/**
+ * The policy for public project pages, `/work/:slug` (P3-11E), listed after
+ * the global entry so it replaces the global value there. Playback only: the
+ * playback origins join `connect-src` and `media-src`, plus `blob:` in
+ * `media-src` for Media Source Extensions. No upload origin, no wildcard, and
+ * `frame-src` keeps YouTube and Vimeo exactly as before.
+ */
+export function videoPlaybackSecurityHeaders(env: Record<string, string | undefined>) {
+  const playback = videoPlaybackOrigins(env);
+  return [{ key: "Content-Security-Policy", value: contentSecurityPolicy(env, { connect: playback, media: ["blob:", ...playback] }) }];
 }

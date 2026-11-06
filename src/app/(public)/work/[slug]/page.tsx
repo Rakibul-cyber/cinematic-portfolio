@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { FadeReveal } from "@/components/motion/fade-reveal";
 import { MediaImage } from "@/components/public/media-image";
+import { ProjectFilms } from "@/components/public/project-films";
 import { ProjectGallery } from "@/components/public/project-gallery";
 import { VideoPlayer } from "@/components/public/video-player";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -156,6 +157,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             />
           </section>
         ) : null}
+
+        <ProjectFilms films={project.films} projectTitle={project.title} />
 
         {gallery.length ? (
           <section aria-label={`${project.title} gallery`} className="pb-24 sm:pb-32">

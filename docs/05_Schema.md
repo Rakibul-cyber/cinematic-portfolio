@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/05_Schema.md` |
-| Version | 1.2.1 (P3-11C committed as `b440dcf`; P3-11D deletion locking recorded; no schema change; migration not applied) |
+| Version | 1.2.2 (P3-11D committed as `cd79df9`; P3-11E assignment locking recorded; no schema change; migration not applied) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -747,10 +747,20 @@ the row in one transaction: `SELECT … FOR UPDATE` on the video, count its
 `DELETE … WHERE id AND status = 'DELETING'`, and the `RESTRICT` key refuses it
 if an assignment exists. Any failure after the claim leaves `DELETE_FAILED`
 (retryable); a `DELETING` row untouched for 5 minutes is treated as an
-interrupted attempt and may be claimed again. **Requirement on the future
-assignment feature:** it must assign only READY videos, checked under a lock on
-the video row, so a `DELETING` video can never gain a project. UNVERIFIED
-against PostgreSQL until P4-03.
+interrupted attempt and may be claimed again.
+
+**P3-11E assignment (LOCAL ONLY, no schema change).** The project save
+transaction (`src/server/cms/project-save.ts`) locks every submitted video row
+with `SELECT "id","status","title" FROM "video" WHERE "id" IN (…) ORDER BY "id"
+FOR UPDATE` (id order, so concurrent saves cannot deadlock), refuses a missing
+or non-READY row, then replaces the project's `project_video` rows
+(`sortOrder` = display order). Deletion locks the same row before counting
+assignments, so whichever transaction locks first wins: a claimed video is
+refused by the save, an assigned video is refused by the deletion. READY can
+only move to DELETING, so an assigned video stays READY. Removing a video from
+a project deletes only the `project_video` row. Verified against a fake with
+row locks and read-committed visibility; **UNVERIFIED against PostgreSQL until
+P4-03**.
 
 ## 9. Schema gaps
 

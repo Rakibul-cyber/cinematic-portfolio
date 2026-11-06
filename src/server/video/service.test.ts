@@ -663,6 +663,27 @@ describe("issuePlaybackToken", () => {
     assert.deepEqual(await publicFor(""), notFound);
   });
 
+  it("re-checks publication on every request, so unpublishing or hiding a category stops playback at once (P3-11E)", async () => {
+    const video = seedReady();
+    const shared = [
+      { projectId: PUBLISHED, projectStatus: "PUBLISHED" as const, categoryActive: true },
+      { projectId: "project-second", projectStatus: "PUBLISHED" as const, categoryActive: true },
+    ];
+    repository.setAssignments(video.id, shared);
+    assert.equal((await service.issuePlaybackToken(video.id, { kind: "public", projectId: PUBLISHED })).ok, true);
+    assert.equal((await service.issuePlaybackToken(video.id, { kind: "public", projectId: "project-second" })).ok, true);
+
+    // The first project is unpublished; the shared video stays playable only through the second.
+    repository.setAssignments(video.id, [{ ...shared[0], projectStatus: "DRAFT" }, shared[1]]);
+    const notFound = { ok: false, error: "not_found", retryable: false };
+    assert.deepEqual(await service.issuePlaybackToken(video.id, { kind: "public", projectId: PUBLISHED }), notFound);
+    assert.equal((await service.issuePlaybackToken(video.id, { kind: "public", projectId: "project-second" })).ok, true);
+
+    // The second project's category is deactivated.
+    repository.setAssignments(video.id, [{ ...shared[0], projectStatus: "DRAFT" }, { ...shared[1], categoryActive: false }]);
+    assert.deepEqual(await service.issuePlaybackToken(video.id, { kind: "public", projectId: "project-second" }), notFound);
+  });
+
   it("does not distinguish draft, unready, and unknown videos for the public", async () => {
     const draftOnly = seedReady();
     repository.setAssignments(draftOnly.id, [{ projectId: DRAFT, projectStatus: "DRAFT", categoryActive: true }]);

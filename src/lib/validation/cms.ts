@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { MAX_PROJECT_VIDEOS } from "@/lib/cms/project-videos";
 import { isValidVideoId, VIDEO_PROVIDERS } from "@/lib/video";
 
 export function slugify(value: string): string {
@@ -176,6 +177,9 @@ export const projectSchema = z.object({
   videoId: videoIdentifier,
   videoTitle,
   mediaIds: z.array(z.string().uuid()).default([]),
+  // Uploaded videos in display order (P3-11E). Absent means "leave the stored
+  // assignments alone": an EDITOR's form has no video section.
+  videoIds: z.array(z.string().uuid()).max(MAX_PROJECT_VIDEOS).optional(),
 }).superRefine((value, ctx) => {
   checkVideoPair(value.videoProvider, value.videoId, ctx, "videoId");
 
@@ -192,6 +196,14 @@ export const projectSchema = z.object({
       code: "custom",
       path: ["mediaIds"],
       message: "A media item can only be attached once.",
+    });
+  }
+
+  if (value.videoIds && new Set(value.videoIds).size !== value.videoIds.length) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["videoIds"],
+      message: "A video can only be added to a project once.",
     });
   }
 });

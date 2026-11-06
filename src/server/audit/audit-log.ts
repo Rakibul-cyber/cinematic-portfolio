@@ -30,6 +30,8 @@ export const AuditAction = {
   CmsDeleted: "cms.deleted",
   ProjectPublished: "project.published",
   ProjectUnpublished: "project.unpublished",
+  /** Uploaded videos added, removed, or reordered on a project (P3-11E). */
+  ProjectVideosChanged: "project.videos_changed",
   InquiryCreated: "inquiry.created",
   InquiryStatusChanged: "inquiry.status_changed",
   CustomerUpdated: "customer.updated",
