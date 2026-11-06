@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.3.3 (P3-11A video provider boundary recorded) |
+| Version | 1.3.4 (P3-11A and P3-11B video provider boundary and services recorded) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -59,7 +59,8 @@ never marked deployed.**
 | Production-bundle verification | Compile-only bundle verified at `b1a579d` (RR-02); offline bundle tests added, uncommitted (RR-03, P4-14). Node.js 22 run PENDING. Full build UNVERIFIED (needs a database, P4-03). |
 | Photo upload resize (P3-09) | LOCAL ONLY: `6b4f75d` on `feature/media-upload-resize`; not pushed, merged, or deployed. Real-browser checks PENDING. |
 | Video foundation helpers (P3-10) | LOCAL ONLY: committed on `feature/video-mvp-foundation` (parent `6b4f75d`); not integrated, pushed, merged, or deployed. |
-| Video provider boundary (P3-11A) | LOCAL ONLY: committed on `feature/video-upload-backend` (parent `e681ffa`); not integrated, pushed, merged, or deployed. |
+| Video provider boundary (P3-11A) | LOCAL ONLY: committed on `feature/video-upload-backend` (parent `e681ffa`) as `18a6f76`; not integrated, pushed, merged, or deployed. |
+| Video services (P3-11B) | LOCAL ONLY: committed on `feature/video-upload-backend` (parent `18a6f76`); not integrated, pushed, merged, or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -421,7 +422,7 @@ the owner's descriptions to commits.
 - **Security impact:** none until integrated. **Production impact:** none.
 
 #### P3-11A — Video provider boundary: Mux configuration, client, webhook signature, playback token (MH-06)
-- **Status:** DONE (unit level, mocked provider); not integrated · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed on branch `feature/video-upload-backend` (parent `e681ffa`, P3-10); not pushed, merged, or deployed.
+- **Status:** DONE (unit level, mocked provider); not integrated · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed as `18a6f76` on branch `feature/video-upload-backend` (parent `e681ffa`, P3-10); not pushed, merged, or deployed.
 - **Depends on:** P3-10 · **Requirements:** future video requirements (MH-03)
 - **Files (all new, server-only):** `src/server/video/config.ts`,
   `src/server/video/errors.ts`, `src/server/video/secret.ts`,
@@ -453,6 +454,53 @@ the owner's descriptions to commits.
   details (`kid` placement, 2160p output, ID shapes) are confirmed only in the
   provider trial (MH-02D Task 5 / T-11).
 - **Security impact:** none until integrated (no route uses it). **Production impact:** none.
+
+#### P3-11B — Video upload, cancellation, webhook, and playback services (MH-06)
+- **Status:** DONE (unit level, mocked provider, in-memory repository); not integrated · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed on branch `feature/video-upload-backend` (parent `18a6f76`, P3-11A); not pushed, merged, or deployed.
+- **Depends on:** P3-10, P3-11A · **Requirements:** future video requirements (MH-03)
+- **Files (all new, server-only):** `src/server/video/repository.ts`
+  (`VideoRecord`, `VideoRepository` interface), `src/server/video/in-memory-repository.ts`
+  (test implementation), `src/server/video/service.ts`, `src/server/video/service.test.ts`.
+- **Scope:** `createVideoService(deps)` with injected repository, Mux client,
+  signing config, clock, id generator, and a logger whose fields cannot carry
+  secrets. `createUploadSession`: title, file name (base name; mp4, mov, m4v,
+  mkv, webm), and declared size validated; 10 GiB default limit; two active
+  (unexpired UPLOAD_PENDING) uploads per user, pre-checked before the provider
+  call and enforced atomically on insert; the record is persisted before the
+  URL is returned; the provider upload is cancelled when persistence fails or
+  the race is lost; the URL is never stored or logged. `cancelUploadSession`:
+  uploader or ADMIN/SUPER_ADMIN; provider first, then compare-and-set;
+  idempotent; follows the provider's state when it refuses. `handleMuxWebhook`:
+  1 MiB cap, signature verified before parsing, payload used only for type and
+  IDs, upload and asset state re-read from Mux, ownership checked (asset
+  `passthrough` = video id and `upload_id` = stored upload), forward-only
+  compare-and-set transitions (UPLOAD_PENDING → PROCESSING → READY), CANCELLED,
+  FAILED, DELETING, and DELETE_FAILED never become READY, orphan assets of
+  cancelled uploads deleted at Mux, 503 for provider, persistence, or repeated
+  write-conflict failures. `issuePlaybackToken`: READY with a signed playback
+  ID; admins (any role) preview; the public only through a named project that
+  is PUBLISHED with an active category; every public refusal is the same
+  `not_found`; 15-minute RS256 token (configurable 60 s–24 h); HTTPS URL.
+- **Tests:** `service.test.ts` 35 passed (upload 8, cancel 7, webhook 12,
+  playback 6, configuration 2). `npm test`: 650 tests, 648 passed, 0 failed,
+  2 skipped; render 270 passed; typecheck and lint clean; `git diff --check`
+  clean. `npm run test:bundle`: PASSED (56 and 32 passed, 0 skipped, 0
+  network attempts; full log captured). One earlier run reported 55 of 56:
+  `docs/06_Plan.md` was edited during that run, which trips the suite's
+  source-digest freshness assertion (`security.bundle-test.ts:144`); the
+  failing test's name was not captured, so this cause is inferred.
+  Node.js 22 run PENDING. No network or database access.
+- **Limitations / UNVERIFIED:** the declared file size is not enforced by the
+  provider; webhook deduplication is by reconciliation (no event-ID store, no
+  schema); provider event types, `errors.type` values, the presence of
+  `upload_id` on assets, and token behaviour mid-playback await the provider
+  trial (MH-02D); the Prisma repository needs the `Video`/`ProjectVideo`
+  schema (P4-03 BLOCKED) and must keep the atomic limit and compare-and-set
+  guarantees; no routes, rate limiting, audit logging, or admin UI yet.
+- **Next:** P3-11C: route handlers (upload session, cancel, webhook with raw
+  body, playback) using `requireUser`/`requireAdmin`, rate limits, and audit
+  entries; add the `MUX_*` variables to `.env.example` and 04_TRD.
+- **Security impact:** none until routes exist. **Production impact:** none.
 
 ## Phase 4 — Edge cases and testing
 
