@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.3.2 (P3-10 video foundation helpers recorded) |
+| Version | 1.3.3 (P3-11A video provider boundary recorded) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -59,6 +59,7 @@ never marked deployed.**
 | Production-bundle verification | Compile-only bundle verified at `b1a579d` (RR-02); offline bundle tests added, uncommitted (RR-03, P4-14). Node.js 22 run PENDING. Full build UNVERIFIED (needs a database, P4-03). |
 | Photo upload resize (P3-09) | LOCAL ONLY: `6b4f75d` on `feature/media-upload-resize`; not pushed, merged, or deployed. Real-browser checks PENDING. |
 | Video foundation helpers (P3-10) | LOCAL ONLY: committed on `feature/video-mvp-foundation` (parent `6b4f75d`); not integrated, pushed, merged, or deployed. |
+| Video provider boundary (P3-11A) | LOCAL ONLY: committed on `feature/video-upload-backend` (parent `e681ffa`); not integrated, pushed, merged, or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -418,6 +419,40 @@ the owner's descriptions to commits.
   parser's 11, and the Vimeo embed does not yet pass the unlisted hash); wire
   the parser into the project form (MH-03 P0-10).
 - **Security impact:** none until integrated. **Production impact:** none.
+
+#### P3-11A — Video provider boundary: Mux configuration, client, webhook signature, playback token (MH-06)
+- **Status:** DONE (unit level, mocked provider); not integrated · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed on branch `feature/video-upload-backend` (parent `e681ffa`, P3-10); not pushed, merged, or deployed.
+- **Depends on:** P3-10 · **Requirements:** future video requirements (MH-03)
+- **Files (all new, server-only):** `src/server/video/config.ts`,
+  `src/server/video/errors.ts`, `src/server/video/secret.ts`,
+  `src/server/video/mux-client.ts`, `src/server/video/webhook-signature.ts`,
+  `src/server/video/playback-token.ts`, and tests for config, mux-client,
+  webhook-signature, and playback-token.
+- **Scope:** configuration from five variables (`MUX_TOKEN_ID`,
+  `MUX_TOKEN_SECRET`, `MUX_WEBHOOK_SECRET`, `MUX_SIGNING_KEY_ID`,
+  `MUX_SIGNING_PRIVATE_KEY`): none set means disabled, a partial or malformed
+  set means invalid (problems name variables, never values); RSA ≥ 2048-bit
+  signing key as PEM or base64 PEM. `Secret` wrapper redacts credentials in
+  `String`, JSON, and `inspect`. A `fetch`-based Mux REST client (no SDK,
+  injectable): direct upload create/get/cancel, asset get/delete, signed
+  playback policy, `max_resolution_tier` 2160p by default, IDs validated before
+  entering paths, redirects refused, 4 s time budget, response bodies of
+  failures discarded; failures are `VideoProviderError` (code and HTTP status
+  only) with a retryable classification. Webhook verification of
+  `mux-signature` (HMAC-SHA256 over `t.rawBody`, constant-time, 300 s
+  tolerance, several `v1` values for rotation). RS256 playback tokens
+  (`sub`, `aud`, `exp`, `kid`; lifetime 60 s–24 h) and HTTPS
+  `stream.mux.com` URLs.
+- **Tests:** 37 passed (`config` 7, `mux-client` 16, `webhook-signature` 7,
+  `playback-token` 7). `npm test`: 615 tests, 613 passed, 0 failed, 2
+  skipped; render 270 passed; typecheck and lint clean; `git diff --check`
+  clean. No network calls; credentials and keys in tests are fictional or
+  generated per run.
+- **Not done / UNVERIFIED:** the five variables are not yet in `.env.example`
+  or [04_TRD.md](04_TRD.md) (added when a route uses them); request and claim
+  details (`kid` placement, 2160p output, ID shapes) are confirmed only in the
+  provider trial (MH-02D Task 5 / T-11).
+- **Security impact:** none until integrated (no route uses it). **Production impact:** none.
 
 ## Phase 4 — Edge cases and testing
 
