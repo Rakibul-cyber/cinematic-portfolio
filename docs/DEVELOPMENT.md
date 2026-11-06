@@ -96,6 +96,34 @@ npm run analytics:verify # analytics and monitoring configuration, CSP, PII scru
 npm run deploy:verify    # netlify.toml: cache headers, ISR safety, header ownership
 ```
 
+The security fixes are also checked in production-compiled code, offline:
+
+```powershell
+npm run test:bundle          # compile-only Next.js build in a temp directory, then the bundle security tests
+npm run test:bundle -- --keep  # keep the temporary workspace for inspection
+```
+
+It copies the working tree (never a `.env*` file other than `.env.example`)
+into a temporary directory and compiles it with
+`next build --experimental-build-mode=compile`, which needs no database. Every
+process gets only system environment variables, mocked Google Fonts, and a
+Node-level offline guard that refuses network access through the APIs it hooks.
+This is not complete OS-level isolation: unsupported network APIs and native or
+non-Node subprocesses may bypass a Node preload guard. It then runs
+`scripts/bundle/security.bundle-test.ts` and the two real-bundle checks that
+`npm test` skips. Each test process verifies the guard and the absence of
+credentials in itself before any test runs. Any failed, skipped, or cancelled
+test, or any network attempt, fails the run. It takes about two minutes, so it
+is not part of `npm test`. The project targets Node.js 22 (`.node-version`);
+the runner warns when another major version is used.
+
+Ctrl+C (SIGINT) or SIGTERM stops the run, removes the workspace's
+`node_modules` junction as a link, deletes the workspace, and exits nonzero
+(130 or 143). Workspaces left by earlier runs (`munir-bundle-*` in the
+temporary directory) are listed but never deleted. Before deleting one by hand,
+remove its `app/node_modules` link first: a recursive delete that follows the
+link could reach the repository's dependencies.
+
 Business-critical behavior receives priority over high-volume, low-value tests.
 Expected coverage eventually includes authentication and authorization, inquiry
 validation, admin CRUD, accessibility, and critical public/admin E2E flows.

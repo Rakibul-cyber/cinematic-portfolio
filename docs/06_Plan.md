@@ -3,10 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.2.1 (DEF-02 and Context Architecture commits recorded) |
-| Last reviewed | 2026-11-03 |
-| Reviewed against | commit `b517fce` (branch `fix/sentry-production-initialization`) |
-| Document status | Draft for owner review. Not committed. |
+| Version | 1.3.0 (RR-02 bundle verification and RR-03 offline bundle tests recorded) |
+| Last reviewed | 2026-11-06 |
+| Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
+| Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
 ## Purpose
 
@@ -42,7 +42,7 @@ Release states (PUBLISHED, MAIN UNPUBLISHED, LOCAL ONLY) are defined in
 [01_PRD.md](01_PRD.md#status-and-release-state-vocabulary). **A local fix is
 never marked deployed.**
 
-## Current release position (2026-11-03)
+## Current release position (2026-11-04)
 
 | Item | State |
 | --- | --- |
@@ -56,6 +56,7 @@ never marked deployed.**
 | Database-backed integration testing | **POSTPONED by owner (BLOCKED)** |
 | DEF-01 media-deletion fix | LOCAL ONLY: commit `379e53b` on `fix/media-delete-admin-only`; not pushed, merged, or deployed |
 | DEF-02 server-Sentry fix | LOCAL ONLY: commit `b517fce` on `fix/sentry-production-initialization`; not pushed, merged, or deployed |
+| Production-bundle verification | Compile-only bundle verified at `b1a579d` (RR-02); offline bundle tests added, uncommitted (RR-03, P4-14). Node.js 22 run PENDING. Full build UNVERIFIED (needs a database, P4-03). |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -353,8 +354,8 @@ the owner's descriptions to commits.
 ## Phase 4 — Edge cases and testing
 
 #### P4-01 — Unit and render suites
-- **Status:** DONE · **Last verified:** 2026-11-03 at `4f7f564`
-- **Evidence:** `npm test`: 472 passed, 0 failed, 2 skipped; render 264 passed; typecheck and lint clean.
+- **Status:** DONE · **Last verified:** 2026-11-06 at `b1a579d` plus uncommitted RR-03 changes (with RR-03C)
+- **Evidence:** `npm test`: 522 tests, 520 passed, 0 failed, 2 skipped (the two real-bundle checks, which run in `npm run test:bundle`, P4-14); render 264 passed; typecheck and lint clean. Earlier: 505 tests, 503 passed, 2 skipped (RR-03, 2026-11-04); 472 passed, 2 skipped at `4f7f564`.
 
 #### P4-02 — Integration harness implementation (SD-13I)
 - **Status:** DONE · **Completed:** 2026-11-03 · **Release:** LOCAL ONLY
@@ -404,18 +405,110 @@ the owner's descriptions to commits.
 
 #### P4-10 — Production build
 - **Status:** compile-only DONE (2026-11-03, Node 22.23.4: no fallback key, no
-  Turnstile bypass in server bundles). **Full build BLOCKED**: static generation needs a database (P4-03).
+  Turnstile bypass in server bundles). Compile-only verification repeated at
+  `b1a579d` on 2026-11-04 (RR-02, Node 24.13.0) and made reproducible offline
+  by P4-14. **Full build BLOCKED**: static generation needs a database (P4-03).
 
 #### P4-11 — Security regression suites
-- **Status:** DONE (`*production-build.test.ts`, `security.test.ts`).
+- **Status:** DONE (`*production-build.test.ts`, `security.test.ts`; real-bundle
+  checks through P4-14).
+
+#### P4-14 — Offline production-bundle security tests (RR-02, RR-03, RR-03C)
+- **Status:** DONE (offline verification; Node.js 22 run PENDING) · **Completed:** 2026-11-04; RR-03C safety corrections 2026-11-06 · **Release:** LOCAL ONLY, uncommitted on `fix/sentry-production-initialization` (from `b1a579d`); not pushed, merged, or deployed.
+- **Depends on:** P4-10 (compile mode), P4-11
+- **Requirements:** NFR-SEC-03, NFR-OBS-01
+- **RR-02 (2026-11-04, verification only, no file changes):** the real Next.js
+  15.5.28 compile-only build of `b1a579d` (isolated copy, no `.env*` file,
+  mocked fonts, no database) was executed module by module: 55 checks passed,
+  0 failed, covering SD-13E, SD-13G, SD-13H, DEF-01, DEF-02, and SEC-03
+  `useSecureCookies`. The 9 security test files gave 158 passed, 0 failed,
+  2 skipped; `npm test` 497 passed, 0 failed, 2 skipped; render 264 passed.
+  Ran on Node.js 24.13.0, because Node.js 22 is not installed locally.
+- **Files (RR-03):** `scripts/bundle/run.ts`, `scripts/bundle/next-server-runtime.ts`,
+  `scripts/bundle/security.bundle-test.ts`, `scripts/bundle/workspace.ts`,
+  `scripts/bundle/workspace.test.ts`, `scripts/bundle/offline-guard.mjs`,
+  `package.json` (`test:bundle`), and the bundle-directory option in
+  `src/server/security/rate-limit-production-build.test.ts` and
+  `turnstile-production-build.test.ts`. No application code changed.
+- **Acceptance:** `npm run test:bundle` builds the working tree with the real
+  Next.js compiler (compile mode) in a temporary directory without any private
+  environment file, credentials, database, or network; runs the bundle suite
+  and the two formerly skipped real-bundle checks against that output; and
+  fails on any failed, skipped, todo, or cancelled test or network attempt.
+- **RR-03C (2026-11-06), from the RR-03B review:**
+  - **R1, interruption cleanup** (`run.ts`, `workspace.ts`): SIGINT and SIGTERM
+    handlers (persistent, not `once`) only record the signal and stop the active
+    child; the main flow notices at its next await, unwinds through one
+    `finally`, and exits 130 or 143. A second signal force-stops the child and
+    never re-enters cleanup. `cleanupWorkspace` touches only a validated
+    `munir-bundle-*` child of the temporary directory that does not overlap the
+    repository, removes `app/node_modules` only if it is a junction or symlink
+    (as a link, never through it), and deletes the workspace only after a
+    no-follow scan finds no link left in it; otherwise it reports the location.
+    A missing link (partial initialization) is fine. Workspaces from earlier
+    runs are listed, flagged if they still hold a link, and never deleted.
+  - **R2, test-process isolation** (`workspace.ts`, called at load in
+    `security.bundle-test.ts` and both real-bundle check files): fails the file
+    unless the guard marker is set, `fetch`, `WebSocket`, and
+    `net.Socket#connect` are the guard's hooks, and a TCP probe to
+    `offline-guard-self-test.invalid` is refused synchronously; no variable whose
+    name marks a credential or service (database URLs, secrets, tokens, DSNs,
+    `R2_`, `AWS_`, `NEON_`, `NETLIFY_`, `PG*`, and others) is present; and
+    `BUNDLE_TEST_CONFIGURATION=fictional-only` and the guard preload are set.
+    Messages name variables, never values. The runner counts the probe as a
+    self-test, not a network attempt, and fails unless every test process
+    (3) recorded one, in addition to the build-process guard check.
+  - **D1:** document headers use durable wording (locally maintained draft;
+    no owner approval, push, or deployment implied).
+- **Tests:** `npm run test:bundle` (2026-11-06, Node.js 24.13.0): bundle suite
+  56 passed, 0 failed, 0 skipped; formerly skipped real-bundle checks 32 passed,
+  0 failed, **0 skipped** (both skip in `npm test` by design); offline guard
+  loaded in 19 processes, 0 network attempts; in-process isolation self-test
+  passed in 3 of 3 test processes; PASSED. Earlier runs: guard loaded in 18–21
+  processes, 0 network attempts in any run. `scripts/bundle/workspace.test.ts`:
+  23 passed (cleanup against a real junction, refusal cases, and isolation
+  checks in guarded and unguarded child processes).
+  Interruption (local hook `BUNDLE_RUNNER_SELF_TEST_SIGNAL`, which delivers the
+  signal twice to the runner's own handlers during the real build): SIGINT
+  exit 130 and SIGTERM exit 143, each with "received again" handled, link
+  removed, workspace deleted, repository `node_modules` intact, no leftover
+  build process. Isolation failure: each of the three bundle test files, run
+  outside the runner, FAILED at load without the guard and, with the guard,
+  when given a fictional `DATABASE_URL` (named in the message, value absent
+  from the output). Real OS signal delivery (terminal Ctrl+C, `kill`) is
+  UNVERIFIED: on Windows, Node cannot send a catchable SIGINT to another
+  process. Negative control: with five fixes reverted in a throwaway
+  copy (DEF-01 guard, Turnstile bypass, Sentry `NODE_ENV`, HMAC fallback,
+  limiter storage fail-closed) the run FAILED (bundle suite 13 failed and
+  16 cancelled, real-bundle checks 11 failed), each mutation caught.
+- **Pending:** a run on Node.js 22 (`.node-version`); not installed locally and
+  not installed without authorization. Static generation, Netlify packaging, and
+  database-backed paths stay with P4-03 and P5-05.
+- **Deferred RR-03B limitations (R3/R4), not implemented:** the preload guard
+  covers the Node APIs it hooks (`fetch`, `WebSocket`, and
+  `net.Socket#connect`, which `http`, `https`, `tls`, and undici use), but it
+  is not OS-level network isolation. **R3:** network APIs it does not hook, such
+  as `dgram` (UDP) and `dns` resolution, and sockets opened by native addons,
+  bypass it; the in-process self-test proves the hooks are installed, not that
+  nothing else can reach the network. **R4:** native or non-Node subprocesses do
+  not load or honor a Node preload, and a Node subprocess started with its own
+  `NODE_OPTIONS` or `--import` flags may drop it; the guard-install count shows
+  which Node processes loaded it, not which processes ran. An OS sandbox or
+  firewall boundary is still required for a complete no-network guarantee.
+- **Interruption limits:** on Windows, stopping a child terminates that process
+  only; build workers it started may outlive it (none did in the verification
+  runs), and a workspace they still hold is reported, not deleted.
+- **Evidence:** working-tree changes on `fix/sentry-production-initialization` (no commit SHA yet).
+- **Security impact:** none on the application; adds regression coverage. **Production impact:** none.
 
 #### P4-12 — Live `auth:verify` and `security:verify`
 - **Status:** BLOCKED (part of P4-03; never against production).
 
 #### P4-13 — Continuous integration
 - **Status:** TODO (decision OD-17; TD-03, TD-08)
-- **Acceptance:** lint, typecheck, and unit and render tests on every push; the
-  full build where a disposable database is available.
+- **Acceptance:** lint, typecheck, and unit and render tests on every push;
+  `npm run test:bundle` (offline, no secrets; P4-14) on Node.js 22; the full
+  build where a disposable database is available.
 
 ## Phase 5 — Release readiness
 

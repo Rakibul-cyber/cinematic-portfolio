@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "tsx --conditions=react-server --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\" && tsx --test \"src/**/*.render-test.ts\"",
+    "test:bundle": "tsx scripts/bundle/run.ts",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "tsx scripts/prisma-guarded.ts migrate-dev",

@@ -3,10 +3,10 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/04_TRD.md` |
-| Version | 1.2.1 (DEF-02 and Context Architecture commits recorded) |
-| Last reviewed | 2026-11-03 |
-| Reviewed against | commit `b517fce` (branch `fix/sentry-production-initialization`) |
-| Document status | Draft for owner review. Not committed. |
+| Version | 1.3.0 (RR-02 bundle verification and RR-03 offline bundle tests recorded) |
+| Last reviewed | 2026-11-06 |
+| Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
+| Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
 ## Purpose
 
@@ -104,9 +104,36 @@ declared range, so the lockfile is the contract. A version change is a task in
 test files (`*.render-test.ts`), and 3 database-backed integration suites
 (`scripts/integration/*.integration.ts`); that run gave 472 unit tests passing
 with 2 skipped, and 264 render tests passing. The DEF-01 and DEF-02 fixes each
-added one unit test file (30 in total). The latest run, at the DEF-02 commit
-`b517fce`, gave 499 unit tests: 497 passed, 0 failed, 2 skipped; render 264
-passed.
+added one unit test file (30 in total). The run at the DEF-02 commit
+`b517fce` gave 499 unit tests: 497 passed, 0 failed, 2 skipped; render 264
+passed. RR-03 (uncommitted) added `scripts/bundle/workspace.test.ts` (31 unit
+test files); with the RR-03C safety corrections, `npm test` gave 522 unit
+tests: 520 passed, 0 failed, 2 skipped; render 264 passed (2026-11-06).
+
+**Production-bundle tests (RR-03):** `npm run test:bundle` compiles the working
+tree with the real Next.js compiler in compile-only mode
+(`next build --experimental-build-mode=compile`) in a temporary directory, with
+no `.env*` file but `.env.example`, a system-only environment, mocked Google
+Fonts, and an offline guard (`scripts/bundle/offline-guard.mjs`) preloaded into
+every process. It then runs `scripts/bundle/security.bundle-test.ts` (56 tests)
+against the compiled modules, loaded into Next.js's own webpack runtime with
+only I/O replaced, plus the two real-bundle checks that `npm test` skips
+(`rate-limit-production-build.test.ts`, `turnstile-production-build.test.ts`,
+32 tests together, none skipped). It fails on any failed, skipped, todo, or
+cancelled test, and on any network attempt. Each test process first checks
+its own isolation (`assertBundleProcessIsolation`): the guard's hooks are
+installed and refuse a probe to a reserved `.invalid` host, no credential or
+service variable is present (reported by name, never value), and the
+configuration is marked fictional; the runner also requires that self-test
+from every test process. SIGINT or SIGTERM removes the dependency junction as
+a link, deletes the workspace only after a no-follow scan finds no link in it,
+and exits 130 or 143; earlier workspaces are reported, never deleted. It is
+deliberately not part of `npm test`, which needs no build. It covers SD-13E
+(both the exported auth instance and the login Server Action's inlined copy),
+SD-13G, SD-13H, DEF-01, and DEF-02, but not static generation, the Netlify
+packaging, or a database. The guard is a Node-level control, not OS-level
+network isolation: unhooked APIs (such as `dgram` or `dns`), native addons, and
+native or non-Node subprocesses are outside it (P4-14, R3 and R4).
 
 ## 2. System architecture
 
@@ -400,7 +427,9 @@ automated dependency or secret scanning in CI (no CI exists).
 `npm run build` (`next build`) with `NPM_FLAGS=--include=dev`; `postinstall`
 runs `prisma generate`. Static generation of `/work/[slug]` reads the database,
 so **a full build needs a reachable database**. Migrations are not part of the
-build.
+build. Compile-only mode (`--experimental-build-mode=compile`) compiles every
+route without static generation and needs no database; `npm run test:bundle`
+uses it (§1.3). A compile-only build is not a releasable artifact.
 
 ### 8.3 Netlify contexts and the publishing lock
 
@@ -513,7 +542,7 @@ worth knowing or a configuration risk that only the owner can check in Netlify.
 | ID | Risk | Evidence | Status |
 | --- | --- | --- | --- |
 | OBS-01 | Browser error boundaries skip any error with a digest, on the assumption that `onRequestError` already reported it on the server (`src/lib/monitoring/report.ts:25-32`, `:43-49`). Server errors are therefore visible **only** if server reporting is initialized; the browser never fills the gap. This is what made DEF-02 a total loss of server errors. | `server-init-production-build.test.ts`, "documents the dependency" | By design; keep. Covered by a test. |
-| OBS-02 | The server reads `NEXT_PUBLIC_SENTRY_DSN`, the environment, and the release from the **runtime** environment; the browser has them inlined at **build** time. If a value is available to Netlify builds but not to functions, server reporting is off while the browser works, and release labels can differ between the two. | `src/sentry.server.config.ts`; `src/instrumentation-client.ts:22-27` | UNVERIFIED configuration risk. Check Netlify variable scopes (P5-02). |
+| OBS-02 | The server reads `NEXT_PUBLIC_SENTRY_DSN`, the environment, and the release from the **runtime** environment; the browser has them inlined at **build** time. If a value is available to Netlify builds but not to functions, server reporting is off while the browser works, and release labels can differ between the two. | `src/sentry.server.config.ts`; `src/instrumentation-client.ts:22-27`; RR-02 (2026-11-04): in a build without a DSN, the compiled browser chunk reads the DSN from the `process.env` polyfill, so browser reporting needs the DSN at build time | UNVERIFIED configuration risk. Check Netlify variable scopes (P5-02). |
 | OBS-03 | Monitoring turns off silently when the DSN is missing or malformed (`src/lib/monitoring/options.ts:53-57`: "Neither state warns"). A misconfigured production looks the same as one without monitoring. | `options.ts`, `dsn.ts` | Deliberate design; changing it needs decision OD-18. |
 | SEC-CAND-01 | `securityHeaders(process.env)` (`next.config.ts:16`) reads `NODE_ENV` for `unsafe-eval`, `upgrade-insecure-requests`, and HSTS (`src/lib/security-headers.ts:39`, `:53`, `:61`). The production server takes headers from the build manifest (`routesManifest.headers`), so they are fixed at build time. A build run with `NODE_ENV=development` would bake a weaker CSP and no HSTS into the deploy, because Next.js keeps a preset `NODE_ENV` during `next build` and only warns. | `node_modules/next/dist/bin/next:68`; `node_modules/next/dist/server/lib/router-utils/filesystem.js:267` | UNVERIFIED; no evidence Netlify sets `NODE_ENV` for builds. Check the build environment (P5-02). Not a confirmed defect. |
 

@@ -6,7 +6,7 @@
 | Version | 1.1.1 (DEF-01 commit recorded) |
 | Last reviewed | 2026-11-03 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
-| Document status | Draft for owner review. Not committed. |
+| Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
 ## Purpose
 

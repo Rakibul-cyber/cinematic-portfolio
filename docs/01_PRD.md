@@ -6,7 +6,7 @@
 | Version | 1.2.1 (DEF-02 and Context Architecture commits recorded) |
 | Last reviewed | 2026-11-03 |
 | Reviewed against | commit `b517fce` (branch `fix/sentry-production-initialization`) |
-| Document status | Draft for owner review. Not committed. |
+| Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 | Product owner | Studio owner, Munir Visuals |
 
 ## Purpose

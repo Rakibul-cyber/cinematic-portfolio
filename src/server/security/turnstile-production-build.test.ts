@@ -5,10 +5,13 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, before, describe, it } from "node:test";
 
+import { assertBundleProcessIsolation } from "../../../scripts/bundle/workspace";
 import { emptyStates } from "@/content/site";
 import { TURNSTILE_RESPONSE_FIELD } from "@/lib/security/turnstile-widget";
 import { submitInquiryWorkflow, type SubmitInquiryDependencies } from "@/server/inquiry/submit-inquiry";
 import type { TurnstileResult, verifyTurnstile as VerifyTurnstile } from "@/server/security/turnstile";
+
+if (process.env.PRODUCTION_BUNDLE_DIR) assertBundleProcessIsolation();
 
 /**
  * Turnstile verification as a production build sees it.
@@ -321,12 +324,16 @@ describe("the inquiry workflow with a production-built verifier", () => {
 });
 
 /**
- * The real `next build` output, when one newer than turnstile.ts is on disk.
- * `npm test` does not build, so this skips rather than trusting a stale bundle.
+ * The real `next build` output. `npm run test:bundle` builds one offline and
+ * sets PRODUCTION_BUNDLE_DIR, and then this must run. Without it, `npm test`
+ * uses `.next` only when a build newer than turnstile.ts is on disk, and
+ * otherwise skips rather than trusting a stale bundle.
  */
 describe("the compiled Next.js server bundle", () => {
-  const buildId = ".next/BUILD_ID";
-  const fresh = existsSync(buildId) && statSync(buildId).mtimeMs > statSync("src/server/security/turnstile.ts").mtimeMs;
+  const bundleDir = process.env.PRODUCTION_BUNDLE_DIR;
+  const nextDir = bundleDir ?? ".next";
+  const buildId = join(nextDir, "BUILD_ID");
+  const fresh = bundleDir !== undefined || (existsSync(buildId) && statSync(buildId).mtimeMs > statSync("src/server/security/turnstile.ts").mtimeMs);
   const options = fresh ? {} : { skip: "no production build newer than turnstile.ts" };
 
   function serverFiles(dir: string): string[] {
@@ -338,7 +345,7 @@ describe("the compiled Next.js server bundle", () => {
   }
 
   it("contains Turnstile verification without the development bypass", options, () => {
-    const withVerifier = serverFiles(".next/server").filter((file) => readFileSync(file, "utf8").includes("turnstile/v0/siteverify"));
+    const withVerifier = serverFiles(join(nextDir, "server")).filter((file) => readFileSync(file, "utf8").includes("turnstile/v0/siteverify"));
     assert.ok(withVerifier.length > 0, "positive control: the verifier is in the bundle");
     for (const file of withVerifier) assert.ok(!/bypassed:!0/.test(readFileSync(file, "utf8")), file);
   });

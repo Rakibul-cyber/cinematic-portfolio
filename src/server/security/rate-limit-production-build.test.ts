@@ -8,7 +8,10 @@ import { after, afterEach, before, describe, it } from "node:test";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
+import { assertBundleProcessIsolation } from "../../../scripts/bundle/workspace";
 import { createLoginGuard, type LoginGuardCategory } from "@/server/auth/login-rate-limit";
+
+if (process.env.PRODUCTION_BUNDLE_DIR) assertBundleProcessIsolation();
 
 /**
  * The pseudonymization key as a production build sees it.
@@ -304,14 +307,18 @@ describe("the inquiry limiter in a production build", () => {
 });
 
 /**
- * The real `next build` output, when one newer than the key's source is on disk.
- * `npm test` does not build, so this skips rather than trusting a stale bundle.
+ * The real `next build` output. `npm run test:bundle` builds one offline and
+ * sets PRODUCTION_BUNDLE_DIR, and then this must run. Without it, `npm test`
+ * uses `.next` only when a build newer than the key's source is on disk, and
+ * otherwise skips rather than trusting a stale bundle.
  */
 describe("the compiled Next.js server bundle", () => {
-  const serverDir = ".next/server";
-  const buildId = ".next/BUILD_ID";
+  const bundleDir = process.env.PRODUCTION_BUNDLE_DIR;
+  const nextDir = bundleDir ?? ".next";
+  const serverDir = join(nextDir, "server");
+  const buildId = join(nextDir, "BUILD_ID");
   const sourceFile = "src/server/security/rate-limit-buckets.ts";
-  const fresh = existsSync(buildId) && statSync(buildId).mtimeMs > statSync(sourceFile).mtimeMs;
+  const fresh = bundleDir !== undefined || (existsSync(buildId) && statSync(buildId).mtimeMs > statSync(sourceFile).mtimeMs);
   const options = fresh ? {} : { skip: "no production build newer than rate-limit-buckets.ts" };
 
   function serverFiles(dir: string): string[] {

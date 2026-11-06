@@ -6,7 +6,7 @@
 | Version | 1.0.0 |
 | Last reviewed | 2026-11-03 |
 | Reviewed against | commit `4f7f564` (branch `docs/context-architecture`) |
-| Document status | Draft for owner review. Not committed. |
+| Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
 ## Purpose
 
