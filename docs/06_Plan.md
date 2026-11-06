@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.3.0 (RR-02 bundle verification and RR-03 offline bundle tests recorded) |
+| Version | 1.3.1 (P3-09 photo-upload resize recorded) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -57,6 +57,7 @@ never marked deployed.**
 | DEF-01 media-deletion fix | LOCAL ONLY: commit `379e53b` on `fix/media-delete-admin-only`; not pushed, merged, or deployed |
 | DEF-02 server-Sentry fix | LOCAL ONLY: commit `b517fce` on `fix/sentry-production-initialization`; not pushed, merged, or deployed |
 | Production-bundle verification | Compile-only bundle verified at `b1a579d` (RR-02); offline bundle tests added, uncommitted (RR-03, P4-14). Node.js 22 run PENDING. Full build UNVERIFIED (needs a database, P4-03). |
+| Photo upload resize (P3-09) | LOCAL ONLY: committed on `feature/media-upload-resize` (parent `b84ab11`); not pushed, merged, or deployed. Real-browser checks PENDING. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -350,6 +351,40 @@ the owner's descriptions to commits.
 - **Acceptance:** all TODO markers replaced with real facts; approvals recorded
   only after a qualified reviewer approves. **Agents must never record an approval.**
 - **Production impact:** opens the legal pages and, through the gate, inquiry intake.
+
+#### P3-09 — Reliable admin photo upload: browser-side resize (MH-03 P0-2)
+- **Status:** DONE (automated verification); real-browser checks PENDING · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed on branch `feature/media-upload-resize` (parent `b84ab11`); not pushed, merged, or deployed.
+- **Depends on:** — (client-side only) · **Requirements:** FR-MED-01
+- **Files:** `src/lib/media-upload.ts` (new), `src/lib/media-upload.test.ts` (new),
+  `src/app/(admin)/admin/media/upload-form.tsx`,
+  `src/app/(admin)/admin/media/upload-form.render-test.ts`.
+- **Scope:** before `POST /api/media`, a photo whose long edge exceeds 2560 px
+  (the server's master cap) or whose size exceeds 4 MB is decoded upright in the
+  browser (`createImageBitmap` with `imageOrientation: "from-image"`, falling
+  back to an image element), downscaled in halving steps, and re-encoded: JPEG
+  at quality 0.92 → 0.76 until it fits, PNG stays PNG, WebP stays WebP or falls
+  back to PNG (transparency kept). Files that already fit are sent unchanged.
+  Clear errors for unsupported types, unreadable large files, files still over
+  4 MB, and a non-JSON platform 413. The 4 MB budget is a margin under the
+  commonly documented Netlify function request limit (about 6 MB, UNVERIFIED).
+  The server pipeline, `/api/media`, R2, authentication, and schema are unchanged.
+- **Acceptance:** large camera JPEGs upload as 2560 px files within 4 MB; small
+  files are sent untouched; failures read as alerts and the form recovers; the
+  existing success, error, and notice-clearing behaviour is unchanged.
+- **Tests:** `media-upload.test.ts` 20 passed (dimension fitting, upload
+  decision, quality ladder, format retention, renaming, unreadable and
+  undrawable images, resource release); `upload-form.render-test.ts` 10 passed
+  (5 new mounted-form tests with a stub router and injected preparation).
+  `npm test`: 542 tests, 540 passed, 0 failed, 2 skipped; render 270 passed;
+  typecheck and lint clean; `npm run test:bundle` PASSED (56 and 32 passed,
+  0 skipped, 0 network attempts; Node.js 22 run PENDING).
+- **Pending (manual, real browsers):** Chrome, Safari, Firefox, and iOS Safari
+  with an EXIF-rotated portrait JPEG, a 40–60 MP file, a transparent PNG, and an
+  iPhone photo; colour fidelity of wide-gamut originals; the real Netlify
+  request limit on an unpublished deploy (MH-01 A1). jsdom cannot decode or draw
+  images, so the canvas codec is not covered by automated tests.
+- **Security impact:** none; uploads still go through the authenticated route
+  and server-side validation. **Production impact:** none until released.
 
 ## Phase 4 — Edge cases and testing
 
