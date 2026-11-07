@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.3.7 (P3-11D committed as `cd79df9`; P3-11E project videos and public Films recorded, uncommitted) |
+| Version | 1.3.8 (P3-11E committed as `186d489`; MH-08 Better Auth update and video integration checklist committed under MH-09) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -63,7 +63,7 @@ never marked deployed.**
 | Video services (P3-11B) | LOCAL ONLY: committed as `6868cbe` on `feature/video-upload-backend` (parent `18a6f76`); not integrated, pushed, merged, or deployed. |
 | Video database adapter and routes (P3-11C) | LOCAL ONLY: committed as `b440dcf` on `feature/video-upload-backend` (parent `6868cbe`); migration `20261106120000_add_uploaded_video` NOT APPLIED to any database; not pushed, merged, or deployed. |
 | Admin video library (P3-11D) | LOCAL ONLY: committed as `cd79df9` on `feature/video-upload-backend` (parent `b440dcf`); uploads disabled until the Mux upload host is confirmed; not pushed, merged, or deployed. |
-| Project videos and public Films (P3-11E) | LOCAL ONLY: committed on `feature/video-upload-backend` (parent `cd79df9`; hash under MH-08); needs the unapplied P3-11C migration and a configured Mux account; not pushed, merged, or deployed. |
+| Project videos and public Films (P3-11E) | LOCAL ONLY: committed as `186d489` on `feature/video-upload-backend` (parent `cd79df9`); needs the unapplied P3-11C migration and a configured Mux account; not pushed, merged, or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -646,7 +646,7 @@ the owner's descriptions to commits.
   **Production impact:** none until released; inert without `MUX_*`.
 
 #### P3-11E — Project video assignment and public Films (MH-03, MH-06, MH-07)
-- **Status:** DONE (automated, offline: fake database with row locks, fake fetch, jsdom); PostgreSQL locking and real playback UNVERIFIED (**P4-03 BLOCKED**, MH-02D trial) · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed on `feature/video-upload-backend` (parent `cd79df9`, P3-11D; the hash is recorded under MH-08 below); not pushed, merged, or deployed.
+- **Status:** DONE (automated, offline: fake database with row locks, fake fetch, jsdom); PostgreSQL locking and real playback UNVERIFIED (**P4-03 BLOCKED**, MH-02D trial) · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY. Committed as `186d489` on `feature/video-upload-backend` (parent `cd79df9`, P3-11D); not pushed, merged, or deployed.
 - **Part A (P3-11D finalised):** reviewed; retry after a provider 404 confirmed safe and asserted; checks re-run (see P3-11D); committed as `cd79df9`.
 - **Depends on:** P3-11D (done) · **Blocks:** release of uploaded video (with P4-03, MH-02D)
 - **Files (new):** `src/server/cms/project-save.ts` (+ `project-save.test.ts`), `src/lib/cms/project-videos.ts` (+ test), `src/components/admin/project-video-picker.tsx` (+ render test), `src/components/public/project-films.tsx` (+ render test).
@@ -657,6 +657,13 @@ the owner's descriptions to commits.
 - **BLOCKED:** the PostgreSQL proof that `FOR UPDATE` in the save and in `beginDeletion` serialise as modelled (two real concurrent transactions, both orders) needs the disposable database (P4-03). Not claimed as verified.
 - **Security review (no upgrade, as instructed):** `npm audit` marks `better-auth` 1.7.3 critical through three advisories, all fixed in 1.7.7 (npm offers 1.7.18, not semver-major): GHSA-965c-763c-88jm / CVE-2026-114607 (critical 9.1; OAuth state usable as a Magic Link token; needs the Magic Link plugin and a social or Generic OAuth provider), GHSA-r4xp-prcw-77qf (high 7.4; needs the OAuth Proxy plugin with cookie-stored state), GHSA-44jh-23m7-hpcf (low 3.7; database-stored Better Auth rate limits on the Drizzle or Kysely adapter). `src/server/auth/config.ts` uses email and password only, the Prisma adapter, `nextCookies`, no social or OAuth provider, no Magic Link, no OAuth Proxy, no Better Auth rate-limit storage: **not affected** by any, per the advisory texts. Recommended: upgrade to the latest 1.7.x (≥ 1.7.7) in a separate task with the auth test suite and bundle tests; add a review step before any OAuth or Magic Link plugin is enabled.
 - **Production impact:** none until released; Films render only for assigned READY videos.
+
+#### MH-08 — Finalise the video MVP and prepare integration testing
+- **Status:** Part A DONE (P3-11E committed as `186d489`); Part B DONE (Better Auth 1.7.18; committed under MH-09, hash recorded there); Part C DONE (checklist) · **Completed:** 2026-11-06 · **Release:** LOCAL ONLY; not pushed, merged, or deployed.
+- **Part A review:** the working tree held only the 29 P3-11E files. The EDITOR gate is `manageVideos: isAdministrative(actor.role)` in `saveProject` (a test now pins it). Both locks are `FOR UPDATE` on the same `"video"` row by `"id"` (`lockVideoRowSql` and `lockVideosForAssignmentSql`). The public HTML holds no provider ID, playback ID, or token, and structured data does not read films. Pre-commit: `npm test` 806 tests, 804 passed, 0 failed, 2 skipped; render 300 passed; typecheck, lint, `git diff --check` clean; `test:bundle` PASSED (56/56, 32/32, 0 network attempts).
+- **Part B (Better Auth):** `better-auth` 1.7.3 → **1.7.18** (latest 1.7.x; patched since 1.7.7), pinned exactly. The lockfile changes only Better Auth's own tree: `@better-auth/*` 1.7.18, `@better-auth/utils` 0.5.1, `better-call` 1.4.5, `@better-fetch/fetch` 1.3.3, `jose` 6.2.15, `kysely` 0.29.8, `nanostores` 1.5.5, `set-cookie-parser` 3.2.2 (no other dependant). Peers satisfied (Next 15, React 19, Prisma 7, zod 4.6.7). The 1.7.4–1.7.18 release notes list no breaking change and no schema change for this configuration. Checked against the code: the login guard only returns or throws (the 1.7.15 `hooks.before` header fix does not apply); session cookie names and attributes are unchanged (`__Secure-better-auth.session_token`, Secure, HttpOnly, SameSite=Lax, Path=/, 8 h); the middleware uses the library's `getSessionCookie`. Expected visible change: passwords over 128 characters are refused with `PASSWORD_TOO_LONG` before verification (1.7.6), which still reaches the user as the generic failure. Tests: auth, authorization, and rate-limit suites 164 tests, 162 passed, 0 failed, 2 skipped (production-build checks); `npm test` 806 tests, 804 passed, 0 failed, 2 skipped; render 300 passed; typecheck, lint clean; `test:bundle` PASSED (56/56, 32/32, including the real-bundle auth and Edge middleware checks). `npm audit`: critical 1 → 0 (low 4, moderate 11 remain, pre-existing, unrelated). Real sign-in against a database is UNVERIFIED (P4-03).
+- **Part C:** [VIDEO_INTEGRATION_CHECKLIST.md](VIDEO_INTEGRATION_CHECKLIST.md), with the owner-authorized steps marked.
+- **Remaining blockers:** P4-03 (disposable database: migration, rollback, PostgreSQL concurrency tests, integration suites); MH-02D (Mux test environment, credentials, webhook, host confirmation, CSP on a deploy preview); real-browser and 4K testing; merge, production migration, and release (all owner-authorized).
 
 ## Phase 4 — Edge cases and testing
 

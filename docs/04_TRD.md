@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/04_TRD.md` |
-| Version | 1.6.0 (P3-11D committed as `cd79df9`; P3-11E project video assignment, public Films, and `/work/:slug` playback CSP recorded, uncommitted) |
+| Version | 1.6.1 (P3-11E committed as `186d489`; MH-08 Better Auth 1.7.18 update committed under MH-09; hash recorded in `docs/06_Plan.md`) |
 | Last reviewed | 2026-11-06 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -59,7 +59,7 @@ declared range, so the lockfile is the contract. A version change is a task in
 | `next` | `^15.5.28` | 15.5.28 | Framework (App Router), Server Actions, ISR |
 | `react`, `react-dom` | `^19.2.8` | 19.2.8 | UI |
 | `typescript` (dev) | `^5.9.3` | 5.9.3 | Type checking |
-| `better-auth` | `1.7.3` (exact) | 1.7.3 | Authentication |
+| `better-auth` | `1.7.18` (exact; MH-08, committed under MH-09; was 1.7.3) | 1.7.18 | Authentication. 1.7.7+ fixes GHSA-965c-763c-88jm, GHSA-r4xp-prcw-77qf, GHSA-44jh-23m7-hpcf (none reachable with this configuration). |
 | `prisma` (dev), `@prisma/client` | `7.10.0` (exact) | 7.10.0 | ORM and migrations; client generated to `src/generated/prisma` |
 | `@prisma/adapter-neon` | `7.10.0` (exact) | 7.10.0 | Prisma driver adapter for Neon |
 | `@neondatabase/serverless` | `1.1.0` (exact) | 1.1.0 | Neon driver (WebSocket to Neon's proxy) |
