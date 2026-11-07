@@ -6,8 +6,8 @@ import {
   inputClass,
 } from "@/components/admin/admin-shell";
 import { ProjectMediaPicker } from "@/components/admin/project-media-picker";
-import { ProjectVideoPicker } from "@/components/admin/project-video-picker";
-import type { ProjectFormVideosView } from "@/lib/cms/project-videos";
+import { ProjectVideoField } from "@/components/admin/project-video-field";
+import { toVideoRef, videoSourceUrl, type VideoProvider } from "@/lib/video";
 type Category = { id: string; name: string };
 type Media = { id: string; originalName: string; altText: string | null };
 type Project = {
@@ -25,29 +25,23 @@ type Project = {
   sortOrder: number;
   seoTitle: string | null;
   seoDescription: string | null;
-  videoProvider: "YOUTUBE" | "VIMEO" | "EXTERNAL" | null;
+  videoProvider: VideoProvider | null;
   videoId: string | null;
   videoTitle: string | null;
   updatedAt: Date;
   media: { mediaId: string }[];
 };
-/**
- * The uploaded-video section (P3-11E): editable for ADMIN and SUPER_ADMIN,
- * a read-only list for an EDITOR, whose save leaves assignments unchanged.
- */
-export type ProjectFormVideos = ProjectFormVideosView;
 export function ProjectForm({
   project,
   categories,
   media,
-  videos,
 }: {
   project?: Project;
   categories: Category[];
   media: Media[];
-  videos?: ProjectFormVideos;
 }) {
   const selectedMediaIds = project?.media.map((item) => item.mediaId) ?? [];
+  const storedVideo = project ? toVideoRef({ provider: project.videoProvider, videoId: project.videoId, title: project.videoTitle }) : null;
   return (
     <AdminForm action={saveProjectAction} className="grid gap-4">
       {project && <input type="hidden" name="id" value={project.id} />}
@@ -183,72 +177,14 @@ export function ProjectForm({
           defaultValue={project?.seoDescription ?? ""}
         />
       </label>
-      <fieldset className="grid gap-3 border border-border p-4 sm:grid-cols-3">
-        <legend>Project film</legend>
-        <p className="text-sm text-muted-foreground sm:col-span-3">
-          Long-form video stays with the video provider. Enter the provider and
-          its video ID only — never a URL or embed code. Leave both empty for no
-          film. The public player loads nothing from the provider until a
-          visitor presses play.
-        </p>
-        <label>
-          Video provider
-          <select
-            className={inputClass}
-            name="videoProvider"
-            defaultValue={project?.videoProvider ?? ""}
-          >
-            <option value="">None</option>
-            <option value="YOUTUBE">YOUTUBE</option>
-            <option value="VIMEO">VIMEO</option>
-          </select>
-        </label>
-        <label>
-          Video ID
-          <input
-            className={inputClass}
-            name="videoId"
-            defaultValue={project?.videoId ?? ""}
-          />
-        </label>
-        <label>
-          Video title
-          <input
-            className={inputClass}
-            name="videoTitle"
-            defaultValue={project?.videoTitle ?? ""}
-          />
-        </label>
-      </fieldset>
+      <ProjectVideoField
+        initialTitle={storedVideo?.title ?? ""}
+        initialUrl={storedVideo ? videoSourceUrl(storedVideo) ?? "" : ""}
+      />
       <ProjectMediaPicker
         initialMediaIds={selectedMediaIds}
         media={media}
       />
-      {videos?.mode === "manage" ? (
-        <ProjectVideoPicker
-          initialVideoIds={videos.selectedIds}
-          videos={videos.options}
-        />
-      ) : videos?.mode === "readonly" ? (
-        <section className="grid gap-2 border border-border p-4" aria-labelledby="project-videos-readonly">
-          <h2 className="font-semibold" id="project-videos-readonly">Videos</h2>
-          <p className="text-sm text-muted-foreground">
-            An administrator manages the uploaded videos of a project. Saving
-            here keeps them as they are.
-          </p>
-          {videos.titles.length ? (
-            <ol className="grid gap-1 text-sm">
-              {videos.titles.map((title, index) => (
-                <li key={`${index}-${title}`}>
-                  {index + 1}. {title}
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="text-sm">No videos.</p>
-          )}
-        </section>
-      ) : null}
       <button className={buttonClass}>Save project</button>
     </AdminForm>
   );

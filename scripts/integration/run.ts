@@ -16,8 +16,7 @@
  *       Preflight and identity, then: mark the (empty) database as disposable,
  *       apply migrations through the existing guarded Prisma runner, seed
  *       test-only accounts, build with Node.js 22, start three `next start`
- *       servers, and run the suites (including the video PostgreSQL suite,
- *       `video.integration.ts`). Writes only to the verified disposable
+ *       servers, and run the suites. Writes only to the verified disposable
  *       branch; delete the branch afterwards.
  *
  * The environment file may contain only the keys in `DISPOSABLE_ENV_KEYS`.
@@ -433,17 +432,6 @@ async function run(checked: Preflight): Promise<void> {
 
   const inquiry = await exec("suite-inquiry", node, [TSX_CLI, "--conditions=react-server", "--test", "--test-reporter=spec", "scripts/integration/inquiry.integration.ts"], suiteEnv({}));
   suiteStep("inquiry workflow suite (real services)", inquiry.output, inquiry.code);
-
-  // Video MVP against real PostgreSQL (MH-09). Serial: the lock tests count
-  // waiting sessions. Mux is a local fake; the guard still blocks any other host.
-  const video = await exec("suite-video", node, [TSX_CLI, "--conditions=react-server", "--test", "--test-concurrency=1", "--test-reporter=spec", "scripts/integration/video.integration.ts"], suiteEnv({
-    DISPOSABLE_NEON_PROJECT_ID: env.DISPOSABLE_NEON_PROJECT_ID,
-    DISPOSABLE_NEON_BRANCH_ID: env.DISPOSABLE_NEON_BRANCH_ID,
-    DISPOSABLE_NEON_ENDPOINT_ID: env.DISPOSABLE_NEON_ENDPOINT_ID,
-    PROTECTED_DEVELOPMENT_ENDPOINT: env.PROTECTED_DEVELOPMENT_ENDPOINT,
-    VIDEO_INTEGRATION_CONFIRM_BRANCH: env.DISPOSABLE_NEON_BRANCH_ID,
-  }));
-  suiteStep("video PostgreSQL suite (migration, limits, transitions, webhooks, locking, rollback)", video.output, video.code);
 
   const security = await exec("security-verify", node, [TSX_CLI, "--conditions=react-server", "scripts/verify-security-flow.ts"], suiteEnv({}));
   note("npm run security:verify (existing live flow)", security.code === 0 && /Live security verification passed/.test(security.output));

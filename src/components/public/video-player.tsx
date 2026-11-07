@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type Ref } from "react";
 import { Play } from "lucide-react";
 
+import type { PublicImage } from "@/lib/public/image-source";
 import { cn } from "@/lib/utils";
 import { videoEmbedUrl, videoLabel, type VideoRef } from "@/lib/video";
 
@@ -11,6 +12,8 @@ type VideoPlayerProps = {
   /** Used as the accessible name when the CMS records no video title. */
   fallbackLabel: string;
   className?: string;
+  /** A local image shown behind the Play button (the project cover); never the provider's thumbnail. */
+  poster?: PublicImage | null;
 };
 
 /**
@@ -40,6 +43,7 @@ type VideoPlayerViewProps = {
   isActivated: boolean;
   label: string;
   onActivate: (event: MouseEvent<HTMLButtonElement>) => void;
+  poster?: PublicImage | null;
   regionRef?: Ref<HTMLDivElement>;
 };
 
@@ -62,6 +66,7 @@ export function VideoPlayerView({
   isActivated,
   label,
   onActivate,
+  poster,
   regionRef,
 }: VideoPlayerViewProps) {
   return (
@@ -85,8 +90,30 @@ export function VideoPlayerView({
           title={label}
         />
       ) : (
+        <>
+        {poster ? (
+          <>
+            {/* Decorative: the button below carries the name. Local WebP variants only (ADR 0005). */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- see ADR 0005 */}
+            <img
+              alt=""
+              className="absolute inset-0 size-full object-cover"
+              decoding="async"
+              height={poster.height}
+              loading="lazy"
+              sizes="(min-width: 1600px) 1400px, 100vw"
+              src={poster.src}
+              srcSet={poster.srcSet}
+              width={poster.width}
+            />
+            <span aria-hidden="true" className="absolute inset-0 bg-linear-to-t from-background/90 via-background/45 to-background/20" />
+          </>
+        ) : null}
         <button
-          className="group absolute inset-0 flex size-full flex-col items-center justify-center gap-5 text-center transition-colors hover:bg-surface"
+          className={cn(
+            "group absolute inset-0 flex size-full flex-col items-center justify-center gap-5 text-center transition-colors",
+            poster ? "hover:bg-background/20" : "hover:bg-surface",
+          )}
           onClick={onActivate}
           type="button"
         >
@@ -105,6 +132,7 @@ export function VideoPlayerView({
             Loads from the video provider only after you press play.
           </span>
         </button>
+        </>
       )}
     </div>
   );
@@ -135,6 +163,7 @@ export function VideoPlayerView({
 export function VideoPlayer({
   className,
   fallbackLabel,
+  poster,
   video,
 }: VideoPlayerProps) {
   const [isActivated, setIsActivated] = useState(false);
@@ -157,6 +186,7 @@ export function VideoPlayer({
       embedUrl={embedUrl}
       isActivated={isActivated}
       label={label}
+      poster={poster}
       onActivate={(event) => {
         moveFocusRef.current = shouldMoveFocusOnActivate(document.activeElement, event.currentTarget);
         setIsActivated(true);

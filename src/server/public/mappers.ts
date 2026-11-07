@@ -4,9 +4,7 @@ import {
   type PublicImage,
 } from "@/lib/public/image-source";
 import { toVideoRef } from "@/lib/video";
-import { formatVideoDuration } from "@/lib/video-library";
 import type {
-  PublicFilm,
   PublicPageContent,
   PublicProjectDetail,
   PublicProjectSummary,
@@ -98,16 +96,7 @@ export type ProjectSummaryRow = {
   media: { sortOrder: number; media: MediaRow }[];
 };
 
-/** One uploaded video assigned to a project (P3-11E). */
-export type ProjectVideoRow = {
-  sortOrder: number;
-  video: { id: string; title: string; status: string; durationSeconds: number | null };
-};
-
 export type ProjectRow = ProjectSummaryRow & {
-  /** Used only to address public playback; never copied onto the detail itself. */
-  id: string;
-  videos: ProjectVideoRow[];
   description: string;
   clientName: string | null;
   location: string | null;
@@ -145,28 +134,6 @@ export function toProjectSummary(
   };
 }
 
-/**
- * The Films section (P3-11E): READY uploaded videos in their saved order
- * (sortOrder, then video id). The query already selects READY only; this
- * filters again so a widened query can never publish another status.
- *
- * Only our own video and project ids leave the server: the browser asks
- * `/api/videos/[id]/playback?projectId=` for a short-lived signed URL after
- * Play, and that route re-checks publication. No provider identifier, playback
- * ID, or token is part of the page.
- */
-export function toPublicFilms(projectId: string, videos: readonly ProjectVideoRow[]): PublicFilm[] {
-  return [...videos]
-    .filter((entry) => entry.video.status === "READY")
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.video.id.localeCompare(b.video.id))
-    .map((entry) => ({
-      videoId: entry.video.id,
-      projectId,
-      title: entry.video.title,
-      durationLabel: entry.video.durationSeconds === null ? null : formatVideoDuration(entry.video.durationSeconds),
-    }));
-}
-
 export function toProjectDetail(
   project: ProjectRow,
   resolveUrl: UrlResolver,
@@ -197,7 +164,6 @@ export function toProjectDetail(
       videoId: project.videoId,
       title: project.videoTitle,
     }),
-    films: toPublicFilms(project.id, project.videos),
     gallery,
     shareImageUrl: gallery.at(0)?.src ?? null,
   };

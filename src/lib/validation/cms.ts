@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { MAX_PROJECT_VIDEOS } from "@/lib/cms/project-videos";
 import { isValidVideoId, VIDEO_PROVIDERS } from "@/lib/video";
+import { MAX_VIDEO_URL_LENGTH, parseEmbeddableVideoUrl } from "@/lib/video-url";
 
 export function slugify(value: string): string {
   return value
@@ -173,15 +173,16 @@ export const projectSchema = z.object({
   sortOrder: order,
   seoTitle: optional(70),
   seoDescription: optional(160),
-  videoProvider,
-  videoId: videoIdentifier,
+  // A pasted YouTube, Vimeo, or Google Drive link. Only the provider and its
+  // video ID are stored (see the transform below); the link itself never is.
+  videoUrl: z.string().trim().max(MAX_VIDEO_URL_LENGTH).default(""),
   videoTitle,
   mediaIds: z.array(z.string().uuid()).default([]),
-  // Uploaded videos in display order (P3-11E). Absent means "leave the stored
-  // assignments alone": an EDITOR's form has no video section.
-  videoIds: z.array(z.string().uuid()).max(MAX_PROJECT_VIDEOS).optional(),
 }).superRefine((value, ctx) => {
-  checkVideoPair(value.videoProvider, value.videoId, ctx, "videoId");
+  if (value.videoUrl) {
+    const video = parseEmbeddableVideoUrl(value.videoUrl);
+    if (!video.ok) ctx.addIssue({ code: "custom", path: ["videoUrl"], message: video.message });
+  }
 
   if (value.id && !value.expectedUpdatedAt) {
     ctx.addIssue({
@@ -198,12 +199,14 @@ export const projectSchema = z.object({
       message: "A media item can only be attached once.",
     });
   }
-
-  if (value.videoIds && new Set(value.videoIds).size !== value.videoIds.length) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["videoIds"],
-      message: "A video can only be added to a project once.",
-    });
-  }
+}).transform(({ videoUrl, ...value }) => {
+  const parsed = videoUrl ? parseEmbeddableVideoUrl(videoUrl) : null;
+  const video = parsed?.ok ? parsed.value : null;
+  return {
+    ...value,
+    videoProvider: video?.provider ?? null,
+    videoId: video?.videoId ?? null,
+    // A title without a video would never be shown.
+    videoTitle: video ? value.videoTitle : null,
+  };
 });

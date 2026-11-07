@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/04_TRD.md` |
-| Version | 1.6.1 (P3-11E committed as `186d489`; MH-08 Better Auth 1.7.18 update committed under MH-09; hash recorded in `docs/06_Plan.md`) |
-| Last reviewed | 2026-11-06 |
+| Version | 1.7.0 (MH-10: Mux upload/streaming removed; YouTube, Vimeo, and Google Drive embeds; `GOOGLE_DRIVE` migration, not applied) |
+| Last reviewed | 2026-11-07 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -73,8 +73,6 @@ declared range, so the lockfile is the contract. A version change is a task in
 | `lucide-react` | `^1.39.0` | 1.39.0 | Icons |
 | `clsx` / `tailwind-merge` | `^2.1.1` / `^3.6.0` | 2.1.1 / 3.6.0 | Class composition (`cn`) |
 | `server-only` | `0.0.1` | 0.0.1 | Build-time guard against client imports |
-| `@mux/upchunk` | `3.5.0` (exact; P3-11D, LOCAL ONLY) | 3.5.0 | Resumable chunked browser upload to Mux direct-upload URLs; loaded only on `/admin/videos` when an upload starts. MIT; dependencies `xhr` (`global`, `once`, `parse-headers`) and `event-target-shim`, all MIT; no audit advisory. |
-| `hls.js` | `1.7.4` (exact; P3-11D, LOCAL ONLY) | 1.7.4 | HLS playback outside Safari; loaded only after Play; run without a Web Worker. Apache-2.0; no runtime dependencies; no audit advisory. |
 | `tailwindcss`, `@tailwindcss/postcss` (dev) | `^4.3.3` | 4.3.3 | Styling |
 
 **Turnstile** has no npm dependency. The widget loads
@@ -316,9 +314,9 @@ docs/                   This Context Architecture, earlier docs, ADRs.
 
 ## 4. Environment variables
 
-Names only. Values are never written in documentation. `.env.example` (the 29
-names counted before P3-11C plus the five `MUX_*` names, empty values) is the
-committed contract.
+Names only. Values are never written in documentation. `.env.example` (29 names,
+empty values) is the committed contract. MH-10 removed the `MUX_*` and
+`VIDEO_*` names with the Mux implementation.
 
 | Group | Variables | Required |
 | --- | --- | --- |
@@ -329,8 +327,6 @@ committed contract.
 | Rate limiting | `RATE_LIMIT_HMAC_SECRET` (≥ 32 chars) | Every non-development environment. Without it, sign-in (LOCAL ONLY) and inquiries refuse. |
 | Media | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_BASE_URL` | Admin uploads; public delivery needs only `R2_PUBLIC_BASE_URL` |
 | Email | `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`, `EMAIL_ADMIN_RECIPIENTS` | Optional; without them deliveries are `SKIPPED` |
-| Video CSP (P3-11D, LOCAL ONLY) | `VIDEO_UPLOAD_ORIGIN` (one https origin), `VIDEO_PLAYBACK_ORIGINS` (extra https segment origins); not secrets, read at build time | Optional. Without `VIDEO_UPLOAD_ORIGIN` the admin offers no upload form. Both only widen the `/admin/videos` policy; `VIDEO_PLAYBACK_ORIGINS` also widens `/work/:slug` (SEC-10). The Mux upload and segment hosts are UNVERIFIED (MH-02D). |
-| Video (P3-11C, LOCAL ONLY) | `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`, `MUX_WEBHOOK_SECRET`, `MUX_SIGNING_KEY_ID`, `MUX_SIGNING_PRIVATE_KEY` (server-only) | Optional. All five valid plus a valid `BETTER_AUTH_URL` enable uploaded video; none set disables it; a partial or malformed set fails closed (routes answer 503, names-only log). |
 | Turnstile | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_EXPECTED_HOSTNAME` | Production inquiry intake |
 | Analytics | `UMAMI_WEBSITE_ID`, `NEXT_PUBLIC_UMAMI_WEBSITE_ID`, `NEXT_PUBLIC_UMAMI_SCRIPT_URL` | Optional |
 | Monitoring | `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT`, `NEXT_PUBLIC_SENTRY_RELEASE`, `SENTRY_ORG`, `SENTRY_PROJECT`; `SENTRY_AUTH_TOKEN` (Netlify or CI only, documented in a comment) | Optional |
@@ -347,11 +343,6 @@ re-checks the session on the server. "Audit" lists `audit_log.action` values.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `/api/auth/[...all]` | Better Auth routes (`sign-in/email`, `sign-out`, `get-session`, and others) | JSON | JSON and `Set-Cookie` | Public. Sign-up disabled (`disableSignUp`). Origin must be `BETTER_AUTH_URL`. | Better Auth; guard normalizes email | Login guard on `/sign-in/email`: account 6/15 min, client 20/15 min (LOCAL ONLY). Better Auth's in-memory limiter, 3/10 s per address. | session rows, rate buckets, audit `admin.sign_in_throttled` | 401 generic; 429 + `Retry-After`; 503 when the limiter is unavailable |
 | `/api/media` | `POST` | multipart `file`, `altText` (≤ 500) | 201 `{ id }` | Session (any role) | Content-Length ≤ 15 MB + 64 KB; Sharp content check; ≤ 12,000 px | none | R2 objects, `media`, `media_variant`, audit `media.uploaded` | 401, 413, 400 with message, 500 generic; partial uploads cleaned up |
-| `/api/videos/uploads` (P3-11C, LOCAL ONLY) | `POST` | JSON `{ title, filename, fileSizeBytes }`, ≤ 4 KB | 201 `{ videoId, uploadUrl, expiresAt }`, `private, no-store` | `Origin` = `BETTER_AUTH_URL` and `Sec-Fetch-Site` same-origin; session; ADMIN | title 1–160; file name mp4/mov/m4v/mkv/webm, no path; declared size 1 B–10 GiB (not proof of bytes received); two active uploads per user (DB-atomic) | 10/h per user | Mux direct upload (signed playback), `video` row before the URL is returned; audit `video.upload_started` | 401, 403, 415, 413, 400 with code; 409 `too_many_uploads`; 429; 503 not configured or limiter unavailable; 502/503 provider; provider upload cancelled if persistence fails |
-| `/api/videos/uploads/[id]/cancel` (P3-11C, LOCAL ONLY) | `POST` | `id` (uuid) | 200 `{ status: "CANCELLED" }` | as above; ADMIN | uuid | 30/10 min per user | Mux cancel, conditional update; audit `video.upload_cancelled` (first time only) | idempotent; 404; 409 once processing; 503 |
-| `/api/videos/[id]` (P3-11D, LOCAL ONLY) | `DELETE` | `id` (uuid) | 200 `{ deleted: true }`, `private, no-store` | as uploads; ADMIN | uuid; not UPLOAD_PENDING, not freshly DELETING, no project assignment (checked under a row lock) | 30/10 min per user | claim DELETING, delete the Mux asset (found through the upload when no asset ID is stored; already gone counts as deleted), remove the row; audit `video.deleted` or `video.delete_failed` | 409 `delete_assigned`, `delete_upload_in_progress`, `delete_in_progress`; 404; provider or database failure → DELETE_FAILED and 503 (retryable) or 502; Retry is the same request |
-| `/api/webhooks/mux` (P3-11C, LOCAL ONLY) | `POST` | raw body ≤ 1 MiB, `mux-signature` | `{ ok }` | HMAC-SHA256 over the exact raw bytes, 300 s tolerance | payload used for type and IDs only; state re-read from Mux; asset `passthrough` and `upload_id` must match | none (signed) | forward-only conditional updates; orphan asset of a cancelled upload deleted; audit `video.ready`, `video.processing_failed`, `video.upload_cancelled` | 401 forged; 413; 200 for duplicate, late, unknown, or unowned events; 503 (redelivered) for provider, database, conflict, or missing configuration |
-| `/api/videos/[id]/playback` (P3-11C, LOCAL ONLY) | `GET` | `id`; optional `projectId` | 200 `{ url, expiresAt }` (HTTPS `stream.mux.com`, RS256 token, 15 min), `private, no-store` | With `projectId`: public, video READY and assigned to that project, PUBLISHED with an active category; a session does not widen this. Without: ADMIN or SUPER_ADMIN preview (EDITOR 403 since P3-11D). | uuids | public 60/10 min per client; admin 120/10 min per user | none | public refusals are one identical 404; admin 409 not ready; 401; 429; 503 |
 | `/admin/inquiries/export` | `GET` | none | `text/csv`, `private, no-store` | ADMIN | — | none | audit `crm.exported` | 403 `Forbidden` (`text/plain`) |
 | `/admin/customers/[id]/export` | `GET` | `id` | JSON attachment `customer-<id>.json`, `private, no-store` | SUPER_ADMIN | — | none | audit `privacy.customer_exported` | 403 `Forbidden` |
 | `/sitemap.xml`, `/robots.txt`, `/opengraph-image` | `GET` | none | XML, text, image | Public | — | none | none | Empty sitemap and no sitemap line when no origin is configured |
@@ -389,7 +380,6 @@ re-checks the session on the server. "Audit" lists `audit_log.action` values.
 | Sentry | Optional errors | `src/instrumentation*.ts`, `src/lib/monitoring/*` | `NEXT_PUBLIC_SENTRY_*`, `SENTRY_*` | Code IMPLEMENTED; account UNVERIFIED; server initialization fixed locally (DEF-02) |
 | Umami | Optional cookieless analytics | `src/components/analytics/umami-analytics.tsx` | `UMAMI_*` | Code IMPLEMENTED; account UNVERIFIED |
 | YouTube-nocookie, Vimeo | Click-to-load embeds | `src/lib/video.ts` | none | IMPLEMENTED |
-| Mux Video | Uploaded video: direct uploads, signed HLS playback, webhooks | `src/server/video/*` (`mux-client.ts` is the only provider boundary) | `MUX_*` | Code LOCAL ONLY (P3-11A–C); never contacted; account and trial UNVERIFIED (MH-02D) |
 
 ## 7. Security
 
@@ -404,7 +394,7 @@ re-checks the session on the server. "Audit" lists `audit_log.action` values.
 | SEC-07 | Bot protection | Turnstile server verification with hostname, action, and freshness checks; 5 s timeout. The development bypass compiles out of production builds. | IMPLEMENTED. Bypass removal is LOCAL ONLY (DEF-03). |
 | SEC-08 | CSRF and origin | Better Auth trusted origin = `BETTER_AUTH_URL`; Next.js Server Action origin check; CSP `form-action 'self'`; `SameSite=Lax`. | IMPLEMENTED |
 | SEC-09 | Input validation | zod schemas at every server boundary (`src/lib/validation/*`); plain-text content only. | IMPLEMENTED |
-| SEC-10 | Security headers | CSP (Turnstile, R2, Umami, and Sentry origins only when configured; `frame-ancestors 'none'`; `object-src 'none'`), `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `Permissions-Policy`. HSTS and `upgrade-insecure-requests` in production. Single source `securityHeaders()`. `/admin/videos` alone gets `videoAdminSecurityHeaders()` (P3-11D, LOCAL ONLY): `connect-src` adds `https://stream.mux.com`, `VIDEO_PLAYBACK_ORIGINS`, and `VIDEO_UPLOAD_ORIGIN`; `media-src` adds `blob:` and the playback origins; no wildcard, no `worker-src`. `/work/:slug` gets `videoPlaybackSecurityHeaders()` (P3-11E, LOCAL ONLY): `connect-src` adds `https://stream.mux.com` and `VIDEO_PLAYBACK_ORIGINS`; `media-src` adds `blob:` and the same origins; never the upload origin; `frame-src` unchanged. Both rely on the later `next.config.ts` header entry replacing the global value (documented Next.js behaviour; UNVERIFIED on a deploy). | IMPLEMENTED |
+| SEC-10 | Security headers | CSP (Turnstile, R2, Umami, and Sentry origins only when configured; `frame-ancestors 'none'`; `object-src 'none'`), `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `Permissions-Policy`. HSTS and `upgrade-insecure-requests` in production. Single source `securityHeaders()`. `frame-src` allows Turnstile, `youtube-nocookie.com`, `player.vimeo.com`, and `drive.google.com` (MH-10) only; no Mux or wildcard origin. | IMPLEMENTED |
 | SEC-11 | Media access | Uploads only through the authenticated Route Handler; R2 write credentials server-only; public read through `R2_PUBLIC_BASE_URL`; metadata stripped; random object keys. | IMPLEMENTED |
 | SEC-12 | Audit logging | `audit_log` rows for authentication, CMS, media, CRM, email, and privacy events; no PII in metadata for privacy and throttle events. | IMPLEMENTED; TD-01, TD-09 |
 | SEC-13 | Privacy controls | SUPER_ADMIN export and anonymization; pseudonymous rate-limit keys; cookieless analytics; click-to-load video; Sentry `beforeSend` scrubbing. | IMPLEMENTED; retention not automated (OD-07) |
@@ -458,12 +448,14 @@ production it requires `--allow-production` plus a typed endpoint confirmation.
 All 7 migrations are additive, and no migration exists after `20260912090000`,
 so commits `288fde6`…`4f7f564` need no schema change.
 
-P3-11C adds an eighth migration, `20261106120000_add_uploaded_video` (enum
-`VideoStatus`, tables `video` and `project_video`; additive only), on
-`feature/video-upload-backend` (LOCAL ONLY). It was generated offline with
-`prisma migrate diff --from-schema --to-schema` and has **not been applied to
-any database**; applying and testing it on a disposable database is BLOCKED by
-P4-03. It must be deployed before any build that includes the video routes.
+MH-10 adds an eighth migration, `20261107120000_add_google_drive_video_provider`
+(`ALTER TYPE "VideoProvider" ADD VALUE 'GOOGLE_DRIVE'`; additive), on
+`feature/external-video` (LOCAL ONLY, **not applied**). It matches an offline
+`prisma migrate diff` from the 7-migration schema exactly. Apply it before
+publishing a build whose admin can save a Google Drive link. No row uses the
+value until the new admin saves one; before rolling back to older code, clear
+such rows (`VIDEO_INTEGRATION_CHECKLIST.md`, section 3). The Mux migration `20261106120000_add_uploaded_video` was
+withdrawn before it was applied anywhere (see `05_Schema.md`).
 
 ### 8.5 Configuration prerequisites for the next release
 

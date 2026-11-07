@@ -10,7 +10,7 @@
  * click-to-load Client Component can use it.
  */
 
-export const VIDEO_PROVIDERS = ["YOUTUBE", "VIMEO", "EXTERNAL"] as const;
+export const VIDEO_PROVIDERS = ["YOUTUBE", "VIMEO", "EXTERNAL", "GOOGLE_DRIVE"] as const;
 
 export type VideoProvider = (typeof VIDEO_PROVIDERS)[number];
 
@@ -24,14 +24,16 @@ export type VideoRef = {
  * Identifier shapes accepted from the CMS.
  *
  * YouTube uses 11 URL-safe characters today, but the length is not contractual,
- * so a conservative range is allowed. Vimeo identifiers are numeric. Anything
- * outside these shapes is rejected rather than interpolated into a URL, which
- * is what keeps a stored value from escaping the embed path.
+ * so a conservative range is allowed. Vimeo identifiers are numeric. Google
+ * Drive file IDs are opaque URL-safe strings (typically 28–44 characters).
+ * Anything outside these shapes is rejected rather than interpolated into a
+ * URL, which is what keeps a stored value from escaping the embed path.
  */
 const ID_PATTERNS: Record<VideoProvider, RegExp> = {
   YOUTUBE: /^[A-Za-z0-9_-]{6,32}$/,
   VIMEO: /^[0-9]{6,20}$/,
   EXTERNAL: /^[A-Za-z0-9_-]{1,64}$/,
+  GOOGLE_DRIVE: /^[A-Za-z0-9_-]{20,64}$/,
 };
 
 /** True when `id` is a syntactically valid identifier for `provider`. */
@@ -71,6 +73,8 @@ export function toVideoRef(input: {
  * YouTube uses `youtube-nocookie.com`; Vimeo is asked not to track (`dnt=1`).
  * `autoplay=1` is safe here because the URL is only ever built *after* an
  * explicit user activation, and no `mute`/sound-on autoplay happens on load.
+ * Google Drive uses its file preview player (`/file/d/<id>/preview`); the file
+ * must be shared as "Anyone with the link", and Drive offers no autoplay.
  *
  * `EXTERNAL` deliberately has no embed URL: an unknown provider must not be
  * turned into an arbitrary third-party frame.
@@ -81,10 +85,37 @@ export function videoEmbedUrl(ref: VideoRef): string | null {
       return `https://www.youtube-nocookie.com/embed/${ref.videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
     case "VIMEO":
       return `https://player.vimeo.com/video/${ref.videoId}?autoplay=1&dnt=1`;
+    case "GOOGLE_DRIVE":
+      return `https://drive.google.com/file/d/${ref.videoId}/preview`;
     case "EXTERNAL":
       return null;
   }
 }
+
+/**
+ * The canonical page link for a stored video, so the admin form can show the
+ * saved video as a URL again. `null` for a provider without one.
+ */
+export function videoSourceUrl(ref: Pick<VideoRef, "provider" | "videoId">): string | null {
+  switch (ref.provider) {
+    case "YOUTUBE":
+      return `https://www.youtube.com/watch?v=${ref.videoId}`;
+    case "VIMEO":
+      return `https://vimeo.com/${ref.videoId}`;
+    case "GOOGLE_DRIVE":
+      return `https://drive.google.com/file/d/${ref.videoId}/view`;
+    case "EXTERNAL":
+      return null;
+  }
+}
+
+/** Display name of a provider for admin messages. */
+export const VIDEO_PROVIDER_LABELS: Record<VideoProvider, string> = {
+  YOUTUBE: "YouTube",
+  VIMEO: "Vimeo",
+  EXTERNAL: "External",
+  GOOGLE_DRIVE: "Google Drive",
+};
 
 /** Accessible name for the player, without inventing a title. */
 export function videoLabel(ref: VideoRef, fallback: string): string {

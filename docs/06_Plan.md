@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.3.9 (MH-08 Better Auth update committed as `624250f`; MH-09 video PostgreSQL suite and checklist committed as `ff52e44`) |
-| Last reviewed | 2026-11-06 |
+| Version | 1.4.0 (MH-10: Mux removed; external video embeds with Google Drive; committed on `feature/external-video`, hash recorded under MH-10) |
+| Last reviewed | 2026-11-07 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -64,6 +64,8 @@ never marked deployed.**
 | Video database adapter and routes (P3-11C) | LOCAL ONLY: committed as `b440dcf` on `feature/video-upload-backend` (parent `6868cbe`); migration `20261106120000_add_uploaded_video` NOT APPLIED to any database; not pushed, merged, or deployed. |
 | Admin video library (P3-11D) | LOCAL ONLY: committed as `cd79df9` on `feature/video-upload-backend` (parent `b440dcf`); uploads disabled until the Mux upload host is confirmed; not pushed, merged, or deployed. |
 | Project videos and public Films (P3-11E) | LOCAL ONLY: committed as `186d489` on `feature/video-upload-backend` (parent `cd79df9`); needs the unapplied P3-11C migration and a configured Mux account; not pushed, merged, or deployed. |
+| Uploaded video via Mux (P3-11A–E) | **WITHDRAWN** by owner decision (MH-10, ADR 0012); code removed on `feature/external-video`; its migration was never applied. |
+| External video embeds (MH-10) | LOCAL ONLY on `feature/external-video`; migration `20261107120000_add_google_drive_video_provider` NOT APPLIED; not pushed, merged, or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -676,6 +678,16 @@ the owner's descriptions to commits.
 - **Follow-up (2026-11-07, uncommitted):** the harness protected only `PRODUCTION_DATABASE_ENDPOINT`. A new required key, `PROTECTED_DEVELOPMENT_ENDPOINT`, is now refused independently as the disposable endpoint and in either URL (`identity.ts`), and is passed to the video suite (`run.ts`). Tests: `identity.test.ts` +3, `video-target.test.ts` +2 (46/46 in the two files); a mutation removing the development checks failed 3 tests.
 - **Next owner action:** P4-03: create a disposable Neon project or branch, then authorize `integration:preflight`, `integration:identity`, and `integration:run` against it.
 - **Production impact:** none.
+
+#### MH-10 — Replace uploaded video with external embeds (YouTube, Vimeo, Google Drive)
+- **Status:** DONE locally (automated, offline) · **Completed:** 2026-11-07 · **Release:** LOCAL ONLY on `feature/external-video` (from `d6dcb31`); migration NOT APPLIED; not pushed, merged, or deployed. Decision: [ADR 0012](DECISIONS/0012-external-video-embeds.md).
+- **Removed:** the Mux implementation (P3-11A–E): `src/server/video/*`, `/api/videos/*`, `/api/webhooks/mux`, `/admin/videos`, project video picker, public Films, HLS player, the upload/CSP/status/eligibility/message helpers, the video parts of the project save and public queries, the video integration suite and its gate, `@mux/upchunk` and `hls.js` (lockfile: deletions only), the `MUX_*`/`VIDEO_*` variables, the `Video`/`ProjectVideo` models and `VideoStatus`. Files modified by the Mux commits were restored to their pre-Mux state (`e681ffa`); no later commit had touched them.
+- **Withdrawn migration:** `20261106120000_add_uploaded_video` removed from the directory. Evidence it was never applied to a retained database: the authorized read-only `prisma migrate status` against the production endpoint (`ep-dawn-paper-b1l0y54j`) on 2026-11-07 listed it as the only pending migration; no other database is configured.
+- **Added:** `GOOGLE_DRIVE` on `VideoProvider`, migration `20261107120000_add_google_drive_video_provider` (one `ALTER TYPE … ADD VALUE`; equals an offline `prisma migrate diff` from the 7-migration schema). Drive links (`/file/d/<id>/…`, `open?id=`, `uc?id=`) parsed with exact hosts and a validated file ID; embed `https://drive.google.com/file/d/<id>/preview`. The project form takes one **Video link** (`videoUrl`) with live provider detection and a click-to-load preview (`project-video-field.tsx`); the server stores only provider, ID, and title. The public player shows the project cover as a lazy, decorative poster. CSP: `https://drive.google.com` added to `frame-src` only. Unlisted Vimeo links are refused (hash not stored). The homepage showreel keeps provider-and-ID input.
+- **Kept:** the integration harness's `PROTECTED_DEVELOPMENT_ENDPOINT` safeguard (MH-09 follow-up).
+- **Tests:** new `external-video.test.ts` (11), `video-player.render-test.ts` +3, `project-video-field.render-test.ts` (3); `form-state.test.ts` updated. `npm test`: 566 tests, 564 passed, 0 failed, 2 skipped; render 276 passed (the drop from 832/300 is the removed Mux suites); typecheck, lint, `git diff --check` clean; `test:bundle` (compile-only production build) PASSED 56/56 and 32/32. A full `next build` was not run: it pre-renders from the database and the only configured database is production.
+- **Remaining (owner-authorized):** backup, apply the migration, merge and push, publish, smoke test ([checklist](VIDEO_INTEGRATION_CHECKLIST.md)). Real-browser Drive playback (desktop and mobile) UNVERIFIED.
+- **Production impact:** none until released.
 
 ## Phase 4 — Edge cases and testing
 

@@ -11,16 +11,16 @@ import type {
   socialSchema,
   testimonialSchema,
 } from "@/lib/validation/cms";
+import { projectMediaRows } from "@/lib/cms/project-media";
+import { nextProjectVersion } from "@/lib/cms/project-version";
 import { AuditAction, recordAuditLog } from "@/server/audit/audit-log";
-import { isAdministrative } from "@/server/auth/roles";
 import type { AdminUser } from "@/server/auth/session";
-import { runProjectSave } from "@/server/cms/project-save";
 import { prisma } from "@/server/db/prisma";
 
 type Input<T extends z.ZodType> = z.infer<T>;
 export class SlugConflictError extends Error {}
 export class ReferencedCategoryError extends Error {}
-export { ProjectConflictError, ProjectVideoAssignmentError } from "@/server/cms/project-save";
+export class ProjectConflictError extends Error {}
 
 async function audit(
   actor: AdminUser,
@@ -165,36 +165,57 @@ export async function saveProject(
   actor: AdminUser,
 ) {
   try {
-    // Video assignments belong to the video library, which is ADMIN or
-    // SUPER_ADMIN only (P3-11D); an EDITOR's save leaves them untouched even
-    // if video ids are submitted (P3-11E).
-    const { project: row, videoChange } = await runProjectSave(prisma, data, {
-      manageVideos: isAdministrative(actor.role),
+    const { id, expectedUpdatedAt, mediaIds, ...fields } = data;
+    const publishedAt = fields.status === "PUBLISHED" ? new Date() : null;
+    const row = await prisma.$transaction(async (tx) => {
+      let project;
+
+      if (id) {
+        if (!expectedUpdatedAt) {
+          throw new ProjectConflictError("Reload the project before saving.");
+        }
+        const updated = await tx.project.updateMany({
+          where: { id, updatedAt: expectedUpdatedAt },
+          data: {
+            ...fields,
+            publishedAt,
+            updatedAt: nextProjectVersion(expectedUpdatedAt),
+          },
+        });
+        if (updated.count !== 1) {
+          throw new ProjectConflictError(
+            "This project changed in another session. Reload it before saving.",
+          );
+        }
+        project = await tx.project.findUniqueOrThrow({ where: { id } });
+      } else {
+        project = await tx.project.create({ data: { ...fields, publishedAt } });
+      }
+
+      await tx.projectMedia.deleteMany({ where: { projectId: project.id } });
+      if (mediaIds.length)
+        await tx.projectMedia.createMany({
+          data: projectMediaRows(mediaIds).map((item) => ({
+            projectId: project.id,
+            ...item,
+          })),
+        });
+      return project;
     });
     await audit(
       actor,
-      data.id ? AuditAction.CmsUpdated : AuditAction.CmsCreated,
+      id ? AuditAction.CmsUpdated : AuditAction.CmsCreated,
       "project",
       row.id,
     );
     await audit(
       actor,
-      data.status === "PUBLISHED"
+      fields.status === "PUBLISHED"
         ? AuditAction.ProjectPublished
         : AuditAction.ProjectUnpublished,
       "project",
       row.id,
     );
-    if (videoChange) {
-      await recordAuditLog({
-        action: AuditAction.ProjectVideosChanged,
-        entityType: "project",
-        entityId: row.id,
-        actorUserId: actor.id,
-        actorEmail: actor.email,
-        metadata: videoChange,
-      });
-    }
     return row;
   } catch (error) {
     translate(error, "project");

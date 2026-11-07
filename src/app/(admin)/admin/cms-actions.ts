@@ -13,7 +13,6 @@ import {
   testimonialSchema,
 } from "@/lib/validation/cms";
 import { describeValidationError, type AdminFormState } from "@/lib/admin/form-state";
-import { PROJECT_VIDEO_SECTION_FIELD } from "@/lib/cms/project-videos";
 import { requireAdmin, requireUser } from "@/server/auth/session";
 import {
   revalidatePublicContent,
@@ -31,7 +30,6 @@ import {
   saveSocial,
   saveTestimonial,
   ProjectConflictError,
-  ProjectVideoAssignmentError,
   ReferencedCategoryError,
   SlugConflictError,
 } from "@/server/cms/service";
@@ -42,7 +40,6 @@ function values(form: FormData) {
 function failure(error: unknown): NonNullable<AdminFormState> {
   if (error instanceof SlugConflictError) return { error: error.message, field: "slug" };
   if (error instanceof ProjectConflictError) return { error: error.message };
-  if (error instanceof ProjectVideoAssignmentError) return { error: error.message };
   if (error instanceof ReferencedCategoryError) return { error: error.message };
   if (error instanceof z.ZodError) return describeValidationError(error);
   return { error: "The change could not be saved." };
@@ -211,11 +208,6 @@ export async function saveProjectAction(
           id,
           featured: form.has("featured"),
           mediaIds: form.getAll("mediaIds"),
-          // Present only when the form rendered the video section (ADMIN or
-          // SUPER_ADMIN); the service ignores it for any other role.
-          videoIds: form.has(PROJECT_VIDEO_SECTION_FIELD)
-            ? form.getAll("videoIds")
-            : undefined,
         }),
         actor,
       );

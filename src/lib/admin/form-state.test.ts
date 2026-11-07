@@ -38,7 +38,7 @@ describe("admin validation messages", () => {
   });
 
   it("keeps cross-field messages on the field the schema points at", () => {
-    assert.deepEqual(failureOf(projectSchema.safeParse({ ...project, videoProvider: "VIMEO", videoId: "" })), { error: "Set both a video provider and a video ID, or leave both empty.", field: "videoId" });
+    assert.deepEqual(failureOf(projectSchema.safeParse({ ...project, videoUrl: "https://example.com/film.mp4" })), { error: "Only YouTube, Vimeo, and Google Drive links are supported.", field: "videoUrl" });
     assert.deepEqual(failureOf(settingsSchema.safeParse({ ...settings, showreelProvider: "YOUTUBE", showreelVideoId: "https://youtu.be/x" })), { error: "Enter the provider's video ID only — not a URL or embed code.", field: "showreelVideoId" });
   });
 

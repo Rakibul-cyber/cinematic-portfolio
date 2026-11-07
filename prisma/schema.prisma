@@ -72,19 +72,7 @@ enum VideoProvider {
   YOUTUBE
   VIMEO
   EXTERNAL
-}
-
-/// Lifecycle of an uploaded video (`src/lib/video-status.ts`). Transitions only
-/// move forward and are applied with conditional updates; a successful
-/// deletion removes the row, so there is no DELETED value.
-enum VideoStatus {
-  UPLOAD_PENDING
-  PROCESSING
-  READY
-  FAILED
-  CANCELLED
-  DELETING
-  DELETE_FAILED
+  GOOGLE_DRIVE
 }
 
 enum InquiryStatus {
@@ -143,7 +131,6 @@ model User {
   sessions  Session[]
   auditLogs AuditLog[]
   media     Media[]
-  videos    Video[]
   customerNotes CustomerNote[]
   inquiryStatusChanges InquiryStatusHistory[]
 
@@ -217,7 +204,6 @@ model Project {
 
   category PortfolioCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   media    ProjectMedia[]
-  videos   ProjectVideo[]
 
   @@index([status, sortOrder])
   @@index([categoryId])
@@ -238,61 +224,6 @@ model ProjectMedia {
   @@index([projectId, sortOrder])
   @@index([mediaId])
   @@map("project_media")
-}
-
-/// A video uploaded to the streaming provider (Mux) through a direct upload.
-///
-/// Only identifiers and display facts are stored. The signed upload URL is a
-/// bearer credential and is never stored; playback is always signed. Provider
-/// failure text is reduced to a known code (`failureCode`) before it is saved.
-///
-/// `declaredSizeBytes` is what the uploader's browser reported. It refuses
-/// obviously oversized files early but is not proof of the bytes received.
-model Video {
-  id                String      @id @default(uuid())
-  title             String
-  originalFilename  String
-  declaredSizeBytes BigInt
-  status            VideoStatus @default(UPLOAD_PENDING)
-  uploaderId        String
-  muxUploadId       String      @unique
-  muxAssetId        String?     @unique
-  /// Signed playback ID; set only when the video becomes READY.
-  playbackId        String?     @unique
-  durationSeconds   Float?
-  width             Int?
-  height            Int?
-  maxResolution     String?
-  failureCode       String?
-  /// When the provider's upload URL stops accepting the file.
-  uploadExpiresAt   DateTime
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-
-  uploader User           @relation(fields: [uploaderId], references: [id], onDelete: Restrict)
-  projects ProjectVideo[]
-
-  @@index([uploaderId, status, uploadExpiresAt])
-  @@index([status])
-  @@map("video")
-}
-
-/// Assignment of a video to a project. A video may be shared by several
-/// projects. Deleting a project removes its assignments; a video cannot be
-/// deleted while any assignment exists (`Restrict`).
-model ProjectVideo {
-  projectId String
-  videoId   String
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  video   Video   @relation(fields: [videoId], references: [id], onDelete: Restrict)
-
-  @@id([projectId, videoId])
-  @@index([projectId, sortOrder])
-  @@index([videoId])
-  @@map("project_video")
 }
 
 model Service {

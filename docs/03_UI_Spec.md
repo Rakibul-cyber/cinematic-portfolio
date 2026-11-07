@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/03_UI_Spec.md` |
-| Version | 1.2.0 (P3-11E project video picker and public Films section recorded, LOCAL ONLY) |
-| Last reviewed | 2026-11-06 |
+| Version | 1.1.0 (MH-10: cover-image poster, Google Drive, admin video link field) |
+| Last reviewed | 2026-11-07 |
 | Reviewed against | commit `4f7f564` (branch `docs/context-architecture`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -251,34 +251,12 @@ polite live region; the submit button is disabled while pending.
 
 | State | Behaviour |
 | --- | --- |
-| Default (inactive) | A provider-free frame with a play control (64 px, 80 px at `sm`), a label, and a short privacy note. **No request** goes to the provider. |
-| Hover | Fill `hover:bg-surface`; control border and icon turn accent. |
+| Default (inactive) | A provider-free frame with a play control (64 px, 80 px at `sm`), a label, and a short privacy note. On project pages the project cover is shown behind it (local WebP variants, `loading="lazy"`, decorative `alt=""`, gradient `from-background/90`). **No request** goes to the provider. |
+| Hover | Fill `hover:bg-surface` (`hover:bg-background/20` over a poster); control border and icon turn accent. |
 | Focus | Global outline on the play button. |
 | Active | Replaced by an `iframe` with `allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"`, in a `role="group"` labelled with the video name. |
 | Error / unsupported | `EXTERNAL` provider: no embed URL, so the player is not rendered. |
 | Responsive | Fills its container (`absolute inset-0`), inside an `aspect-video` frame. |
-
-### 4.6a Uploaded-video player (`src/components/video/hls-player.tsx`, P3-11D, LOCAL ONLY)
-
-| State | Behaviour |
-| --- | --- |
-| Default (inactive) | An `aspect-video` frame with a square-cornered **Play** button (admin button type style, border, no shadow); the title is a visually hidden suffix. **No request** is made: no playback token, playlist, or player library. |
-| Loading | Button disabled, "Loading…". |
-| Active | A native `<video controls playsInline>` labelled "Video: <title>". Safari plays the signed HLS URL natively; other browsers load `hls.js` on demand (no Web Worker). |
-| Error | `role="alert"` line under the frame: not available (404), still processing (409), no permission (403), session ended (401), too many requests (429), or a generic failure; an unsupported browser says so. Play is offered again. |
-
-### 4.6b Project videos and Films (P3-11E, LOCAL ONLY)
-
-- **Editor picker** (`src/components/admin/project-video-picker.tsx`): the same
-  fieldset pattern as the image picker: an ordered list (number, title, "Ready ·
-  duration · resolution", Up, Down, Remove) and a "Ready videos" list with Add.
-  A non-READY attached video shows "Not ready. Remove it before saving." Moves
-  and removals are announced in a polite live region. Square corners, borders,
-  no shadows.
-- **Public Films** (`src/components/public/project-films.tsx`): an eyebrow
-  heading "Films" in the accent style used by "Film", then one `HlsPlayer` per
-  video with its title and duration above, in saved order. Rendered nothing when
-  there are no films.
 
 ### 4.7 Dialogs and toasts
 
@@ -328,8 +306,14 @@ polite live region; the submit button is disabled while pending.
 
 Click-to-load only. No autoplay before activation; after activation the embed
 URL requests autoplay (`autoplay=1`). YouTube uses `youtube-nocookie.com` with
-`rel=0`, `modestbranding=1`, and `playsinline=1`; Vimeo uses `dnt=1`. The CSP
-`frame-src` allows only those two hosts and Turnstile.
+`rel=0`, `modestbranding=1`, and `playsinline=1`; Vimeo uses `dnt=1`; Google
+Drive uses `drive.google.com/file/d/<id>/preview` (no autoplay). The CSP
+`frame-src` allows only those three hosts and Turnstile.
+
+Admin (MH-10): the project form has one **Video link** field. The provider is
+detected as the administrator types ("Detected: Google Drive"), refusals are
+explained in plain words, and a valid link shows the same click-to-load player
+as a preview (`project-video-field.tsx`).
 
 ### 5.3 Loading placeholders and fallbacks
 

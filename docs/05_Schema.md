@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/05_Schema.md` |
-| Version | 1.2.2 (P3-11D committed as `cd79df9`; P3-11E assignment locking recorded; no schema change; migration not applied) |
-| Last reviewed | 2026-11-06 |
+| Version | 1.3.0 (MH-10: `GOOGLE_DRIVE` video provider; the unapplied Mux migration was withdrawn) |
+| Last reviewed | 2026-11-07 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -174,7 +174,7 @@ erDiagram
 | `MediaVariantName` | `THUMBNAIL`, `W640`, `W1280`, `W1920`, `MASTER` | `media_variant.variant` (the master is also `media.objectKey`) |
 | `PublicationStatus` | `DRAFT`, `PUBLISHED` | `project.status` |
 | `ProjectMediaRole` | `COVER`, `HERO`, `GALLERY` | `project_media.role` |
-| `VideoProvider` | `YOUTUBE`, `VIMEO`, `EXTERNAL` | `project.videoProvider`, `site_setting.showreelProvider` |
+| `VideoProvider` | `YOUTUBE`, `VIMEO`, `EXTERNAL`, `GOOGLE_DRIVE` (MH-10, migration 8) | `project.videoProvider`, `site_setting.showreelProvider` |
 | `InquiryStatus` | `NEW`, `CONTACTED`, `DISCUSSION`, `QUOTE_SENT`, `CONFIRMED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED` | `inquiry.status`, `inquiry_status_history.fromStatus`/`toStatus` |
 | `EmailDeliveryType` | `INQUIRY_ADMIN_NOTIFICATION`, `INQUIRY_CUSTOMER_ACKNOWLEDGMENT` | `email_delivery.type` |
 | `EmailDeliveryStatus` | `PROCESSING`, `ACCEPTED`, `FAILED`, `SKIPPED` | `email_delivery.status` |
@@ -720,47 +720,19 @@ down script.
 | 5 | `20260908190000_add_inquiry_crm` | 2026-09-08 | `InquiryStatus`; `customer`, `inquiry`, `inquiry_status_history`, `customer_note` | 1 (`user`), 3 (`service`) |
 | 6 | `20260910224253_add_email_delivery` | 2026-09-10 | `EmailDeliveryType`, `EmailDeliveryStatus`; `email_delivery` | 5 (`inquiry`) |
 | 7 | `20260912090000_add_security_privacy` | 2026-09-12 | `rate_limit_bucket`; `anonymizedAt` on `customer` and `inquiry` | 5 |
-| 8 | `20261106120000_add_uploaded_video` (P3-11C, LOCAL ONLY, **NOT APPLIED** anywhere; database testing BLOCKED by P4-03) | 2026-11-06 | `VideoStatus`; `video`, `project_video` | 1 (`user`), 3 (`project`) |
+| 8 | `20261107120000_add_google_drive_video_provider` (MH-10, LOCAL ONLY, **not applied**) | 2026-11-07 | value `GOOGLE_DRIVE` on `VideoProvider` (`ALTER TYPE … ADD VALUE`; additive, no table or row change) | 4 |
+
+**Withdrawn migration.** `20261106120000_add_uploaded_video` (Mux `video` and
+`project_video` tables, P3-11C) was removed from the directory in MH-10 before
+it was applied anywhere: `prisma migrate status` against the production
+endpoint on 2026-11-07 listed it as the only pending migration. A database
+that ever applied it would need its tables and `_prisma_migrations` row
+removed by hand; none is known.
 
 **Compatibility.** Every application commit from `288fde6` (published) to
 `4f7f564` uses this same schema. Publishing any of them needs no migration. The
 login limiter (`10f09b4`) reuses `rate_limit_bucket` with new scopes rather
 than adding a table (ADR 0011).
-
-**P3-11C video tables (LOCAL ONLY, not applied).** `video` holds one Mux direct
-upload: title, original file name, `declaredSizeBytes` (`BIGINT`; the browser's
-declaration, not proof of bytes received), `status` (`VideoStatus`, seven
-values, forward-only), `uploaderId` (→ `user`, `RESTRICT`), unique
-`muxUploadId`, `muxAssetId`, and signed `playbackId`, display metadata, a
-`failureCode` that is always a known code, and `uploadExpiresAt`. The signed
-upload URL is never stored. `project_video` (`projectId`, `videoId`,
-`sortOrder`; key `(projectId, videoId)`) assigns videos to projects: deleting a
-project cascades to its assignments, while a video cannot be deleted while
-assigned (`RESTRICT`). Authorization stays in the application: the two-upload
-limit uses a transaction-scoped advisory lock per uploader, and state changes
-are conditional updates on the expected status (`src/server/video/prisma-repository.ts`).
-
-**P3-11D deletion (LOCAL ONLY, no schema change).** Permanent deletion claims
-the row in one transaction: `SELECT … FOR UPDATE` on the video, count its
-`project_video` rows, refuse an assigned video or an active upload, then set
-`DELETING`. The Mux asset is deleted next; the row is removed only by
-`DELETE … WHERE id AND status = 'DELETING'`, and the `RESTRICT` key refuses it
-if an assignment exists. Any failure after the claim leaves `DELETE_FAILED`
-(retryable); a `DELETING` row untouched for 5 minutes is treated as an
-interrupted attempt and may be claimed again.
-
-**P3-11E assignment (LOCAL ONLY, no schema change).** The project save
-transaction (`src/server/cms/project-save.ts`) locks every submitted video row
-with `SELECT "id","status","title" FROM "video" WHERE "id" IN (…) ORDER BY "id"
-FOR UPDATE` (id order, so concurrent saves cannot deadlock), refuses a missing
-or non-READY row, then replaces the project's `project_video` rows
-(`sortOrder` = display order). Deletion locks the same row before counting
-assignments, so whichever transaction locks first wins: a claimed video is
-refused by the save, an assigned video is refused by the deletion. READY can
-only move to DELETING, so an assigned video stays READY. Removing a video from
-a project deletes only the `project_video` row. Verified against a fake with
-row locks and read-committed visibility; **UNVERIFIED against PostgreSQL until
-P4-03**.
 
 ## 9. Schema gaps
 

@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/02_AppFlow.md` |
-| Version | 1.3.0 (P3-11D committed as `cd79df9`; P3-11E project videos and public Films recorded, LOCAL ONLY, uncommitted) |
-| Last reviewed | 2026-11-06 |
+| Version | 1.2.0 (MH-10: project video by pasted link; Google Drive) |
+| Last reviewed | 2026-11-07 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -83,7 +83,6 @@ All are `force-dynamic` and require a valid session.
 | `/admin/pages` | EDITOR | FR-CMS-05 |
 | `/admin/settings` | ADMIN | FR-CMS-06 |
 | `/admin/media` | EDITOR (delete: ADMIN, fixed locally under DEF-01; published build: EDITOR) | FR-MED-01, FR-MED-02 |
-| `/admin/videos` (P3-11D, LOCAL ONLY) | ADMIN (EDITOR: 403) | Uploaded video (MH-03) |
 | `/admin/inquiries`, `/admin/inquiries/[id]` | EDITOR | FR-CRM-01, FR-EML-01 |
 | `/admin/inquiries/export` | ADMIN | FR-CRM-03 |
 | `/admin/customers`, `/admin/customers/[id]` | EDITOR (anonymize: SUPER_ADMIN) | FR-CRM-02, FR-CRM-04 |
@@ -129,14 +128,8 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 #### SCR-PUB-03 — Project `/work/[slug]`
 
 - **Data:** `getPublishedProjectBySlug(slug)`.
-- **Actions:** gallery viewing; the video play button builds the embed URL from
-  provider and ID.
-- **Films (P3-11E, LOCAL ONLY):** READY uploaded videos assigned to the project,
-  in saved order, each behind the click-to-load `HlsPlayer`. The HTML holds only
-  the video and project ids and the title; Play calls
-  `/api/videos/[id]/playback?projectId=`, which re-checks PUBLISHED, active
-  category, and READY on every request. The YouTube/Vimeo "Film" section is
-  unchanged and shown above it.
+- **Actions:** gallery viewing; the video play button (over the project cover)
+  builds the embed URL from provider and ID: YouTube, Vimeo, or Google Drive.
 - **Error / not found:** a draft project, a project in an inactive category, or
   an unknown slug all call `notFound()` and return the same 404.
 
@@ -214,18 +207,15 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
   roles, and order); `deleteAction` (ADMIN, confirm dialog).
 - **Validation:** `src/lib/validation/cms.ts`; slug uniqueness; a project
   version check refuses a save made against stale data.
+- **Project film (MH-10):** one optional YouTube, Vimeo, or Google Drive link
+  (`videoUrl`) and title. The server parses the link (`parseEmbeddableVideoUrl`)
+  and stores only provider and ID; an unsupported link is a field error on
+  `videoUrl`; an empty link removes the film. Visibility follows the project's
+  status. Preview: the public click-to-load player.
 - **Empty:** "No projects yet."
 - **Success:** a saved notice; public cache tags revalidated.
 - **Side effects:** audit `cms.created`, `cms.updated`, `cms.deleted`,
-  `project.published`, `project.unpublished`, `project.videos_changed`
-  (P3-11E: added, removed, reordered, count).
-- **Videos (P3-11E, LOCAL ONLY):** ADMIN or SUPER_ADMIN see a Videos section
-  (`ProjectVideoPicker`): attached videos in order with Up, Down, Remove, and
-  READY library videos with Add. Remove only drops the assignment. The save
-  locks the submitted video rows and refuses a missing or non-READY video with
-  a message naming it; the whole save (fields, images, videos) rolls back. An
-  EDITOR sees a read-only list; an EDITOR's save never changes assignments,
-  even if video ids are submitted.
+  `project.published`, `project.unpublished`.
 
 #### SCR-ADM-04 — Categories, Services, Testimonials
 
@@ -247,36 +237,6 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 - **Actions:** `saveSettingsAction`, `saveSocialAction`, `deleteAction` for
   social links.
 - **Side effects:** public layout, metadata, and contact details revalidated.
-
-#### SCR-ADM-07V — Videos `/admin/videos` (P3-11D, LOCAL ONLY, uncommitted)
-
-- **Role:** ADMIN or SUPER_ADMIN (`requireAdmin`); an EDITOR receives 403
-  (`forbidden()`) and is not offered the navigation link. Every action is a
-  video API route that repeats the origin, session, and role checks.
-- **Upload:** title and file (MP4, MOV, M4V, MKV, WebM; declared size up to
-  10 GiB, a preliminary check only) → `POST /api/videos/uploads` → resumable
-  chunked transfer straight to Mux (`@mux/upchunk`, 30 MiB chunks). A progress
-  bar and percentage, then "Upload complete. Mux is processing the video…".
-  **Cancel upload** aborts the transfer and calls the cancel route. The upload
-  URL must be on `VIDEO_UPLOAD_ORIGIN`; until that is configured (host
-  UNVERIFIED), or while video is not configured, the form is replaced by a
-  plain explanation.
-- **List:** title, status (Uploading, Processing, Ready, Failed, Cancelled,
-  Deleting, Delete failed), duration, resolution, file name, number of
-  projects, and a status detail (a known failure message, never provider
-  text). The page refreshes every 5 s while any video is uploading,
-  processing, or deleting, or an upload runs in this tab.
-- **Preview:** READY only; click-to-load player (`HlsPlayer`); no playback
-  token is requested before Play.
-- **Delete:** offered for READY, PROCESSING, FAILED, and CANCELLED videos used
-  by no project; `window.confirm` names the video and says it cannot be
-  recovered (OD-14 open). An assigned video shows "This video is used by a
-  project…" instead of a Delete control, and the server refuses it with 409.
-  A provider or database failure leaves the video "Delete failed" with an
-  alert, and the row offers **Retry delete**. An upload in progress offers
-  **Cancel upload** instead.
-- **Empty:** "No videos uploaded yet."
-- **Unchanged:** the image library (SCR-ADM-07) and its deletion workflow.
 
 #### SCR-ADM-07 — Media `/admin/media`
 

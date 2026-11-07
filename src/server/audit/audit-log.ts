@@ -30,8 +30,6 @@ export const AuditAction = {
   CmsDeleted: "cms.deleted",
   ProjectPublished: "project.published",
   ProjectUnpublished: "project.unpublished",
-  /** Uploaded videos added, removed, or reordered on a project (P3-11E). */
-  ProjectVideosChanged: "project.videos_changed",
   InquiryCreated: "inquiry.created",
   InquiryStatusChanged: "inquiry.status_changed",
   CustomerUpdated: "customer.updated",
@@ -45,12 +43,6 @@ export const AuditAction = {
   EmailDeliveryResultSuperseded: "email.delivery_result_superseded",
   PrivacyCustomerExported: "privacy.customer_exported",
   PrivacyCustomerAnonymized: "privacy.customer_anonymized",
-  VideoUploadStarted: "video.upload_started",
-  VideoUploadCancelled: "video.upload_cancelled",
-  VideoReady: "video.ready",
-  VideoProcessingFailed: "video.processing_failed",
-  VideoDeleted: "video.deleted",
-  VideoDeleteFailed: "video.delete_failed",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];
@@ -71,7 +63,6 @@ export const AuditEntityType = {
   Customer: "customer",
   CustomerNote: "customer_note",
   EmailDelivery: "email_delivery",
-  Video: "video",
 } as const;
 
 export type AuditEntityType =
