@@ -130,9 +130,9 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 - **Data:** `getPublishedProjectBySlug(slug)`.
 - **Actions:** gallery viewing; the video play button (over the project cover)
   builds the embed URL from provider and ID: YouTube, Vimeo, or Google Drive.
-- **Error / not found:** a draft project or an unknown slug both call
-  `notFound()` and return the same 404. A category (missing or inactive) never
-  hides a published project (MH-13); the category line is omitted when absent.
+- **Error / not found:** a draft project, a project in an inactive category, or
+  an unknown slug all call `notFound()` and return the same 404. A project with
+  no category is shown (MH-13); its category line is omitted.
 
 #### SCR-PUB-04 — Services `/services`
 

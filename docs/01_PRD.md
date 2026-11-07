@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/01_PRD.md` |
-| Version | 1.3.0 (MH-13: projects need no category; publication is the only visibility rule) |
+| Version | 1.3.0 (MH-13: projects need no category; an inactive category still hides a project) |
 | Last reviewed | 2026-11-07 |
 | Reviewed against | commit `b517fce` (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -156,8 +156,8 @@ the behaviour the code already implements unless the status says otherwise.
 - **Story:** As a visitor, I want to browse all published projects and filter
   them by category.
 - **Acceptance criteria:**
-  1. Lists only projects whose status is `PUBLISHED`, in `sortOrder`. A project
-     needs no category, and its category never hides it (MH-13).
+  1. Lists only projects whose status is `PUBLISHED` and that have no category
+     or an active one, in `sortOrder` (MH-13: a category is optional).
   2. Category filter uses `?category=<slug>` and offers only active categories
      that contain published work.
   3. Publication is enforced in the query (`src/server/public/`), not hidden in
@@ -174,7 +174,7 @@ the behaviour the code already implements unless the status says otherwise.
 - **Story:** As a prospective client, I want a full page per project with its
   gallery, description, and film.
 - **Acceptance criteria:**
-  1. `/work/[slug]` renders only a published project (with or without a category). A
+  1. `/work/[slug]` renders only a published project with no category or an active one. A
      draft and a slug that never existed both return the same normal 404.
   2. Gallery follows `ProjectMedia.sortOrder` and roles `COVER`, `HERO`, `GALLERY`.
   3. Per-project SEO title and description override defaults when set.

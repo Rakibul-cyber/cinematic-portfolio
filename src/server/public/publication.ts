@@ -1,3 +1,5 @@
+import type { Prisma } from "@/generated/prisma/client";
+
 /**
  * Publication rules for public reads.
  *
@@ -11,13 +13,14 @@
  */
 
 /**
- * Only `PUBLISHED` projects are ever readable publicly. Publication is the
- * only rule (MH-13): a project needs no category, and its category, if any,
- * does not affect whether it is shown.
+ * Only `PUBLISHED` projects are ever readable publicly. A project needs no
+ * category (MH-13): one without a category is shown, one in an active category
+ * is shown, and one in an inactive category stays hidden, as before.
  */
 export const PUBLISHED_PROJECT_WHERE = {
   status: "PUBLISHED",
-} as const;
+  OR: [{ categoryId: null }, { category: { isActive: true } }],
+} satisfies Prisma.ProjectWhereInput;
 
 /**
  * Deterministic project order: curated `sortOrder`, then most recently

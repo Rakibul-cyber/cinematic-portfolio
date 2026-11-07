@@ -80,8 +80,27 @@ function project(overrides: Partial<ProjectRow> = {}): ProjectRow {
 }
 
 describe("publication rules", () => {
-  it("restricts public project reads to published work, whatever the category", () => {
-    assert.deepEqual(PUBLISHED_PROJECT_WHERE, { status: "PUBLISHED" });
+  it("shows published projects without a category or in an active one, and hides the rest", () => {
+    assert.deepEqual(PUBLISHED_PROJECT_WHERE, {
+      status: "PUBLISHED",
+      OR: [{ categoryId: null }, { category: { isActive: true } }],
+    });
+
+    // The filter above, evaluated the way PostgreSQL applies it to one row.
+    type Row = { status: "DRAFT" | "PUBLISHED"; categoryId: string | null; category: { isActive: boolean } | null };
+    const visible = (row: Row) =>
+      row.status === PUBLISHED_PROJECT_WHERE.status &&
+      PUBLISHED_PROJECT_WHERE.OR.some((branch) =>
+        "categoryId" in branch ? row.categoryId === branch.categoryId : row.category?.isActive === branch.category.isActive,
+      );
+    const cases: [string, Row, boolean][] = [
+      ["published, no category", { status: "PUBLISHED", categoryId: null, category: null }, true],
+      ["published, active category", { status: "PUBLISHED", categoryId: "c1", category: { isActive: true } }, true],
+      ["published, inactive category", { status: "PUBLISHED", categoryId: "c2", category: { isActive: false } }, false],
+      ["draft, no category", { status: "DRAFT", categoryId: null, category: null }, false],
+      ["draft, active category", { status: "DRAFT", categoryId: "c1", category: { isActive: true } }, false],
+    ];
+    for (const [label, row, expected] of cases) assert.equal(visible(row), expected, label);
   });
 
   it("maps a project without a category, or with an inactive one, to no category", () => {
