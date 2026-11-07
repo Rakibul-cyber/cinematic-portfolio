@@ -2,9 +2,9 @@
 
 | Field | Value |
 | --- | --- |
-| Task | MH-08 (Part C) |
-| Code | `feature/video-upload-backend` at `186d489` (P3-11E). Nothing is merged, published, or applied. |
-| Written | 2026-11-06, without connecting to any external service |
+| Task | MH-08 (Part C); revised in MH-09 (sections 2 and 12) |
+| Code | `feature/video-upload-backend` at `624250f` (Better Auth 1.7.18 on top of P3-11E). Nothing is merged, published, or applied. |
+| Written | 2026-11-06, revised 2026-11-07, without connecting to any external service |
 
 **[OWNER]** marks a step that needs the owner's explicit authorization *in that
 task* (CLAUDE.md). Unmarked steps run only against disposable resources and need
@@ -42,21 +42,38 @@ command output. Otherwise write UNVERIFIED.
       `integration:identity` and `integration:run`.
       **[OWNER]** CLAUDE.md requires authorization to run them.
 
-## 2. PostgreSQL concurrency tests (still to be written; BLOCKED until 1)
+## 2. Video PostgreSQL suite (written in MH-09; NOT RUN)
 
-Two real connections, each a `BEGIN … COMMIT`, run in both orders:
+`scripts/integration/video.integration.ts` runs as one step of
+`integration:run` **[OWNER]**, after the branch is verified, marked, and
+migrated. Mux is a local fake; no provider request is made. Started any other
+way, it refuses before loading a driver (`video-suite-gate.ts`), and it refuses
+a database that is empty, unmarked, or missing the video migration. Record
+the step's pass and fail counts. The suite covers:
 
-- [ ] **Delete versus assignment:** session A locks video V for assignment
-      (`… FOR UPDATE`), and session B's `beginDeletion(V)` waits. After A
-      commits, B is refused with `delete_assigned`. In the reverse order the
-      save is refused (V is DELETING) and no `project_video` row exists.
-- [ ] **Two saves sharing videos:** project P saves `[V1, V2]` while project Q
-      saves `[V2, V1]`. Neither deadlocks, because locks are taken in id order.
-- [ ] **Concurrent uploads:** N parallel `createUploadSession` calls for one
-      user never exceed the active-upload limit (advisory lock).
-- [ ] **RESTRICT key:** `DELETE FROM video` with an assignment present fails.
-- [ ] **Webhook race:** a duplicated `video.asset.ready` event applied twice
-      leaves one consistent READY row.
+- [ ] **Migration:** replayed in a scratch schema, the video migration leaves
+      every existing table, key, index, type, and row unchanged; the rollback
+      statements in section 1 restore the previous schema exactly; re-applying
+      works. `public` is never touched by this test.
+- [ ] **Uploads:** two concurrent uploads by one user give two rows; six
+      concurrent requests give exactly two (no orphan provider upload); ten
+      parallel repository inserts give two; a held advisory lock blocks only
+      that uploader; cancellation and expiry free a slot.
+- [ ] **Transitions:** a wrong expected status changes nothing; one of eight
+      identical and one of two competing updates wins; an update waiting on a
+      row lock re-checks the status after the other session commits.
+- [ ] **Webhooks:** four concurrent duplicates of `video.asset.ready` give one
+      READY row and one audit transition; late and out-of-order events leave
+      READY unchanged; an asset arriving after cancellation is deleted; a
+      DELETING row is untouched; an unknown upload is ignored.
+- [ ] **Assignment versus deletion:** both orders, forced with a lock-holding
+      session, plus 20 unsynchronised races: never assigned while DELETING or
+      gone. Two saves sharing videos in opposite order do not deadlock.
+- [ ] **Shared video:** deletion is refused while any project uses it, the
+      `RESTRICT` key stops a direct row delete, and it succeeds once
+      unassigned; deleting a project removes only its own assignments.
+- [ ] **Rollback:** a non-READY video, a failing foreign key, a stale version,
+      or a duplicate slug leaves the project, its media, and its videos unchanged.
 
 ## 3. Mux account and test environment
 
@@ -161,13 +178,66 @@ Two real connections, each a `BEGIN … COMMIT`, run in both orders:
       production Mux environment), and point the production webhook at the
       live domain.
 - [ ] **[OWNER]** Publish.
-- **Rollback, fastest first:**
-  1. Unset the `MUX_*` variables and redeploy. Video turns off
-     ("not configured"), and the rest of the site is unaffected.
-  2. Republish the previous deploy in Netlify (published today:
-     `main@288fde6`, as the owner reported). The new tables stay in place and
-     are unused by the old code.
-  3. Database: prefer leaving the additive tables. To remove them, first delete
-     the Mux assets (or keep the Mux environment), restore from the backup or
-     run the rehearsed `DROP` statements from section 1, and remove the
-     `_prisma_migrations` row. **[OWNER]**
+
+## 12. Backing out: four separate actions
+
+Use the lightest one that solves the problem. Each is independent; only the
+order in 12.3 and 12.4 matters. Every step here is **[OWNER]** in production.
+
+### 12.1 Feature disablement (minutes; nothing is lost)
+
+- **[OWNER]** Remove any one `MUX_*` variable in Netlify (production scope),
+  then trigger a redeploy. Variables apply only to new deploys.
+- Effect: the video routes answer 503 ("not configured"); uploads, admin
+  preview, and public playback stop; webhooks get 503, so Mux retries them
+  for a while. Rows and Mux assets stay; the rest of the site is unaffected.
+- Undo: restore the variable and redeploy.
+
+### 12.2 Application rollback (minutes; database untouched)
+
+- **[OWNER]** In Netlify, publish the previous production deploy
+  (`main@288fde6` as owner-reported). Do not change Auto Publishing or its lock.
+- The old code ignores the `video` and `project_video` tables. Its webhook
+  path returns 404: **[OWNER]** disable the webhook in the Mux dashboard so
+  Mux stops retrying.
+- Undo: republish the newer deploy.
+
+### 12.3 Database rollback (only if the tables must go)
+
+Prefer keeping the additive tables: they cost nothing while unused.
+
+1. Roll back the application first (12.2). The new code fails without the tables.
+2. **[OWNER]** Create a Neon restore point (or a branch) of production.
+3. **[OWNER]** Export `id`, `muxUploadId`, `muxAssetId`, and `status` from
+   `video`. This is the only record of which Mux assets belong to the site;
+   12.4 needs it.
+4. **[OWNER]** Run in one transaction the section 1 `DROP` statements, then
+   `DELETE FROM "_prisma_migrations" WHERE migration_name = '20261106120000_add_uploaded_video';`.
+   Avoid a point-in-time restore: it would also discard inquiries and other
+   data written since.
+- Undo: `npm run db:migrate:deploy --allow-production` re-creates empty tables;
+  assignments are lost.
+
+### 12.4 Mux asset cleanup (irreversible; billing stops)
+
+1. Only after 12.3, or after confirming no `READY` row still needs the asset.
+   Deleting an asset in use breaks its Films at once.
+2. Compare the assets in the Mux environment with the export from 12.3 (or
+   the live `video` table). Delete only assets whose passthrough is one of
+   the site's video IDs.
+3. **[OWNER]** Delete them in the Mux dashboard or API, in the right
+   environment (test or production).
+4. **[OWNER]** If video is abandoned: delete the webhook, revoke the access
+   token and signing key, and remove the remaining `MUX_*` variables.
+
+## Owner approvals for real external operations
+
+| Operation | Section |
+| --- | --- |
+| Create or delete a Neon branch | 1 |
+| Run `integration:identity` (read-only) and `integration:run` (writes to the disposable branch) | 1, 2 |
+| Create the Mux account, test environment, token, signing key, webhook | 3–5 |
+| Set or change Netlify variables; create a deploy preview | 4, 6, 7, 12.1 |
+| Push, merge, publish, or republish a deploy | 11, 12.2 |
+| Production backup, migration, export, or `DROP` | 11, 12.3 |
+| Delete Mux assets; revoke credentials | 12.4 |
