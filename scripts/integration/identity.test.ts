@@ -27,6 +27,7 @@ import {
 
 const ENDPOINT = "ep-quiet-sky-a1b2c3d4";
 const PRODUCTION = "ep-bold-sea-e5f6a7b8";
+const DEVELOPMENT = "ep-warm-dune-c9d0e1f2";
 const REGION = "eu-central-1.aws.neon.tech";
 const valid: DisposableEnv = {
   DATABASE_URL: `postgresql://itest_owner:fake-password@${ENDPOINT}-pooler.${REGION}/neondb?sslmode=require`,
@@ -35,6 +36,7 @@ const valid: DisposableEnv = {
   DISPOSABLE_NEON_BRANCH_ID: "br-young-moon-a1b2c3d4",
   DISPOSABLE_NEON_ENDPOINT_ID: ENDPOINT,
   PRODUCTION_DATABASE_ENDPOINT: PRODUCTION,
+  PROTECTED_DEVELOPMENT_ENDPOINT: DEVELOPMENT,
 };
 const file = (env: Partial<DisposableEnv> & Record<string, string>) => Object.entries(env).map(([key, value]) => `${key}=${value}`).join("\n");
 const reasons = (env: DisposableEnv) => {
@@ -92,6 +94,42 @@ describe("the disposable target", () => {
     assert.ok(reasons({ ...valid, ...productionUrls }).some((reason) => /PRODUCTION_DATABASE_ENDPOINT/.test(reason)));
     assert.ok(reasons({ ...valid, ...productionUrls, DISPOSABLE_NEON_ENDPOINT_ID: PRODUCTION }).length);
     assert.ok(reasons({ ...valid, DATABASE_URL_UNPOOLED: productionUrls.DATABASE_URL_UNPOOLED }).length, "one URL alone pointing at production");
+  });
+
+  it("refuses the protected development endpoint on its own, however it is reached", () => {
+    const developmentUrls = {
+      DATABASE_URL: valid.DATABASE_URL.replaceAll(ENDPOINT, DEVELOPMENT),
+      DATABASE_URL_UNPOOLED: valid.DATABASE_URL_UNPOOLED.replaceAll(ENDPOINT, DEVELOPMENT),
+    };
+    // Production is declared and different, so only the development rule can catch these.
+    assert.ok(reasons({ ...valid, DISPOSABLE_NEON_ENDPOINT_ID: DEVELOPMENT }).some((reason) => /protected development endpoint/.test(reason)));
+    assert.ok(reasons({ ...valid, ...developmentUrls }).some((reason) => /DATABASE_URL points at PROTECTED_DEVELOPMENT_ENDPOINT/.test(reason)));
+    assert.ok(reasons({ ...valid, ...developmentUrls }).some((reason) => /DATABASE_URL_UNPOOLED points at PROTECTED_DEVELOPMENT_ENDPOINT/.test(reason)));
+    const all = reasons({ ...valid, ...developmentUrls, DISPOSABLE_NEON_ENDPOINT_ID: DEVELOPMENT });
+    assert.ok(all.length && all.every((reason) => !/PRODUCTION_DATABASE_ENDPOINT|production endpoint/.test(reason)), "not caught by the production rule");
+    assert.ok(reasons({ ...valid, DATABASE_URL_UNPOOLED: developmentUrls.DATABASE_URL_UNPOOLED }).length, "one URL alone pointing at development");
+  });
+
+  it("protects both endpoints at once when they differ, and still when they are the same", () => {
+    for (const target of [PRODUCTION, DEVELOPMENT]) {
+      const urls = { DATABASE_URL: valid.DATABASE_URL.replaceAll(ENDPOINT, target), DATABASE_URL_UNPOOLED: valid.DATABASE_URL_UNPOOLED.replaceAll(ENDPOINT, target) };
+      assert.ok(reasons({ ...valid, ...urls, DISPOSABLE_NEON_ENDPOINT_ID: target }).length, target);
+    }
+    const shared = { ...valid, PRODUCTION_DATABASE_ENDPOINT: DEVELOPMENT };
+    assert.ok(assessDisposableTarget(shared).ok, "a shared production/development endpoint is a valid declaration");
+    assert.ok(reasons({ ...shared, DISPOSABLE_NEON_ENDPOINT_ID: DEVELOPMENT }).length);
+  });
+
+  it("requires the protected development endpoint and checks its form", () => {
+    const { PROTECTED_DEVELOPMENT_ENDPOINT: _omitted, ...rest } = valid;
+    void _omitted;
+    const parsed = parseDisposableEnv(file(rest));
+    assert.ok(!parsed.ok && parsed.reasons.some((reason) => reason.startsWith("PROTECTED_DEVELOPMENT_ENDPOINT")));
+    assert.ok(reasons({ ...valid, PROTECTED_DEVELOPMENT_ENDPOINT: "development" }).length);
+    assert.ok(reasons({ ...valid, PROTECTED_DEVELOPMENT_ENDPOINT: `${DEVELOPMENT}-pooler` }).length);
+    const result = assessDisposableTarget(valid);
+    assert.ok(result.ok);
+    assert.equal(result.value.developmentEndpointId, DEVELOPMENT);
   });
 
   it("refuses URLs that do not both name the declared endpoint", () => {

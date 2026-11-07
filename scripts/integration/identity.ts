@@ -22,6 +22,9 @@ export const DISPOSABLE_ENV_KEYS = [
   "DISPOSABLE_NEON_BRANCH_ID",
   "DISPOSABLE_NEON_ENDPOINT_ID",
   "PRODUCTION_DATABASE_ENDPOINT",
+  // The everyday development endpoint. Protected on its own, never through
+  // PRODUCTION_DATABASE_ENDPOINT: a test run may touch neither.
+  "PROTECTED_DEVELOPMENT_ENDPOINT",
 ] as const;
 
 export type DisposableEnvKey = (typeof DISPOSABLE_ENV_KEYS)[number];
@@ -69,6 +72,7 @@ export type DisposableTarget = {
   branchId: string;
   endpointId: string;
   productionEndpointId: string;
+  developmentEndpointId: string;
   pooledHost: string;
   directHost: string;
   database: string;
@@ -140,19 +144,30 @@ export function assessDisposableTarget(env: DisposableEnv): Checked<DisposableTa
   if (endpointId === productionEndpointId) {
     reasons.push("DISPOSABLE_NEON_ENDPOINT_ID is the production endpoint.");
   }
+  const developmentEndpointId = env.PROTECTED_DEVELOPMENT_ENDPOINT.trim().toLowerCase();
+  if (!/^ep-[a-z0-9-]+$/.test(developmentEndpointId) || developmentEndpointId.endsWith("-pooler")) {
+    reasons.push("PROTECTED_DEVELOPMENT_ENDPOINT is not a Neon endpoint id (ep-..., without -pooler).");
+  }
+  if (endpointId === developmentEndpointId) {
+    reasons.push("DISPOSABLE_NEON_ENDPOINT_ID is the protected development endpoint.");
+  }
 
   const pooled = parseNeonUrl("DATABASE_URL", env.DATABASE_URL, reasons);
   const direct = parseNeonUrl("DATABASE_URL_UNPOOLED", env.DATABASE_URL_UNPOOLED, reasons);
+  const protectedEndpoints = [
+    ["PRODUCTION_DATABASE_ENDPOINT", productionEndpointId],
+    ["PROTECTED_DEVELOPMENT_ENDPOINT", developmentEndpointId],
+  ] as const;
 
   if (pooled) {
     if (!pooled.firstLabel.endsWith("-pooler")) reasons.push("DATABASE_URL must use the pooled host (ep-...-pooler).");
     if (pooled.firstLabel.replace(/-pooler$/, "") !== endpointId) reasons.push("DATABASE_URL does not point at DISPOSABLE_NEON_ENDPOINT_ID.");
-    if (pooled.firstLabel.replace(/-pooler$/, "") === productionEndpointId) reasons.push("DATABASE_URL points at PRODUCTION_DATABASE_ENDPOINT.");
+    for (const [name, id] of protectedEndpoints) if (pooled.firstLabel.replace(/-pooler$/, "") === id) reasons.push(`DATABASE_URL points at ${name}.`);
   }
   if (direct) {
     if (direct.firstLabel.endsWith("-pooler")) reasons.push("DATABASE_URL_UNPOOLED must use the direct host, not -pooler.");
     if (direct.firstLabel !== endpointId) reasons.push("DATABASE_URL_UNPOOLED does not point at DISPOSABLE_NEON_ENDPOINT_ID.");
-    if (direct.firstLabel === productionEndpointId) reasons.push("DATABASE_URL_UNPOOLED points at PRODUCTION_DATABASE_ENDPOINT.");
+    for (const [name, id] of protectedEndpoints) if (direct.firstLabel === id) reasons.push(`DATABASE_URL_UNPOOLED points at ${name}.`);
   }
   if (pooled && direct) {
     if (pooled.domain !== direct.domain) reasons.push("DATABASE_URL and DATABASE_URL_UNPOOLED are in different Neon regions.");
@@ -163,7 +178,7 @@ export function assessDisposableTarget(env: DisposableEnv): Checked<DisposableTa
   if (reasons.length || !pooled || !direct) return { ok: false, reasons };
   return {
     ok: true,
-    value: { projectId, branchId, endpointId, productionEndpointId, pooledHost: pooled.host, directHost: direct.host, database: pooled.database, user: pooled.user },
+    value: { projectId, branchId, endpointId, productionEndpointId, developmentEndpointId, pooledHost: pooled.host, directHost: direct.host, database: pooled.database, user: pooled.user },
   };
 }
 

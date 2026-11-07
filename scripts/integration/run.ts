@@ -142,6 +142,7 @@ function preflight(): Preflight {
   console.log(`  Endpoint  ${t.endpointId} (pooled ${t.pooledHost}, direct ${t.directHost})`);
   console.log(`  Database  ${t.database} as ${t.user}`);
   console.log(`  Refuses   ${t.productionEndpointId} (declared production endpoint)`);
+  console.log(`  Refuses   ${t.developmentEndpointId} (protected development endpoint)`);
   console.log(`  Node.js   ${spawnSync(node, ["--version"], { encoding: "utf8", env: processEnv(buildChildEnv(process.env, {})) }).stdout.trim()}`);
   console.log("  Checkout  no private environment files");
   return { env: parsed.value, target: t, node };
@@ -240,7 +241,7 @@ async function verifyIdentity({ env, target }: Preflight): Promise<{ state: Data
   console.log(`    - the database is ${pooled.state === "empty" ? "empty (no table in the public schema)" : "carrying this run's disposable marker"}`);
   console.log("    - no host other than the two declared ones was contacted");
   console.log("  Taken from the hostnames (Neon routes each connection by its endpoint id):");
-  console.log(`    - endpoint ${target.endpointId}, which is not the declared production endpoint ${target.productionEndpointId}`);
+  console.log(`    - endpoint ${target.endpointId}, which is neither the declared production endpoint ${target.productionEndpointId} nor the protected development endpoint ${target.developmentEndpointId}`);
   console.log("  NOT proven by a database connection; confirm in the Neon Console:");
   console.log(`    - project ${target.projectId} is a separate disposable project`);
   console.log(`    - branch ${target.branchId} is that project's branch, and ${target.endpointId} is its read-write compute`);
@@ -439,6 +440,7 @@ async function run(checked: Preflight): Promise<void> {
     DISPOSABLE_NEON_PROJECT_ID: env.DISPOSABLE_NEON_PROJECT_ID,
     DISPOSABLE_NEON_BRANCH_ID: env.DISPOSABLE_NEON_BRANCH_ID,
     DISPOSABLE_NEON_ENDPOINT_ID: env.DISPOSABLE_NEON_ENDPOINT_ID,
+    PROTECTED_DEVELOPMENT_ENDPOINT: env.PROTECTED_DEVELOPMENT_ENDPOINT,
     VIDEO_INTEGRATION_CONFIRM_BRANCH: env.DISPOSABLE_NEON_BRANCH_ID,
   }));
   suiteStep("video PostgreSQL suite (migration, limits, transitions, webhooks, locking, rollback)", video.output, video.code);

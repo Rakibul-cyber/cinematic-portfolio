@@ -47,7 +47,9 @@ command output. Otherwise write UNVERIFIED.
 `scripts/integration/video.integration.ts` runs as one step of
 `integration:run` **[OWNER]**, after the branch is verified, marked, and
 migrated. Mux is a local fake; no provider request is made. Started any other
-way, it refuses before loading a driver (`video-suite-gate.ts`), and it refuses
+way, it refuses before loading a driver (`video-suite-gate.ts`). The settings
+file must name both `PRODUCTION_DATABASE_ENDPOINT` and
+`PROTECTED_DEVELOPMENT_ENDPOINT`; the harness refuses either. It refuses
 a database that is empty, unmarked, or missing the video migration. Record
 the step's pass and fail counts. The suite covers:
 

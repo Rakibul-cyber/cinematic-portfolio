@@ -26,6 +26,7 @@ const valid = (): Record<string, string | undefined> => ({
   DISPOSABLE_NEON_BRANCH_ID: "br-test-branch-a1b2c3",
   DISPOSABLE_NEON_ENDPOINT_ID: "ep-quiet-sky-a1b2c3",
   PRODUCTION_DATABASE_ENDPOINT: "ep-other-prod-d4e5f6",
+  PROTECTED_DEVELOPMENT_ENDPOINT: "ep-everyday-dev-a7b8c9",
   [VIDEO_SUITE_CONFIRM_KEY]: "br-test-branch-a1b2c3",
   PATH: "/usr/bin",
 });
@@ -49,7 +50,14 @@ describe("assessVideoSuiteEnv", () => {
 
   it("refuses an empty environment (the state of any accidental run)", () => refused({ PATH: "/usr/bin" }, /not configured/));
 
-  for (const key of ["DATABASE_URL", "DATABASE_URL_UNPOOLED", "DISPOSABLE_NEON_BRANCH_ID", "PRODUCTION_DATABASE_ENDPOINT"]) {
+  it("refuses the protected development endpoint, separately from production", () => {
+    const dev = "ep-everyday-dev-a7b8c9";
+    const urls = { DATABASE_URL: valid().DATABASE_URL!.replace("ep-quiet-sky-a1b2c3", dev), DATABASE_URL_UNPOOLED: valid().DATABASE_URL_UNPOOLED!.replace("ep-quiet-sky-a1b2c3", dev) };
+    refused({ ...valid(), ...urls, DISPOSABLE_NEON_ENDPOINT_ID: dev, DEV_DATABASE_ENDPOINT: undefined }, /protected development endpoint/);
+    refused({ ...valid(), ...urls }, /PROTECTED_DEVELOPMENT_ENDPOINT/);
+  });
+
+  for (const key of ["DATABASE_URL", "DATABASE_URL_UNPOOLED", "DISPOSABLE_NEON_BRANCH_ID", "PRODUCTION_DATABASE_ENDPOINT", "PROTECTED_DEVELOPMENT_ENDPOINT"]) {
     it(`refuses when ${key} is missing`, () => refused({ ...valid(), [key]: undefined }, new RegExp(key)));
   }
 
