@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   categorySchema,
   pageSchema,
+  projectFormValues,
   projectSchema,
   serviceSchema,
   settingsSchema,
@@ -196,24 +197,15 @@ export async function saveProjectAction(
   form: FormData,
 ): Promise<AdminFormState> {
   const actor = await requireUser("/admin/projects");
-  const raw = values(form);
-  const id = typeof raw.id === "string" && raw.id ? raw.id : undefined;
-  const path = id ? `/admin/projects/${id}` : "/admin/projects/new";
+  const input = projectFormValues(form);
+  const path = input.id ? `/admin/projects/${input.id}` : "/admin/projects/new";
   return save(
     path,
     async () => {
-      const row = await saveProject(
-        projectSchema.parse({
-          ...raw,
-          id,
-          featured: form.has("featured"),
-          mediaIds: form.getAll("mediaIds"),
-        }),
-        actor,
-      );
+      const row = await saveProject(projectSchema.parse(input), actor);
       return `/admin/projects/${row.id}`;
     },
-    { kind: "project", slug: typeof raw.slug === "string" ? raw.slug : null },
+    { kind: "project", slug: input.slug || null },
   );
 }
 export async function deleteAction(form: FormData) {

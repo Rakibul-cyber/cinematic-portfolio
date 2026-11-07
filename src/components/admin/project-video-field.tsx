@@ -15,54 +15,60 @@ export function describeVideoUrl(input: string): { kind: "empty" } | { kind: "ok
 }
 
 /**
- * The project film: one pasted YouTube, Vimeo, or Google Drive link and an
- * optional title. The provider is detected in the browser for feedback only;
- * the server parses the link again and stores just the provider and video ID.
- * The preview is the public click-to-load player, so nothing is requested from
- * the provider until the administrator presses play.
+ * The project film: one pasted YouTube, Vimeo, or Google Drive link. The
+ * provider is detected in the browser for feedback only; the server parses the
+ * link again and stores just the provider and video ID.
+ *
+ * There is no title input. A title saved earlier is submitted unchanged while
+ * the link stays the same; for a new or replaced link it is left empty, and
+ * the public player names the film after the project title. The preview is
+ * the public click-to-load player, so nothing is requested from the provider
+ * until the editor presses play.
  */
-export function ProjectVideoField({ initialUrl, initialTitle }: { initialUrl: string; initialTitle: string }) {
+export function ProjectVideoField({ initialUrl, savedTitle }: { initialUrl: string; savedTitle: string }) {
   const [url, setUrl] = useState(initialUrl);
-  const [title, setTitle] = useState(initialTitle);
   const status = describeVideoUrl(url);
   const preview = url.trim() ? parseEmbeddableVideoUrl(url) : null;
+  const title = url.trim() === initialUrl.trim() ? savedTitle : "";
 
   return (
     <fieldset className="grid gap-3 border border-border p-4">
-      <legend>Project film</legend>
-      <p className="text-sm text-muted-foreground">
-        Upload the film to YouTube (unlisted is fine), Vimeo, or Google Drive
-        (shared as &ldquo;Anyone with the link&rdquo;), then paste its link here.
-        Leave it empty for no film. The project&rsquo;s cover image is the
-        thumbnail visitors see before they press play.
-      </p>
+      <legend>Film</legend>
       <label>
         Video link
         <input
-          aria-describedby="project-video-status"
+          aria-describedby="project-video-help project-video-status"
+          aria-invalid={status.kind === "error" ? true : undefined}
           autoComplete="off"
           className={inputClass}
           inputMode="url"
           name="videoUrl"
           onChange={(event) => setUrl(event.target.value)}
-          placeholder="https://www.youtube.com/watch?v=… or https://drive.google.com/file/d/…/view"
+          placeholder="Paste a YouTube, Vimeo or Google Drive link"
+          type="text"
           value={url}
         />
       </label>
-      <p aria-live="polite" className="text-sm" id="project-video-status">
+      <p className="text-sm text-muted-foreground" id="project-video-help">
+        Copy the link from YouTube (unlisted is fine), Vimeo, or Google Drive
+        (shared as &ldquo;Anyone with the link&rdquo;) and paste it here. Leave
+        it empty for no film. Visitors see the cover image until they press play.
+      </p>
+      <p
+        aria-live="polite"
+        className={status.kind === "error" ? "border border-accent p-3 text-sm" : "text-sm"}
+        id="project-video-status"
+      >
         {status.kind === "ok" ? `Detected: ${status.label}` : status.kind === "error" ? status.message : ""}
       </p>
-      <label>
-        Video title (optional)
-        <input className={inputClass} maxLength={160} name="videoTitle" onChange={(event) => setTitle(event.target.value)} value={title} />
-      </label>
+      <input name="videoTitle" type="hidden" value={title} />
       {preview?.ok ? (
         <div className="grid gap-2">
           <p className="text-sm text-muted-foreground">Preview</p>
           <VideoPlayer
             fallbackLabel="project film"
             key={`${preview.value.provider}:${preview.value.videoId}`}
-            video={{ ...preview.value, title: title.trim() || null }}
+            video={{ ...preview.value, title: title || null }}
           />
         </div>
       ) : null}

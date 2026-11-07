@@ -31,6 +31,16 @@ type Project = {
   updatedAt: Date;
   media: { mediaId: string }[];
 };
+const hintClass = "mt-1 block text-xs text-muted-foreground";
+/**
+ * The project editor used by New project and Edit project.
+ *
+ * The everyday fields are always visible; everything else sits in a native
+ * `<details>` that starts closed. Every advanced field is still submitted with
+ * its current value, so saving never clears what is hidden. An empty slug on a
+ * new project is generated from the title by the save action; an existing slug
+ * is shown as-is and only changes if the editor changes it.
+ */
 export function ProjectForm({
   project,
   categories,
@@ -42,8 +52,11 @@ export function ProjectForm({
 }) {
   const selectedMediaIds = project?.media.map((item) => item.mediaId) ?? [];
   const storedVideo = project ? toVideoRef({ provider: project.videoProvider, videoId: project.videoId, title: project.videoTitle }) : null;
+  // A title saved earlier is kept; without one, the public player names the
+  // film after the project title.
+  const savedVideoTitle = storedVideo?.title ?? "";
   return (
-    <AdminForm action={saveProjectAction} className="grid gap-4">
+    <AdminForm action={saveProjectAction} className="grid max-w-3xl gap-5">
       {project && <input type="hidden" name="id" value={project.id} />}
       {project && (
         <input
@@ -53,20 +66,12 @@ export function ProjectForm({
         />
       )}
       <label>
-        Title
+        Project title
         <input
           className={inputClass}
           name="title"
           defaultValue={project?.title}
-          required
-        />
-      </label>
-      <label>
-        Slug
-        <input
-          className={inputClass}
-          name="slug"
-          defaultValue={project?.slug}
+          maxLength={160}
           required
         />
       </label>
@@ -75,7 +80,7 @@ export function ProjectForm({
         <select
           className={inputClass}
           name="categoryId"
-          defaultValue={project?.categoryId}
+          defaultValue={project?.categoryId ?? ""}
           required
         >
           <option value="">Select category</option>
@@ -87,105 +92,139 @@ export function ProjectForm({
         </select>
       </label>
       <label>
-        Summary
+        Short description
         <textarea
+          aria-describedby="project-summary-hint"
           className={areaClass}
           name="summary"
           defaultValue={project?.summary}
+          maxLength={500}
           required
         />
-      </label>
-      <label>
-        Description
-        <textarea
-          className="min-h-56 w-full border border-border bg-background p-3"
-          name="description"
-          defaultValue={project?.description}
-          required
-        />
-      </label>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label>
-          Client
-          <input
-            className={inputClass}
-            name="clientName"
-            defaultValue={project?.clientName ?? ""}
-          />
-        </label>
-        <label>
-          Location
-          <input
-            className={inputClass}
-            name="location"
-            defaultValue={project?.location ?? ""}
-          />
-        </label>
-        <label>
-          Project date
-          <input
-            className={inputClass}
-            type="date"
-            name="projectDate"
-            defaultValue={
-              project?.projectDate?.toISOString().slice(0, 10) ?? ""
-            }
-          />
-        </label>
-        <label>
-          Order
-          <input
-            className={inputClass}
-            type="number"
-            name="sortOrder"
-            defaultValue={project?.sortOrder ?? 0}
-          />
-        </label>
-        <label>
-          Status
-          <select
-            className={inputClass}
-            name="status"
-            defaultValue={project?.status ?? "DRAFT"}
-          >
-            <option>DRAFT</option>
-            <option>PUBLISHED</option>
-          </select>
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            name="featured"
-            defaultChecked={project?.featured}
-          />{" "}
-          Featured
-        </label>
-      </div>
-      <label>
-        SEO title
-        <input
-          className={inputClass}
-          name="seoTitle"
-          defaultValue={project?.seoTitle ?? ""}
-        />
-      </label>
-      <label>
-        SEO description
-        <textarea
-          className={areaClass}
-          name="seoDescription"
-          defaultValue={project?.seoDescription ?? ""}
-        />
+        <span className={hintClass} id="project-summary-hint">
+          One or two sentences shown under the title and on project cards.
+        </span>
       </label>
       <ProjectVideoField
-        initialTitle={storedVideo?.title ?? ""}
         initialUrl={storedVideo ? videoSourceUrl(storedVideo) ?? "" : ""}
+        savedTitle={savedVideoTitle}
       />
       <ProjectMediaPicker
         initialMediaIds={selectedMediaIds}
         media={media}
       />
-      <button className={buttonClass}>Save project</button>
+      <label className="flex min-h-10 items-center gap-3">
+        <input
+          aria-describedby="project-publish-hint"
+          className="size-5"
+          type="checkbox"
+          name="status"
+          value="PUBLISHED"
+          defaultChecked={project?.status === "PUBLISHED"}
+        />
+        <span>
+          Publish on the website
+          <span className={hintClass} id="project-publish-hint">
+            Unpublished projects stay hidden from visitors.
+          </span>
+        </span>
+      </label>
+      <details className="border border-border p-4">
+        <summary className="min-h-10 cursor-pointer content-center">
+          Advanced details
+        </summary>
+        <div className="mt-4 grid gap-4">
+          <label>
+            Slug
+            <input
+              aria-describedby="project-slug-hint"
+              className={inputClass}
+              name="slug"
+              defaultValue={project?.slug ?? ""}
+              placeholder={project ? undefined : "Generated from the title"}
+            />
+            <span className={hintClass} id="project-slug-hint">
+              {project
+                ? "The project's web address. Changing it breaks links already shared."
+                : "Leave empty to create it from the title."}
+            </span>
+          </label>
+          <label>
+            Full description
+            <textarea
+              className="min-h-56 w-full border border-border bg-background p-3"
+              name="description"
+              defaultValue={project?.description ?? ""}
+            />
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label>
+              Client
+              <input
+                className={inputClass}
+                name="clientName"
+                defaultValue={project?.clientName ?? ""}
+              />
+            </label>
+            <label>
+              Location
+              <input
+                className={inputClass}
+                name="location"
+                defaultValue={project?.location ?? ""}
+              />
+            </label>
+            <label>
+              Project date
+              <input
+                className={inputClass}
+                type="date"
+                name="projectDate"
+                defaultValue={
+                  project?.projectDate?.toISOString().slice(0, 10) ?? ""
+                }
+              />
+            </label>
+            <label>
+              Order
+              <input
+                className={inputClass}
+                type="number"
+                name="sortOrder"
+                defaultValue={project?.sortOrder ?? 0}
+              />
+            </label>
+          </div>
+          <label className="flex min-h-10 items-center gap-3">
+            <input
+              className="size-5"
+              type="checkbox"
+              name="featured"
+              defaultChecked={project?.featured}
+            />
+            Featured
+          </label>
+          <label>
+            SEO title
+            <input
+              className={inputClass}
+              name="seoTitle"
+              defaultValue={project?.seoTitle ?? ""}
+            />
+          </label>
+          <label>
+            SEO description
+            <textarea
+              className={areaClass}
+              name="seoDescription"
+              defaultValue={project?.seoDescription ?? ""}
+            />
+          </label>
+        </div>
+      </details>
+      <div>
+        <button className={buttonClass}>Save project</button>
+      </div>
     </AdminForm>
   );
 }

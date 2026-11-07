@@ -14,6 +14,34 @@ export function slugify(value: string): string {
     .slice(0, 100);
 }
 
+/** A new project's slug when the editor leaves it empty. */
+export function defaultProjectSlug(title: string): string {
+  // `slugify` can cut a word in half at 100 characters and leave a hyphen.
+  return slugify(title).replace(/-+$/, "") || "project";
+}
+
+/**
+ * The project form's submitted values, ready for `projectSchema`.
+ *
+ * The publish checkbox is sent only when ticked, so its absence means draft.
+ * An empty slug on a new project is generated from the title; an existing
+ * project's slug is never generated, so an emptied one is reported instead.
+ */
+export function projectFormValues(form: FormData) {
+  const raw = Object.fromEntries(form.entries());
+  const id = typeof raw.id === "string" && raw.id ? raw.id : undefined;
+  const slug = typeof raw.slug === "string" ? raw.slug.trim() : "";
+  const title = typeof raw.title === "string" ? raw.title : "";
+  return {
+    ...raw,
+    id,
+    slug: slug || (id ? "" : defaultProjectSlug(title)),
+    status: form.get("status") === "PUBLISHED" ? "PUBLISHED" : "DRAFT",
+    featured: form.has("featured"),
+    mediaIds: form.getAll("mediaIds"),
+  };
+}
+
 const slug = z
   .string()
   .trim()
@@ -161,7 +189,9 @@ export const projectSchema = z.object({
   title: z.string().trim().min(1).max(160),
   slug,
   summary: z.string().trim().min(1).max(500),
-  description: z.string().trim().min(1).max(15000),
+  // Optional: the short description (`summary`) is the required text, and an
+  // empty description renders no paragraphs on the public page.
+  description: z.string().trim().max(15000).default(""),
   clientName: optional(160),
   location: optional(160),
   projectDate: z

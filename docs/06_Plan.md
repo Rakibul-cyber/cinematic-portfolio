@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.4.0 (MH-10: Mux removed; external video embeds with Google Drive; committed as `f10cb7d` on `feature/external-video`) |
+| Version | 1.5.0 (MH-11: simplified project editor on `feature/simple-project-editor`; MH-10 merged to `main@2056a15`, unpublished) |
 | Last reviewed | 2026-11-07 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -65,7 +65,8 @@ never marked deployed.**
 | Admin video library (P3-11D) | LOCAL ONLY: committed as `cd79df9` on `feature/video-upload-backend` (parent `b440dcf`); uploads disabled until the Mux upload host is confirmed; not pushed, merged, or deployed. |
 | Project videos and public Films (P3-11E) | LOCAL ONLY: committed as `186d489` on `feature/video-upload-backend` (parent `cd79df9`); needs the unapplied P3-11C migration and a configured Mux account; not pushed, merged, or deployed. |
 | Uploaded video via Mux (P3-11A–E) | **WITHDRAWN** by owner decision (MH-10, ADR 0012); code removed on `feature/external-video`; its migration was never applied. |
-| External video embeds (MH-10) | LOCAL ONLY on `feature/external-video`; migration `20261107120000_add_google_drive_video_provider` NOT APPLIED; not pushed, merged, or deployed. |
+| External video embeds (MH-10) | On `main@2056a15` (pushed; Netlify build reported successful by the owner, **not published**); migration `20261107120000_add_google_drive_video_provider` APPLIED to production 2026-11-07. |
+| Simplified project editor (MH-11) | LOCAL ONLY on `feature/simple-project-editor`; not pushed, merged, or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -687,6 +688,14 @@ the owner's descriptions to commits.
 - **Kept:** the integration harness's `PROTECTED_DEVELOPMENT_ENDPOINT` safeguard (MH-09 follow-up).
 - **Tests:** new `external-video.test.ts` (11), `video-player.render-test.ts` +3, `project-video-field.render-test.ts` (3); `form-state.test.ts` updated. `npm test`: 566 tests, 564 passed, 0 failed, 2 skipped; render 276 passed (the drop from 832/300 is the removed Mux suites); typecheck, lint, `git diff --check` clean; `test:bundle` (compile-only production build) PASSED 56/56 and 32/32. A full `next build` was not run: it pre-renders from the database and the only configured database is production.
 - **Remaining (owner-authorized):** publish, smoke test ([checklist](VIDEO_INTEGRATION_CHECKLIST.md)). Real-browser Drive playback (desktop and mobile) UNVERIFIED.
+- **Production impact:** none until released.
+
+#### MH-11 — Simplified, nontechnical project editor
+- **Status:** DONE locally (automated, offline) · **Completed:** 2026-11-07 · **Release:** LOCAL ONLY on `feature/simple-project-editor` (from `main@2056a15`); not pushed, merged, or deployed. Owner-requested; no new decision (no schema, route, or dependency change).
+- **Mismatch diagnosed first:** a screenshot of New project showing "Video provider"/"Video ID" came from the **published** deploy, not from `main@2056a15`. Evidence: both `/admin/projects/new` and `/admin/projects/[id]` render the shared `ProjectForm`, which at `2056a15` has only **Video link**; "Video provider"/"Video ID" exist in `project-form.tsx` at `288fde6`; the live `https://munirvisuals.com` CSP `frame-src` (checked 2026-11-07) lacks `https://drive.google.com`, which `f10cb7d` added. The `2056a15` build is built but unpublished (Auto Publishing locked).
+- **Changed:** `project-form.tsx` shows Project title, Category, Short description (`summary`), Video link, the existing media picker (first image = cover), a **Publish on the website** checkbox (`status=PUBLISHED`; absent = draft), and Save. Slug, full description, client, location, date, order, featured, and SEO fields sit in a native `<details>` "Advanced details", closed by default, with no `required` attributes; all are still submitted with their current values. `project-video-field.tsx` drops the visible title input: a saved `videoTitle` is resubmitted unchanged while the link is unchanged; otherwise it is empty and the public player names the film after the project title. Refused links get `aria-invalid` and a bordered message. `projectFormValues` (`src/lib/validation/cms.ts`) builds the action input: an empty slug on a **new** project becomes `defaultProjectSlug(title)` (`slugify`, trailing hyphen trimmed, fallback `project`); an existing project's slug is never generated, so an emptied one is a field error. `projectSchema.description` is now optional (default empty; empty renders no paragraphs). `AdminForm` opens an enclosing `<details>` before focusing a rejected field. `videoProvider`, `videoId`, `videoTitle` storage, server-side link parsing, `requireUser`, the version check, and public visibility rules are unchanged.
+- **Tests:** `cms.test.ts` +8, `admin-form.render-test.ts` +3, `project-video-field.render-test.ts` +1 (and updated). `npm test`: 574 tests, 572 passed, 0 failed, 2 skipped; render 280 passed; typecheck, lint, `git diff --check` clean; `test:bundle` PASSED 56/56 and 32/32 (0 network attempts). A full `next build` was not run (it needs a database; the only configured one is production). Real-browser checks on desktop and mobile UNVERIFIED.
+- **Remaining (owner-authorized):** review, merge, push, publish; smoke test New and Edit project on a phone and a desktop.
 - **Production impact:** none until released.
 
 ## Phase 4 — Edge cases and testing

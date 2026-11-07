@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/03_UI_Spec.md` |
-| Version | 1.1.0 (MH-10: cover-image poster, Google Drive, admin video link field) |
+| Version | 1.2.0 (MH-11: simplified project editor; MH-10: cover-image poster, Google Drive, admin video link field) |
 | Last reviewed | 2026-11-07 |
 | Reviewed against | commit `4f7f564` (branch `docs/context-architecture`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -313,7 +313,13 @@ Drive uses `drive.google.com/file/d/<id>/preview` (no autoplay). The CSP
 Admin (MH-10): the project form has one **Video link** field. The provider is
 detected as the administrator types ("Detected: Google Drive"), refusals are
 explained in plain words, and a valid link shows the same click-to-load player
-as a preview (`project-video-field.tsx`).
+as a preview (`project-video-field.tsx`). A refused link is marked
+`aria-invalid` and its message is bordered with the accent token.
+
+Admin (MH-11): the project editor shows the everyday fields in one column
+(`max-w-3xl`) and puts the rest in a native `<details>` "Advanced details",
+closed by default, styled like the other admin fieldsets (`border-border`,
+square corners, no shadow). Checkboxes are 20 px with a 40 px row height.
 
 ### 5.3 Loading placeholders and fallbacks
 

@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/02_AppFlow.md` |
-| Version | 1.2.0 (MH-10: project video by pasted link; Google Drive) |
+| Version | 1.3.0 (MH-11: simplified project editor; MH-10: project video by pasted link; Google Drive) |
 | Last reviewed | 2026-11-07 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -207,11 +207,20 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
   roles, and order); `deleteAction` (ADMIN, confirm dialog).
 - **Validation:** `src/lib/validation/cms.ts`; slug uniqueness; a project
   version check refuses a save made against stale data.
+- **Form layout (MH-11):** visible: title, category, short description
+  (`summary`), video link, media (first image = cover), a Publish checkbox
+  (`status=PUBLISHED`, absent = `DRAFT`). A closed `<details>` holds slug,
+  description (optional), client, location, date, order, featured, and SEO.
+  An empty slug on a new project is generated from the title
+  (`projectFormValues`); an existing slug is never regenerated. A rejected
+  field inside the closed section opens it before focus.
 - **Project film (MH-10):** one optional YouTube, Vimeo, or Google Drive link
-  (`videoUrl`) and title. The server parses the link (`parseEmbeddableVideoUrl`)
+  (`videoUrl`). The server parses the link (`parseEmbeddableVideoUrl`)
   and stores only provider and ID; an unsupported link is a field error on
-  `videoUrl`; an empty link removes the film. Visibility follows the project's
-  status. Preview: the public click-to-load player.
+  `videoUrl`; an empty link removes the film. No title input (MH-11): a saved
+  `videoTitle` is kept while the link is unchanged; otherwise the public player
+  uses the project title. Visibility follows the project's status. Preview: the
+  public click-to-load player.
 - **Empty:** "No projects yet."
 - **Success:** a saved notice; public cache tags revalidated.
 - **Side effects:** audit `cms.created`, `cms.updated`, `cms.deleted`,

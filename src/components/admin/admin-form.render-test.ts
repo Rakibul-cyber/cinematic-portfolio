@@ -158,6 +158,63 @@ describe("a rejected save", () => {
   });
 });
 
+describe("a rejected field inside a closed details section", () => {
+  it("opens the section so the field can be focused", async () => {
+    const container = dom.window.document.createElement("div");
+    dom.window.document.body.append(container);
+    const root = createRoot(container);
+    const action = async () => ({ error: "A project with this slug already exists.", field: "slug" });
+    await act(async () =>
+      root.render(
+        createElement(
+          AdminForm,
+          { action },
+          createElement("label", null, "Title", createElement("input", { name: "title", defaultValue: "T" })),
+          createElement(
+            "details",
+            null,
+            createElement("summary", null, "Advanced details"),
+            createElement("label", null, "Slug", createElement("input", { name: "slug", defaultValue: "taken" })),
+          ),
+          createElement("button", null, "Save"),
+        ),
+      ),
+    );
+    const form = container.querySelector("form")!;
+    const details = form.querySelector("details")!;
+    assert.equal(details.open, false);
+    await act(async () => form.requestSubmit());
+    assert.equal(details.open, true);
+    assert.equal(dom.window.document.activeElement, form.querySelector("[name=slug]"));
+    assert.equal(form.querySelector("[role=alert]")!.textContent, "Slug: A project with this slug already exists.");
+    await act(async () => root.unmount());
+    container.remove();
+  });
+});
+
+describe("the project editor", () => {
+  const source = readFileSync("src/components/admin/project-form.tsx", "utf8");
+  const [visible, advanced] = source.split("<details className");
+
+  it("shows only the everyday fields, with no provider or video ID input", () => {
+    for (const name of ["title", "categoryId", "summary", "status"]) assert.match(visible, new RegExp(`name="${name}"`), name);
+    assert.match(visible, /<ProjectVideoField/);
+    assert.match(visible, /<ProjectMediaPicker/);
+    assert.match(visible, /type="checkbox"\s+name="status"\s+value="PUBLISHED"/);
+    assert.doesNotMatch(source, /name="videoProvider"|name="videoId"|Video provider|Video ID/);
+  });
+
+  it("keeps every advanced field in a details section that starts closed", () => {
+    assert.ok(advanced, "advanced details section");
+    assert.match(source, /<details className="[^"]*">/, "no open attribute");
+    for (const name of ["slug", "description", "clientName", "location", "projectDate", "sortOrder", "featured", "seoTitle", "seoDescription"]) {
+      assert.match(advanced, new RegExp(`name="${name}"`), name);
+      assert.doesNotMatch(visible, new RegExp(`name="${name}"`), name);
+    }
+    assert.doesNotMatch(advanced, /\brequired\b/, "a closed section cannot show the browser's required-field prompt");
+  });
+});
+
 describe("a successful save after a rejected one", () => {
   it("clears the message and the mark, and resets the form as before", async () => {
     let call = 0;

@@ -47,6 +47,10 @@ export function AdminForm({ action, children, ...props }: Omit<ComponentProps<"f
       field.setAttribute("aria-describedby", [marked.current.describedBy, errorId].filter(Boolean).join(" "));
       const label = labelText(field);
       setMessage(label ? `${label}: ${visible.error}` : visible.error);
+      // A field inside a closed <details> (the project form's advanced
+      // section) cannot take focus until its section is open.
+      const section = field.closest("details");
+      if (section) section.open = true;
       field.focus();
     } else {
       setMessage(visible.error);

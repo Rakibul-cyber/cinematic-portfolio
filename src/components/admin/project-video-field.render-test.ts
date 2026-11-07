@@ -20,9 +20,10 @@ describe("project video field", () => {
   });
 
   it("submits the link as videoUrl and previews a saved video with the click-to-load player", () => {
-    const html = renderToStaticMarkup(React.createElement(ProjectVideoField, { initialUrl: DRIVE, initialTitle: "Brand film" }));
+    const html = renderToStaticMarkup(React.createElement(ProjectVideoField, { initialUrl: DRIVE, savedTitle: "Brand film" }));
     assert.match(html, /name="videoUrl"/);
-    assert.match(html, /name="videoTitle"/);
+    assert.match(html, /<input type="hidden" name="videoTitle" value="Brand film"\/>/, "a saved title is kept unchanged");
+    assert.ok(!/<input[^>]*type="text"[^>]*name="videoTitle"|<input[^>]*name="videoTitle"[^>]*type="text"/.test(html), "no visible title input");
     assert.match(html, /Detected: Google Drive/);
     assert.match(html, /Play Brand film/);
     assert.ok(!html.includes("<iframe"), "the preview loads nothing until pressed");
@@ -30,7 +31,15 @@ describe("project video field", () => {
   });
 
   it("shows no preview without a valid link", () => {
-    const html = renderToStaticMarkup(React.createElement(ProjectVideoField, { initialUrl: "", initialTitle: "" }));
+    const html = renderToStaticMarkup(React.createElement(ProjectVideoField, { initialUrl: "", savedTitle: "" }));
+    assert.ok(!html.includes("Play "));
+    assert.ok(!/Video provider|Video ID/.test(html), "a link only: never a provider or video ID");
+  });
+
+  it("marks a refused link invalid, explains why and shows no preview", () => {
+    const html = renderToStaticMarkup(React.createElement(ProjectVideoField, { initialUrl: "https://example.com/film.mp4", savedTitle: "" }));
+    assert.match(html, /aria-invalid="true"/);
+    assert.match(html, /id="project-video-status"[^>]*>[^<]+</);
     assert.ok(!html.includes("Play "));
   });
 });
