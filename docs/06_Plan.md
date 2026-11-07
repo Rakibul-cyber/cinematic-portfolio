@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.4.0 (MH-10: Mux removed; external video embeds with Google Drive; committed on `feature/external-video`, hash recorded under MH-10) |
+| Version | 1.4.0 (MH-10: Mux removed; external video embeds with Google Drive; committed as `f10cb7d` on `feature/external-video`) |
 | Last reviewed | 2026-11-07 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -680,7 +680,7 @@ the owner's descriptions to commits.
 - **Production impact:** none.
 
 #### MH-10 — Replace uploaded video with external embeds (YouTube, Vimeo, Google Drive)
-- **Status:** DONE locally (automated, offline) · **Completed:** 2026-11-07 · **Release:** LOCAL ONLY on `feature/external-video` (from `d6dcb31`); migration NOT APPLIED; not pushed, merged, or deployed. Decision: [ADR 0012](DECISIONS/0012-external-video-embeds.md).
+- **Status:** DONE locally (automated, offline) · **Completed:** 2026-11-07 · **Release:** LOCAL ONLY: committed as `f10cb7d` on `feature/external-video` (parent `d6dcb31`); migration NOT APPLIED; not pushed, merged, or deployed. Decision: [ADR 0012](DECISIONS/0012-external-video-embeds.md).
 - **Removed:** the Mux implementation (P3-11A–E): `src/server/video/*`, `/api/videos/*`, `/api/webhooks/mux`, `/admin/videos`, project video picker, public Films, HLS player, the upload/CSP/status/eligibility/message helpers, the video parts of the project save and public queries, the video integration suite and its gate, `@mux/upchunk` and `hls.js` (lockfile: deletions only), the `MUX_*`/`VIDEO_*` variables, the `Video`/`ProjectVideo` models and `VideoStatus`. Files modified by the Mux commits were restored to their pre-Mux state (`e681ffa`); no later commit had touched them.
 - **Withdrawn migration:** `20261106120000_add_uploaded_video` removed from the directory. Evidence it was never applied to a retained database: the authorized read-only `prisma migrate status` against the production endpoint (`ep-dawn-paper-b1l0y54j`) on 2026-11-07 listed it as the only pending migration; no other database is configured.
 - **Added:** `GOOGLE_DRIVE` on `VideoProvider`, migration `20261107120000_add_google_drive_video_provider` (one `ALTER TYPE … ADD VALUE`; equals an offline `prisma migrate diff` from the 7-migration schema). Drive links (`/file/d/<id>/…`, `open?id=`, `uc?id=`) parsed with exact hosts and a validated file ID; embed `https://drive.google.com/file/d/<id>/preview`. The project form takes one **Video link** (`videoUrl`) with live provider detection and a click-to-load preview (`project-video-field.tsx`); the server stores only provider, ID, and title. The public player shows the project cover as a lazy, decorative poster. CSP: `https://drive.google.com` added to `frame-src` only. Unlisted Vimeo links are refused (hash not stored). The homepage showreel keeps provider-and-ID input.
