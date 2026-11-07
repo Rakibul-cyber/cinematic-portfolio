@@ -197,7 +197,9 @@ export const projectSchema = z.object({
   projectDate: z
     .string()
     .transform((v) => (v ? new Date(`${v}T00:00:00.000Z`) : null)),
-  categoryId: z.string().uuid(),
+  // Optional: empty means "automatic" for a new project and "unchanged" for an
+  // existing one (see `decideProjectCategory`).
+  categoryId: z.string().default("").transform((value) => value || null).pipe(z.string().uuid().nullable()),
   status: z.enum(["DRAFT", "PUBLISHED"]),
   featured: z.coerce.boolean(),
   sortOrder: order,

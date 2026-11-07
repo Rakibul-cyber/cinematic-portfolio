@@ -96,12 +96,36 @@ describe("simplified project form", () => {
     assert.deepEqual(result.error?.issues.map((issue) => issue.path[0]), ["videoUrl"]);
   });
 
-  it("still requires the title, category and short description", () => {
-    for (const missing of ["title", "categoryId", "summary"]) {
+  it("still requires the title and short description", () => {
+    for (const missing of ["title", "summary"]) {
       const result = projectSchema.safeParse(projectFormValues(projectForm(NEW.map(([k, v]) => [k, k === missing ? "" : v]))));
       assert.equal(result.success, false, missing);
       assert.deepEqual(result.error?.issues.map((issue) => issue.path[0]), [missing]);
     }
+  });
+
+  it("creates a project without a category choice (the server assigns one)", () => {
+    const withoutField = NEW.filter(([k]) => k !== "categoryId");
+    for (const entries of [withoutField, NEW.map(([k, v]): [string, string] => [k, k === "categoryId" ? "" : v])]) {
+      const parsed = projectSchema.parse(projectFormValues(projectForm(entries)));
+      assert.equal(parsed.categoryId, null);
+      assert.equal(parsed.id, undefined);
+    }
+  });
+
+  it("edits a project without a category choice (the server keeps the saved one)", () => {
+    const parsed = projectSchema.parse(projectFormValues(projectForm([
+      ["id", PROJECT], ["expectedUpdatedAt", "2026-11-07T10:00:00.000Z"], ["slug", "kept-slug"],
+      ...NEW.filter(([k]) => k !== "categoryId" && k !== "slug"),
+    ])));
+    assert.equal(parsed.categoryId, null);
+    assert.equal(parsed.id, PROJECT);
+  });
+
+  it("keeps a chosen category and refuses a malformed one", () => {
+    assert.equal(projectSchema.parse(projectFormValues(projectForm(NEW))).categoryId, CATEGORY);
+    const bad = projectSchema.safeParse(projectFormValues(projectForm(NEW.map(([k, v]) => [k, k === "categoryId" ? "films" : v]))));
+    assert.deepEqual(bad.error?.issues.map((issue) => issue.path[0]), ["categoryId"]);
   });
 });
 

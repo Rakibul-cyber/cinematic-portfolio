@@ -33,7 +33,7 @@ describe("admin validation messages", () => {
   it("replaces Zod's format defaults for email, URL and option fields", () => {
     assert.deepEqual(failureOf(settingsSchema.safeParse({ ...settings, contactEmail: "nope" })), { error: "Enter a valid email address.", field: "contactEmail" });
     assert.deepEqual(failureOf(socialSchema.safeParse({ platform: "P", label: "L", url: "nope", sortOrder: "0", isActive: true })), { error: "Enter a full URL, including https://.", field: "url" });
-    assert.deepEqual(failureOf(projectSchema.safeParse({ ...project, categoryId: "" })), { error: "Choose one of the listed options.", field: "categoryId" });
+    assert.deepEqual(failureOf(projectSchema.safeParse({ ...project, categoryId: "films" })), { error: "Choose one of the listed options.", field: "categoryId" });
     assert.deepEqual(failureOf(projectSchema.safeParse({ ...project, status: "LIVE" })), { error: "Choose one of the listed options.", field: "status" });
   });
 

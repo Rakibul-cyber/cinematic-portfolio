@@ -207,10 +207,14 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
   roles, and order); `deleteAction` (ADMIN, confirm dialog).
 - **Validation:** `src/lib/validation/cms.ts`; slug uniqueness; a project
   version check refuses a save made against stale data.
-- **Form layout (MH-11):** visible: title, category, short description
+- **Form layout (MH-11, MH-12):** visible: title, short description
   (`summary`), video link, media (first image = cover), a Publish checkbox
-  (`status=PUBLISHED`, absent = `DRAFT`). A closed `<details>` holds slug,
-  description (optional), client, location, date, order, featured, and SEO.
+  (`status=PUBLISHED`, absent = `DRAFT`). A closed `<details>` holds category,
+  slug, description (optional), client, location, date, order, featured, and
+  SEO. Category is optional in the form: a new project without one gets the
+  first active category (`sortOrder`, then name); an edit without one keeps the
+  saved category; with no active category the save is refused with a message.
+  No category is created automatically.
   An empty slug on a new project is generated from the title
   (`projectFormValues`); an existing slug is never regenerated. A rejected
   field inside the closed section opens it before focus.

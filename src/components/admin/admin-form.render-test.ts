@@ -197,7 +197,7 @@ describe("the project editor", () => {
   const [visible, advanced] = source.split("<details className");
 
   it("shows only the everyday fields, with no provider or video ID input", () => {
-    for (const name of ["title", "categoryId", "summary", "status"]) assert.match(visible, new RegExp(`name="${name}"`), name);
+    for (const name of ["title", "summary", "status"]) assert.match(visible, new RegExp(`name="${name}"`), name);
     assert.match(visible, /<ProjectVideoField/);
     assert.match(visible, /<ProjectMediaPicker/);
     assert.match(visible, /type="checkbox"\s+name="status"\s+value="PUBLISHED"/);
@@ -207,11 +207,12 @@ describe("the project editor", () => {
   it("keeps every advanced field in a details section that starts closed", () => {
     assert.ok(advanced, "advanced details section");
     assert.match(source, /<details className="[^"]*">/, "no open attribute");
-    for (const name of ["slug", "description", "clientName", "location", "projectDate", "sortOrder", "featured", "seoTitle", "seoDescription"]) {
+    for (const name of ["categoryId", "slug", "description", "clientName", "location", "projectDate", "sortOrder", "featured", "seoTitle", "seoDescription"]) {
       assert.match(advanced, new RegExp(`name="${name}"`), name);
       assert.doesNotMatch(visible, new RegExp(`name="${name}"`), name);
     }
     assert.doesNotMatch(advanced, /\brequired\b/, "a closed section cannot show the browser's required-field prompt");
+    assert.ok(advanced.includes('{project ? null : <option value="">Automatic</option>}'), "a new project can leave the category automatic");
   });
 });
 

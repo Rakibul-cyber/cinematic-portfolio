@@ -12,7 +12,7 @@ export default async function Page({
   const [categories, media] = await Promise.all([
     prisma.portfolioCategory.findMany({
       where: { isActive: true },
-      orderBy: { sortOrder: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: { id: true, name: true },
     }),
     prisma.media.findMany({

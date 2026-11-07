@@ -11,6 +11,7 @@ import type {
   socialSchema,
   testimonialSchema,
 } from "@/lib/validation/cms";
+import { decideProjectCategory, MISSING_CATEGORY_MESSAGE } from "@/lib/cms/project-category";
 import { projectMediaRows } from "@/lib/cms/project-media";
 import { nextProjectVersion } from "@/lib/cms/project-version";
 import { AuditAction, recordAuditLog } from "@/server/audit/audit-log";
@@ -21,6 +22,8 @@ type Input<T extends z.ZodType> = z.infer<T>;
 export class SlugConflictError extends Error {}
 export class ReferencedCategoryError extends Error {}
 export class ProjectConflictError extends Error {}
+/** A new project has no chosen category and no active category exists. */
+export class MissingCategoryError extends Error {}
 
 async function audit(
   actor: AdminUser,
@@ -165,10 +168,25 @@ export async function saveProject(
   actor: AdminUser,
 ) {
   try {
-    const { id, expectedUpdatedAt, mediaIds, ...fields } = data;
+    const { id, expectedUpdatedAt, mediaIds, categoryId: chosenCategoryId, ...fields } = data;
     const publishedAt = fields.status === "PUBLISHED" ? new Date() : null;
     const row = await prisma.$transaction(async (tx) => {
       let project;
+      const firstActive =
+        chosenCategoryId || id
+          ? null
+          : await tx.portfolioCategory.findFirst({
+              where: { isActive: true },
+              orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+              select: { id: true },
+            });
+      const category = decideProjectCategory({
+        chosen: chosenCategoryId,
+        isNew: !id,
+        firstActiveCategoryId: firstActive?.id ?? null,
+      });
+      if (category.kind === "missing") throw new MissingCategoryError(MISSING_CATEGORY_MESSAGE);
+      const categoryField = category.kind === "set" ? { categoryId: category.categoryId } : {};
 
       if (id) {
         if (!expectedUpdatedAt) {
@@ -178,6 +196,7 @@ export async function saveProject(
           where: { id, updatedAt: expectedUpdatedAt },
           data: {
             ...fields,
+            ...categoryField,
             publishedAt,
             updatedAt: nextProjectVersion(expectedUpdatedAt),
           },
@@ -189,7 +208,8 @@ export async function saveProject(
         }
         project = await tx.project.findUniqueOrThrow({ where: { id } });
       } else {
-        project = await tx.project.create({ data: { ...fields, publishedAt } });
+        if (category.kind !== "set") throw new MissingCategoryError(MISSING_CATEGORY_MESSAGE);
+        project = await tx.project.create({ data: { ...fields, categoryId: category.categoryId, publishedAt } });
       }
 
       await tx.projectMedia.deleteMany({ where: { projectId: project.id } });

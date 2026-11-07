@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.5.0 (MH-11: simplified project editor on `feature/simple-project-editor`; MH-10 merged to `main@2056a15`, unpublished) |
+| Version | 1.6.0 (MH-12: automatic project category, local; MH-11 on `main@0957a7b`, unpublished) |
 | Last reviewed | 2026-11-07 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -66,7 +66,8 @@ never marked deployed.**
 | Project videos and public Films (P3-11E) | LOCAL ONLY: committed as `186d489` on `feature/video-upload-backend` (parent `cd79df9`); needs the unapplied P3-11C migration and a configured Mux account; not pushed, merged, or deployed. |
 | Uploaded video via Mux (P3-11A–E) | **WITHDRAWN** by owner decision (MH-10, ADR 0012); code removed on `feature/external-video`; its migration was never applied. |
 | External video embeds (MH-10) | On `main@2056a15` (pushed; Netlify build reported successful by the owner, **not published**); migration `20261107120000_add_google_drive_video_provider` APPLIED to production 2026-11-07. |
-| Simplified project editor (MH-11) | LOCAL ONLY on `feature/simple-project-editor`; not pushed, merged, or deployed. |
+| Simplified project editor (MH-11) | On `main@0957a7b` (pushed); not published. |
+| Automatic project category (MH-12) | LOCAL ONLY on `feature/automatic-project-category`; not pushed, merged, or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -697,6 +698,15 @@ the owner's descriptions to commits.
 - **Tests:** `cms.test.ts` +8, `admin-form.render-test.ts` +3, `project-video-field.render-test.ts` +1 (and updated). `npm test`: 574 tests, 572 passed, 0 failed, 2 skipped; render 280 passed; typecheck, lint, `git diff --check` clean; `test:bundle` PASSED 56/56 and 32/32 (0 network attempts). A full `next build` was not run (it needs a database; the only configured one is production). Real-browser checks on desktop and mobile UNVERIFIED.
 - **Remaining (owner-authorized):** review, merge, push, publish; smoke test New and Edit project on a phone and a desktop.
 - **Production impact:** none until released.
+- **Follow-up:** merged and pushed as `main@0957a7b` (owner-authorized, 2026-11-07); not published.
+
+#### MH-12 — Create projects without choosing a category
+- **Status:** DONE locally (automated, offline) · **Completed:** 2026-11-07 · **Release:** LOCAL ONLY on `feature/automatic-project-category` (from `main@0957a7b`); not pushed, merged, or deployed.
+- **Root cause (from code; production data not read, not authorized):** New project lists only **active** categories (`isActive: true`), and no seed or migration creates one, so an empty dropdown means production has no active category. A category is required end to end: `project.categoryId` is `NOT NULL` with an `ON DELETE RESTRICT` foreign key; public visibility requires `category.isActive` (`publication.ts`); public pages show the category name.
+- **Change:** Category leaves the visible form and moves into Advanced details (no `required`; New offers "Automatic", Edit preselects the saved category). `projectSchema.categoryId` is optional (empty → `null`; a malformed value is still refused). `saveProject` uses `decideProjectCategory` (`src/lib/cms/project-category.ts`): a chosen category is used; an update without one writes no `categoryId` (existing assignment kept); a create without one takes the first **active** category by `sortOrder`, then name (the public filter order). With no active category the save is refused with "Add a category under Categories first…" on the category field; no category is ever created or assigned from an inactive one. New page category order now matches (`sortOrder`, `name`).
+- **Tests:** new `project-category.test.ts` (6); `cms.test.ts` +3 (create and edit without category, malformed category) and 1 updated; `form-state.test.ts` and `admin-form.render-test.ts` updated. `npm test`: 583 tests, 581 passed, 0 failed, 2 skipped; render 280 passed; typecheck, lint, `git diff --check` clean. Saving against a real database UNVERIFIED (none available offline).
+- **Owner action before publishing projects:** if Categories is empty, add one active category (for example "Films") under `/admin/categories`. It then becomes the automatic default.
+- **Production impact:** none until released; existing projects keep their categories.
 
 ## Phase 4 — Edge cases and testing
 

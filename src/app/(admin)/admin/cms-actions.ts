@@ -30,6 +30,7 @@ import {
   saveSettings,
   saveSocial,
   saveTestimonial,
+  MissingCategoryError,
   ProjectConflictError,
   ReferencedCategoryError,
   SlugConflictError,
@@ -41,6 +42,7 @@ function values(form: FormData) {
 function failure(error: unknown): NonNullable<AdminFormState> {
   if (error instanceof SlugConflictError) return { error: error.message, field: "slug" };
   if (error instanceof ProjectConflictError) return { error: error.message };
+  if (error instanceof MissingCategoryError) return { error: error.message, field: "categoryId" };
   if (error instanceof ReferencedCategoryError) return { error: error.message };
   if (error instanceof z.ZodError) return describeValidationError(error);
   return { error: "The change could not be saved." };
