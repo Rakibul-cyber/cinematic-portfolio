@@ -21,7 +21,8 @@ export type PublicProjectSummary = {
   slug: string;
   title: string;
   summary: string;
-  category: PublicCategory;
+  /** Null when the project has no category, or its category is inactive. */
+  category: PublicCategory | null;
   /** Year of the shoot, when the CMS records a date. */
   year: number | null;
   cover: PublicImage | null;

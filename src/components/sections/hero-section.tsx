@@ -84,7 +84,7 @@ export function HeroSection({
                 <span className="text-foreground transition-colors group-hover:text-accent">
                   {hero.title}
                 </span>
-                <span>{hero.category.name}</span>
+                {hero.category ? <span>{hero.category.name}</span> : null}
               </p>
             </Link>
           </FadeReveal>

@@ -73,16 +73,26 @@ function project(overrides: Partial<ProjectRow> = {}): ProjectRow {
     videoProvider: null,
     videoId: null,
     videoTitle: null,
-    category: { name: "Editorial", slug: "editorial" },
+    category: { name: "Editorial", slug: "editorial", isActive: true },
     media: [{ sortOrder: 0, media: media() }],
     ...overrides,
   };
 }
 
 describe("publication rules", () => {
-  it("restricts public project reads to published work in active categories", () => {
-    assert.equal(PUBLISHED_PROJECT_WHERE.status, "PUBLISHED");
-    assert.deepEqual(PUBLISHED_PROJECT_WHERE.category, { isActive: true });
+  it("restricts public project reads to published work, whatever the category", () => {
+    assert.deepEqual(PUBLISHED_PROJECT_WHERE, { status: "PUBLISHED" });
+  });
+
+  it("maps a project without a category, or with an inactive one, to no category", () => {
+    for (const category of [null, { name: "Old", slug: "old", isActive: false }]) {
+      const detail = toProjectDetail(project({ category }), resolveUrl);
+      assert.equal(detail.category, null);
+      assert.equal(detail.title, "Harbour Light");
+      assert.equal(detail.gallery.length, 1, "images are unaffected");
+    }
+    const active = toProjectDetail(project(), resolveUrl).category;
+    assert.deepEqual(active, { name: "Editorial", slug: "editorial" }, "the active flag never reaches the page");
   });
 
   it("restricts services, testimonials, and social links to active rows", () => {
@@ -232,7 +242,7 @@ describe("public view models", () => {
     for (const key of forbidden) {
       assert.ok(!(key in detail), `detail exposes ${key}`);
       assert.ok(!(key in summary), `summary exposes ${key}`);
-      assert.ok(!(key in summary.category), `category exposes ${key}`);
+      assert.ok(summary.category && !(key in summary.category), `category exposes ${key}`);
     }
   });
 

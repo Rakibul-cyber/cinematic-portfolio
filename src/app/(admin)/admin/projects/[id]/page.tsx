@@ -14,7 +14,7 @@ export default async function Page({
 }) {
   const { id } = await params;
   const user = await requireUser(`/admin/projects/${id}`);
-  const [project, categories, media] = await Promise.all([
+  const [project, media] = await Promise.all([
     prisma.project.findUnique({
       where: { id },
       include: {
@@ -28,10 +28,6 @@ export default async function Page({
           },
         },
       },
-    }),
-    prisma.portfolioCategory.findMany({
-      orderBy: { sortOrder: "asc" },
-      select: { id: true, name: true },
     }),
     prisma.media.findMany({
       orderBy: { createdAt: "desc" },
@@ -50,7 +46,6 @@ export default async function Page({
       <Notice message={error} />
       <ProjectForm
         project={project}
-        categories={categories}
         media={mediaOptions}
       />
     </AdminShell>

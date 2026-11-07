@@ -51,7 +51,7 @@ export default async function Page({
                   {r.title}
                 </Link>
                 <p className="text-sm text-muted-foreground">
-                  {r.category.name} · {r.status} ·{" "}
+                  {r.category ? `${r.category.name} · ` : ""}{r.status} ·{" "}
                   {r.featured ? "Featured · " : ""}
                   {r.updatedAt.toLocaleDateString()}
                 </p>

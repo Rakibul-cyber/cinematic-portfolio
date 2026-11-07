@@ -19,7 +19,7 @@ function projectForm(entries: [string, string][]) {
 
 describe("simplified project form", () => {
   it("generates a new project's slug from the title", () => {
-    const values = projectFormValues(projectForm([["title", "Côte d'Azur Wedding Film"], ["slug", ""], ["categoryId", CATEGORY], ["summary", "S"]]));
+    const values = projectFormValues(projectForm([["title", "Côte d'Azur Wedding Film"], ["slug", ""], ["summary", "S"]]));
     assert.equal(values.slug, "cote-d-azur-wedding-film");
     assert.equal(values.id, undefined);
   });
@@ -30,7 +30,7 @@ describe("simplified project form", () => {
     assert.equal(edited.slug, "original-slug");
     const emptied = projectFormValues(projectForm([["id", PROJECT], ["title", "Renamed project"], ["slug", ""]]));
     assert.equal(emptied.slug, "", "an emptied slug is reported, not regenerated");
-    assert.equal(projectSchema.safeParse({ ...emptied, categoryId: CATEGORY, summary: "S", projectDate: "", expectedUpdatedAt: new Date().toISOString() }).success, false);
+    assert.equal(projectSchema.safeParse({ ...emptied, summary: "S", projectDate: "", expectedUpdatedAt: new Date().toISOString() }).success, false);
   });
 
   it("falls back when a title has no URL-safe characters, and never ends a slug with a hyphen", () => {
@@ -48,7 +48,7 @@ describe("simplified project form", () => {
 
   it("saves a project from the visible fields only, storing just provider, ID and title", () => {
     const form = projectForm([
-      ["title", "Brand Film"], ["slug", ""], ["categoryId", CATEGORY], ["summary", "A short film."],
+      ["title", "Brand Film"], ["slug", ""], ["summary", "A short film."],
       ["videoUrl", "https://youtu.be/dQw4w9WgXcQ"], ["videoTitle", ""],
       ["description", ""], ["clientName", ""], ["location", ""], ["projectDate", ""], ["sortOrder", "0"], ["seoTitle", ""], ["seoDescription", ""],
     ]);
@@ -65,7 +65,7 @@ describe("simplified project form", () => {
   it("keeps the advanced values and a saved video title on save", () => {
     const form = projectForm([
       ["id", PROJECT], ["expectedUpdatedAt", "2026-11-07T10:00:00.000Z"],
-      ["title", "Brand Film"], ["slug", "kept-slug"], ["categoryId", CATEGORY], ["summary", "A short film."], ["status", "PUBLISHED"],
+      ["title", "Brand Film"], ["slug", "kept-slug"], ["summary", "A short film."], ["status", "PUBLISHED"],
       ["videoUrl", "https://vimeo.com/76979871"], ["videoTitle", "Director's cut"],
       ["description", "Long text."], ["clientName", "Client"], ["location", "Berlin"], ["projectDate", "2026-05-01"], ["sortOrder", "3"], ["featured", "on"], ["seoTitle", "SEO"], ["seoDescription", "SEO text"],
     ]);
@@ -85,8 +85,12 @@ describe("simplified project form", () => {
 
   // What a new project's form submits with every advanced field left empty.
   const NEW: [string, string][] = [
-    ["title", "T"], ["slug", ""], ["categoryId", CATEGORY], ["summary", "S"], ["videoUrl", ""], ["videoTitle", ""],
+    ["title", "T"], ["slug", ""], ["summary", "S"], ["videoUrl", ""], ["videoTitle", ""],
     ["description", ""], ["clientName", ""], ["location", ""], ["projectDate", ""], ["sortOrder", "0"], ["seoTitle", ""], ["seoDescription", ""],
+  ];
+  const EDIT: [string, string][] = [
+    ["id", PROJECT], ["expectedUpdatedAt", "2026-11-07T10:00:00.000Z"], ["slug", "kept-slug"],
+    ...NEW.filter(([k]) => k !== "slug"),
   ];
 
   it("still refuses an invalid video link on the server", () => {
@@ -96,36 +100,29 @@ describe("simplified project form", () => {
     assert.deepEqual(result.error?.issues.map((issue) => issue.path[0]), ["videoUrl"]);
   });
 
-  it("still requires the title and short description", () => {
-    for (const missing of ["title", "summary"]) {
-      const result = projectSchema.safeParse(projectFormValues(projectForm(NEW.map(([k, v]) => [k, k === missing ? "" : v]))));
-      assert.equal(result.success, false, missing);
-      assert.deepEqual(result.error?.issues.map((issue) => issue.path[0]), [missing]);
-    }
+  it("requires only the title (it names the page and makes the slug)", () => {
+    const result = projectSchema.safeParse(projectFormValues(projectForm(NEW.map(([k, v]) => [k, k === "title" ? "" : v]))));
+    assert.deepEqual(result.error?.issues.map((issue) => issue.path[0]), ["title"]);
   });
 
-  it("creates a project without a category choice (the server assigns one)", () => {
-    const withoutField = NEW.filter(([k]) => k !== "categoryId");
-    for (const entries of [withoutField, NEW.map(([k, v]): [string, string] => [k, k === "categoryId" ? "" : v])]) {
+  it("saves a project with only a title: no description, video, image or category", () => {
+    const parsed = projectSchema.parse(projectFormValues(projectForm(NEW.map(([k, v]) => [k, k === "summary" ? "" : v]))));
+    assert.equal(parsed.summary, "");
+    assert.equal(parsed.videoProvider, null);
+    assert.deepEqual(parsed.mediaIds, []);
+  });
+
+  it("creates and edits a project without any category, writing none", () => {
+    for (const entries of [NEW, EDIT]) {
       const parsed = projectSchema.parse(projectFormValues(projectForm(entries)));
-      assert.equal(parsed.categoryId, null);
-      assert.equal(parsed.id, undefined);
+      assert.ok(!("categoryId" in parsed), "the save never writes a category, so a saved one is kept");
     }
+    assert.equal(projectSchema.parse(projectFormValues(projectForm(EDIT))).id, PROJECT);
   });
 
-  it("edits a project without a category choice (the server keeps the saved one)", () => {
-    const parsed = projectSchema.parse(projectFormValues(projectForm([
-      ["id", PROJECT], ["expectedUpdatedAt", "2026-11-07T10:00:00.000Z"], ["slug", "kept-slug"],
-      ...NEW.filter(([k]) => k !== "categoryId" && k !== "slug"),
-    ])));
-    assert.equal(parsed.categoryId, null);
-    assert.equal(parsed.id, PROJECT);
-  });
-
-  it("keeps a chosen category and refuses a malformed one", () => {
-    assert.equal(projectSchema.parse(projectFormValues(projectForm(NEW))).categoryId, CATEGORY);
-    const bad = projectSchema.safeParse(projectFormValues(projectForm(NEW.map(([k, v]) => [k, k === "categoryId" ? "films" : v]))));
-    assert.deepEqual(bad.error?.issues.map((issue) => issue.path[0]), ["categoryId"]);
+  it("ignores a categoryId posted by an old form instead of writing it", () => {
+    const parsed = projectSchema.parse(projectFormValues(projectForm([...EDIT, ["categoryId", CATEGORY]])));
+    assert.ok(!("categoryId" in parsed));
   });
 });
 
@@ -167,7 +164,6 @@ describe("CMS validation", () => {
       clientName: "",
       location: "",
       projectDate: "",
-      categoryId: "123e4567-e89b-12d3-a456-426614174000",
       status: "PUBLISHED",
       featured: false,
       sortOrder: 0,
@@ -187,7 +183,6 @@ describe("CMS validation", () => {
       clientName: "",
       location: "",
       projectDate: "",
-      categoryId: "123e4567-e89b-12d3-a456-426614174000",
       status: "DRAFT",
       featured: false,
       sortOrder: 0,
@@ -216,7 +211,6 @@ describe("CMS validation", () => {
       clientName: "",
       location: "",
       projectDate: "",
-      categoryId: "123e4567-e89b-12d3-a456-426614174000",
       status: "PUBLISHED",
       featured: false,
       sortOrder: 0,

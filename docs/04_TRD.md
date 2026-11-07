@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/04_TRD.md` |
-| Version | 1.7.0 (MH-10: Mux upload/streaming removed; YouTube, Vimeo, and Google Drive embeds; `GOOGLE_DRIVE` migration, not applied) |
+| Version | 1.8.0 (MH-13: optional project category migration, not applied; MH-10: external video embeds) |
 | Last reviewed | 2026-11-07 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -447,6 +447,14 @@ uses it (§1.3). A compile-only build is not a releasable artifact.
 production it requires `--allow-production` plus a typed endpoint confirmation.
 All 7 migrations are additive, and no migration exists after `20260912090000`,
 so commits `288fde6`…`4f7f564` need no schema change.
+
+MH-13 adds a ninth migration, `20261107200000_make_project_category_optional`
+(`ALTER TABLE "project" ALTER COLUMN "categoryId" DROP NOT NULL`; additive), on
+`feature/optional-project-category` (LOCAL ONLY, **not applied**). It equals an
+offline `prisma migrate diff` of the schema change. Apply it before publishing
+the MH-13 build. Before rolling back to older code, give every project a
+category again (`UPDATE "project" SET "categoryId" = '<id>' WHERE "categoryId" IS NULL`):
+older Prisma clients expect a category on every project.
 
 MH-10 adds an eighth migration, `20261107120000_add_google_drive_video_provider`
 (`ALTER TYPE "VideoProvider" ADD VALUE 'GOOGLE_DRIVE'`; additive), on

@@ -189,7 +189,7 @@ model Project {
   clientName     String?
   location       String?
   projectDate    DateTime?
-  categoryId     String
+  categoryId     String?
   status         PublicationStatus @default(DRAFT)
   featured       Boolean           @default(false)
   sortOrder      Int               @default(0)
@@ -202,7 +202,7 @@ model Project {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  category PortfolioCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  category PortfolioCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   media    ProjectMedia[]
 
   @@index([status, sortOrder])

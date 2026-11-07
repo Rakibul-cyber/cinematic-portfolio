@@ -188,18 +188,15 @@ export const projectSchema = z.object({
   expectedUpdatedAt: z.coerce.date().optional(),
   title: z.string().trim().min(1).max(160),
   slug,
-  summary: z.string().trim().min(1).max(500),
-  // Optional: the short description (`summary`) is the required text, and an
-  // empty description renders no paragraphs on the public page.
+  // Optional: an empty short description renders nothing on the public site.
+  summary: z.string().trim().max(500).default(""),
+  // Optional: an empty description renders no paragraphs on the public page.
   description: z.string().trim().max(15000).default(""),
   clientName: optional(160),
   location: optional(160),
   projectDate: z
     .string()
     .transform((v) => (v ? new Date(`${v}T00:00:00.000Z`) : null)),
-  // Optional: empty means "automatic" for a new project and "unchanged" for an
-  // existing one (see `decideProjectCategory`).
-  categoryId: z.string().default("").transform((value) => value || null).pipe(z.string().uuid().nullable()),
   status: z.enum(["DRAFT", "PUBLISHED"]),
   featured: z.coerce.boolean(),
   sortOrder: order,

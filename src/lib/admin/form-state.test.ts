@@ -12,7 +12,7 @@ function failureOf(result: { success: boolean; error?: unknown }) {
 
 const category = { name: "Weddings", slug: "weddings", description: "", sortOrder: "0", isActive: true };
 const page = { key: "services", title: "Services", eyebrow: "", body: "Body", seoTitle: "", seoDescription: "" };
-const project = { title: "T", slug: "t", summary: "S", description: "D", clientName: "", location: "", projectDate: "", categoryId: "00000000-0000-4000-8000-000000000001", status: "DRAFT", featured: false, sortOrder: "0", seoTitle: "", seoDescription: "", mediaIds: [] };
+const project = { title: "T", slug: "t", summary: "S", description: "D", clientName: "", location: "", projectDate: "", status: "DRAFT", featured: false, sortOrder: "0", seoTitle: "", seoDescription: "", mediaIds: [] };
 const settings = { studioName: "Studio", tagline: "", contactEmail: "", contactPhone: "", whatsappNumber: "", locationText: "", footerCopyright: "", defaultSeoTitle: "", defaultSeoDescription: "" };
 
 describe("admin validation messages", () => {
@@ -33,7 +33,7 @@ describe("admin validation messages", () => {
   it("replaces Zod's format defaults for email, URL and option fields", () => {
     assert.deepEqual(failureOf(settingsSchema.safeParse({ ...settings, contactEmail: "nope" })), { error: "Enter a valid email address.", field: "contactEmail" });
     assert.deepEqual(failureOf(socialSchema.safeParse({ platform: "P", label: "L", url: "nope", sortOrder: "0", isActive: true })), { error: "Enter a full URL, including https://.", field: "url" });
-    assert.deepEqual(failureOf(projectSchema.safeParse({ ...project, categoryId: "films" })), { error: "Choose one of the listed options.", field: "categoryId" });
+    assert.deepEqual(failureOf(projectSchema.safeParse({ ...project, mediaIds: ["films"] })), { error: "Choose one of the listed options.", field: "mediaIds" });
     assert.deepEqual(failureOf(projectSchema.safeParse({ ...project, status: "LIVE" })), { error: "Choose one of the listed options.", field: "status" });
   });
 

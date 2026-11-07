@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.6.0 (MH-12: automatic project category, local; MH-11 on `main@0957a7b`, unpublished) |
+| Version | 1.7.0 (MH-13: projects without categories, local, migration not applied; MH-12 on `main@986ed59`, unpublished) |
 | Last reviewed | 2026-11-07 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -67,7 +67,8 @@ never marked deployed.**
 | Uploaded video via Mux (P3-11A–E) | **WITHDRAWN** by owner decision (MH-10, ADR 0012); code removed on `feature/external-video`; its migration was never applied. |
 | External video embeds (MH-10) | On `main@2056a15` (pushed; Netlify build reported successful by the owner, **not published**); migration `20261107120000_add_google_drive_video_provider` APPLIED to production 2026-11-07. |
 | Simplified project editor (MH-11) | On `main@0957a7b` (pushed); not published. |
-| Automatic project category (MH-12) | LOCAL ONLY on `feature/automatic-project-category`; not pushed, merged, or deployed. |
+| Automatic project category (MH-12) | On `main@986ed59` (pushed), not published; superseded by MH-13. |
+| Projects without categories (MH-13) | LOCAL ONLY on `feature/optional-project-category`; migration `20261107200000_make_project_category_optional` NOT APPLIED; not pushed, merged, or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -707,6 +708,19 @@ the owner's descriptions to commits.
 - **Tests:** new `project-category.test.ts` (6); `cms.test.ts` +3 (create and edit without category, malformed category) and 1 updated; `form-state.test.ts` and `admin-form.render-test.ts` updated. `npm test`: 583 tests, 581 passed, 0 failed, 2 skipped; render 280 passed; typecheck, lint, `git diff --check` clean. Saving against a real database UNVERIFIED (none available offline).
 - **Owner action before publishing projects:** if Categories is empty, add one active category (for example "Films") under `/admin/categories`. It then becomes the automatic default.
 - **Production impact:** none until released; existing projects keep their categories.
+- **Follow-up:** merged and pushed as `main@986ed59` (owner-authorized, 2026-11-07); not published. **Superseded by MH-13** (owner decision: no categories in the editor and no automatic assignment).
+
+#### MH-13 — Projects without categories
+- **Status:** DONE locally (automated, offline) · **Completed:** 2026-11-07 · **Release:** LOCAL ONLY on `feature/optional-project-category` (from `main@986ed59`); migration NOT APPLIED; not pushed, merged, or deployed.
+- **Owner decision:** Munir does not create or select categories, and none is assigned automatically. Categories stay in the database and in `/admin/categories`; nothing is deleted.
+- **Dependencies inspected:** schema (`categoryId` NOT NULL + FK RESTRICT + index); `projectSchema`; `saveProject` (MH-12 auto-assignment); admin New/Edit pages (category queries) and list (`category.name`); public visibility `PUBLISHED_PROJECT_WHERE.category.isActive`; mappers/view-models (`category` non-null); project card, home hero, project page (eyebrow and facts), JSON-LD `genre`; `/work` filter and `getPublicCategories` (unchanged: they list only categories that have published projects); `deleteCategory` (unchanged: refuses a category still used).
+- **Migration:** `20261107200000_make_project_category_optional`: `ALTER TABLE "project" ALTER COLUMN "categoryId" DROP NOT NULL;` (equals an offline `prisma migrate diff`; FK, index, and rows unchanged).
+- **Changed:** `categoryId String?` / `category PortfolioCategory?`; `projectSchema` has no `categoryId` (a posted one is stripped) and `summary` is optional; `saveProject` creates without a category and never writes `categoryId` on update; `MissingCategoryError`, `decideProjectCategory` and its message removed; form has no category control and only Title is required; `PUBLISHED_PROJECT_WHERE` is `{ status: "PUBLISHED" }`; the public category is `null` when missing **or inactive** (no longer hides the project, not shown either); card, hero, project page, and JSON-LD omit it when null; the project page omits an empty short description.
+- **Title:** kept required: it is the page heading, the link name, and the source of the slug. Proposed alternative if wanted: default an empty title to "Untitled project" (slug `untitled-project`, which a second untitled project would collide with).
+- **Behaviour change:** a published project whose category is inactive now appears publicly (it was hidden).
+- **Tests:** `cms.test.ts` (create and edit without category, stale `categoryId` ignored, title-only save), `public-content.test.ts` (+1: null and inactive category), new `project-card.render-test.ts` (4), `admin-form.render-test.ts`, `form-state.test.ts` updated; `project-category.test.ts` removed with its module. `npm test`: 578 tests, 576 passed, 0 failed, 2 skipped; render 285 passed; typecheck, lint, `git diff --check` clean; `test:bundle` PASSED 56/56 and 32/32 (0 network attempts). Full `next build` not run (needs a database). Migration not run against any database.
+- **Release order (owner-authorized):** apply the migration (guarded command, typed confirmation), then merge, push, and publish. Rollback to older code requires every project to have a category again (04_TRD).
+- **Production impact:** none until released.
 
 ## Phase 4 — Edge cases and testing
 

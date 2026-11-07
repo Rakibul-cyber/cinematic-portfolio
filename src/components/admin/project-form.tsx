@@ -8,7 +8,6 @@ import {
 import { ProjectMediaPicker } from "@/components/admin/project-media-picker";
 import { ProjectVideoField } from "@/components/admin/project-video-field";
 import { toVideoRef, videoSourceUrl, type VideoProvider } from "@/lib/video";
-type Category = { id: string; name: string };
 type Media = { id: string; originalName: string; altText: string | null };
 type Project = {
   id: string;
@@ -19,7 +18,6 @@ type Project = {
   clientName: string | null;
   location: string | null;
   projectDate: Date | null;
-  categoryId: string;
   status: "DRAFT" | "PUBLISHED";
   featured: boolean;
   sortOrder: number;
@@ -37,20 +35,17 @@ const hintClass = "mt-1 block text-xs text-muted-foreground";
  *
  * The everyday fields are always visible; everything else sits in a native
  * `<details>` that starts closed. Every advanced field is still submitted with
- * its current value, so saving never clears what is hidden. The category is
- * chosen automatically for a new project unless the editor picks one (see
- * `decideProjectCategory`); an existing project's category is preselected and
- * kept. An empty slug on a
+ * its current value, so saving never clears what is hidden. There is no
+ * category: projects do not need one, and a category saved earlier is kept by
+ * the save (it never writes `categoryId`). An empty slug on a
  * new project is generated from the title by the save action; an existing slug
  * is shown as-is and only changes if the editor changes it.
  */
 export function ProjectForm({
   project,
-  categories,
   media,
 }: {
   project?: Project;
-  categories: Category[];
   media: Media[];
 }) {
   const selectedMediaIds = project?.media.map((item) => item.mediaId) ?? [];
@@ -86,10 +81,9 @@ export function ProjectForm({
           name="summary"
           defaultValue={project?.summary}
           maxLength={500}
-          required
         />
         <span className={hintClass} id="project-summary-hint">
-          One or two sentences shown under the title and on project cards.
+          Optional. One or two sentences shown under the title and on project cards.
         </span>
       </label>
       <ProjectVideoField
@@ -121,27 +115,6 @@ export function ProjectForm({
           Advanced details
         </summary>
         <div className="mt-4 grid gap-4">
-          <label>
-            Category
-            <select
-              aria-describedby="project-category-hint"
-              className={inputClass}
-              name="categoryId"
-              defaultValue={project?.categoryId ?? ""}
-            >
-              {project ? null : <option value="">Automatic</option>}
-              {categories.map((c) => (
-                <option value={c.id} key={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <span className={hintClass} id="project-category-hint">
-              {project
-                ? "Groups the project on the Work page."
-                : "Automatic uses the first active category in the Categories list."}
-            </span>
-          </label>
           <label>
             Slug
             <input

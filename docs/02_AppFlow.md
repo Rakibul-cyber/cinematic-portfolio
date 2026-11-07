@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/02_AppFlow.md` |
-| Version | 1.3.0 (MH-11: simplified project editor; MH-10: project video by pasted link; Google Drive) |
+| Version | 1.4.0 (MH-13: no project category; MH-11: simplified project editor; MH-10: project video by pasted link) |
 | Last reviewed | 2026-11-07 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -130,8 +130,9 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 - **Data:** `getPublishedProjectBySlug(slug)`.
 - **Actions:** gallery viewing; the video play button (over the project cover)
   builds the embed URL from provider and ID: YouTube, Vimeo, or Google Drive.
-- **Error / not found:** a draft project, a project in an inactive category, or
-  an unknown slug all call `notFound()` and return the same 404.
+- **Error / not found:** a draft project or an unknown slug both call
+  `notFound()` and return the same 404. A category (missing or inactive) never
+  hides a published project (MH-13); the category line is omitted when absent.
 
 #### SCR-PUB-04 — Services `/services`
 
@@ -207,14 +208,12 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
   roles, and order); `deleteAction` (ADMIN, confirm dialog).
 - **Validation:** `src/lib/validation/cms.ts`; slug uniqueness; a project
   version check refuses a save made against stale data.
-- **Form layout (MH-11, MH-12):** visible: title, short description
-  (`summary`), video link, media (first image = cover), a Publish checkbox
-  (`status=PUBLISHED`, absent = `DRAFT`). A closed `<details>` holds category,
-  slug, description (optional), client, location, date, order, featured, and
-  SEO. Category is optional in the form: a new project without one gets the
-  first active category (`sortOrder`, then name); an edit without one keeps the
-  saved category; with no active category the save is refused with a message.
-  No category is created automatically.
+- **Form layout (MH-11, MH-13):** visible: title (the only required field),
+  short description (optional), video link, media (first image = cover), a
+  Publish checkbox (`status=PUBLISHED`, absent = `DRAFT`). A closed `<details>`
+  holds slug, description, client, location, date, order, featured, and SEO.
+  There is no category control: a new project is saved without one, and the
+  save never writes `categoryId`, so an existing assignment is kept.
   An empty slug on a new project is generated from the title
   (`projectFormValues`); an existing slug is never regenerated. A rejected
   field inside the closed section opens it before focus.

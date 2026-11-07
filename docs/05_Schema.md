@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/05_Schema.md` |
-| Version | 1.3.0 (MH-10: `GOOGLE_DRIVE` video provider; the unapplied Mux migration was withdrawn) |
+| Version | 1.4.0 (MH-13: `project.categoryId` nullable; MH-10: `GOOGLE_DRIVE` video provider) |
 | Last reviewed | 2026-11-07 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -254,7 +254,7 @@ Every primary key and every unique constraint is backed by a unique index.
 | `clientName` | `String?` | `TEXT` | yes | — | — |
 | `location` | `String?` | `TEXT` | yes | — | — |
 | `projectDate` | `DateTime?` | `TIMESTAMP(3)` | yes | — | — |
-| `categoryId` | `String` | `TEXT` | no | — | FK → `portfolio_category.id` (ON DELETE RESTRICT, ON UPDATE CASCADE) |
+| `categoryId` | `String?` | `TEXT` | yes (MH-13) | — | FK → `portfolio_category.id` (ON DELETE RESTRICT, ON UPDATE CASCADE) |
 | `status` | `PublicationStatus` | `PublicationStatus` | no | `'DRAFT'` (DB) | — |
 | `featured` | `Boolean` | `BOOLEAN` | no | `false` (DB) | — |
 | `sortOrder` | `Int` | `INTEGER` | no | `0` (DB) | — |
@@ -720,7 +720,8 @@ down script.
 | 5 | `20260908190000_add_inquiry_crm` | 2026-09-08 | `InquiryStatus`; `customer`, `inquiry`, `inquiry_status_history`, `customer_note` | 1 (`user`), 3 (`service`) |
 | 6 | `20260910224253_add_email_delivery` | 2026-09-10 | `EmailDeliveryType`, `EmailDeliveryStatus`; `email_delivery` | 5 (`inquiry`) |
 | 7 | `20260912090000_add_security_privacy` | 2026-09-12 | `rate_limit_bucket`; `anonymizedAt` on `customer` and `inquiry` | 5 |
-| 8 | `20261107120000_add_google_drive_video_provider` (MH-10, LOCAL ONLY, **not applied**) | 2026-11-07 | value `GOOGLE_DRIVE` on `VideoProvider` (`ALTER TYPE … ADD VALUE`; additive, no table or row change) | 4 |
+| 8 | `20261107120000_add_google_drive_video_provider` (MH-10, applied to production 2026-11-07) | 2026-11-07 | value `GOOGLE_DRIVE` on `VideoProvider` (`ALTER TYPE … ADD VALUE`; additive, no table or row change) | 4 |
+| 9 | `20261107200000_make_project_category_optional` (MH-13, LOCAL ONLY, **not applied**) | 2026-11-07 | `project.categoryId` `DROP NOT NULL` (FK, index, and rows unchanged) | 2 |
 
 **Withdrawn migration.** `20261106120000_add_uploaded_video` (Mux `video` and
 `project_video` tables, P3-11C) was removed from the directory in MH-10 before

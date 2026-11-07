@@ -61,9 +61,11 @@ export function ProjectCard({
             <Heading className="font-display text-2xl font-medium transition-colors group-hover:text-accent sm:text-3xl">
               {project.title}
             </Heading>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {project.category.name}
-            </p>
+            {project.category ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {project.category.name}
+              </p>
+            ) : null}
           </div>
           {project.year ? (
             <p className="pt-2 text-[0.5625rem] tracking-[0.14em] text-muted-foreground uppercase">

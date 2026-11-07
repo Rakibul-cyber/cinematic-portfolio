@@ -87,7 +87,7 @@ function projectSummarySelect() {
     title: true,
     summary: true,
     projectDate: true,
-    category: { select: { name: true, slug: true } },
+    category: { select: { name: true, slug: true, isActive: true } },
     media: projectMediaSelect(),
   };
 }

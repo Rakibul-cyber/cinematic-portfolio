@@ -10,10 +10,13 @@
  * a database connection.
  */
 
-/** Only `PUBLISHED` projects are ever readable publicly. */
+/**
+ * Only `PUBLISHED` projects are ever readable publicly. Publication is the
+ * only rule (MH-13): a project needs no category, and its category, if any,
+ * does not affect whether it is shown.
+ */
 export const PUBLISHED_PROJECT_WHERE = {
   status: "PUBLISHED",
-  category: { isActive: true },
 } as const;
 
 /**

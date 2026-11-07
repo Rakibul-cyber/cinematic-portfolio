@@ -9,23 +9,16 @@ export default async function Page({
   searchParams: Promise<{ error?: string }>;
 }) {
   const user = await requireUser("/admin/projects/new");
-  const [categories, media] = await Promise.all([
-    prisma.portfolioCategory.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: { id: true, name: true },
-    }),
-    prisma.media.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      select: { id: true, originalName: true, altText: true },
-    }),
-  ]);
+  const media = await prisma.media.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 100,
+    select: { id: true, originalName: true, altText: true },
+  });
   const { error } = await searchParams;
   return (
     <AdminShell user={user} title="New project">
       <Notice message={error} />
-      <ProjectForm categories={categories} media={media} />
+      <ProjectForm media={media} />
     </AdminShell>
   );
 }

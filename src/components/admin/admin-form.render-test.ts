@@ -207,12 +207,17 @@ describe("the project editor", () => {
   it("keeps every advanced field in a details section that starts closed", () => {
     assert.ok(advanced, "advanced details section");
     assert.match(source, /<details className="[^"]*">/, "no open attribute");
-    for (const name of ["categoryId", "slug", "description", "clientName", "location", "projectDate", "sortOrder", "featured", "seoTitle", "seoDescription"]) {
+    for (const name of ["slug", "description", "clientName", "location", "projectDate", "sortOrder", "featured", "seoTitle", "seoDescription"]) {
       assert.match(advanced, new RegExp(`name="${name}"`), name);
       assert.doesNotMatch(visible, new RegExp(`name="${name}"`), name);
     }
     assert.doesNotMatch(advanced, /\brequired\b/, "a closed section cannot show the browser's required-field prompt");
-    assert.ok(advanced.includes('{project ? null : <option value="">Automatic</option>}'), "a new project can leave the category automatic");
+  });
+
+  it("asks for no category anywhere, and requires only the title", () => {
+    assert.doesNotMatch(source, /name="categoryId"|categories|^\s*Category\s*$/m);
+    assert.deepEqual(source.match(/\brequired\b/g)?.length, 1);
+    assert.match(visible, /name="title"[^>]*\n[^>]*maxLength=\{160\}\s+required/);
   });
 });
 

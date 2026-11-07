@@ -74,7 +74,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const [cover, ...gallery] = project.gallery;
 
   const facts = [
-    { label: "Category", value: project.category.name },
+    { label: "Category", value: project.category?.name },
     { label: "Client", value: project.clientName },
     { label: "Location", value: project.location },
     { label: "Date", value: project.dateLabel },
@@ -86,15 +86,19 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     <main id="main-content">
       <Container>
         <FadeReveal className="pt-12 sm:pt-20 lg:pt-28">
-          <p className="text-[0.6875rem] font-semibold tracking-[0.18em] text-accent uppercase">
-            {project.category.name}
-          </p>
-          <h1 className="editorial-balance mt-5 max-w-4xl font-display text-[clamp(2.75rem,7.5vw,8rem)] leading-[0.86] font-medium tracking-[-0.04em]">
+          {project.category ? (
+            <p className="mb-5 text-[0.6875rem] font-semibold tracking-[0.18em] text-accent uppercase">
+              {project.category.name}
+            </p>
+          ) : null}
+          <h1 className="editorial-balance max-w-4xl font-display text-[clamp(2.75rem,7.5vw,8rem)] leading-[0.86] font-medium tracking-[-0.04em]">
             {project.title}
           </h1>
-          <p className="mt-8 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">
-            {project.summary}
-          </p>
+          {project.summary ? (
+            <p className="mt-8 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">
+              {project.summary}
+            </p>
+          ) : null}
         </FadeReveal>
       </Container>
 
