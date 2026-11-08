@@ -4,7 +4,11 @@ import { randomUUID } from "node:crypto";
 
 import { headers } from "next/headers";
 
-import { describeDatabaseError } from "@/lib/diagnostics/database-error";
+import { Prisma } from "@/generated/prisma/client";
+import {
+  DATABASE_IDENTITY_SQL,
+  describeDatabaseError,
+} from "@/lib/diagnostics/database-error";
 import { prisma } from "@/server/db/prisma";
 
 /**
@@ -34,7 +38,7 @@ async function databaseIdentity() {
   try {
     const rows = await prisma.$queryRaw<
       { database: unknown; schema: unknown }[]
-    >`SELECT current_database() AS database, current_schema() AS schema`;
+    >(Prisma.raw(DATABASE_IDENTITY_SQL));
     const pick = (value: unknown) =>
       typeof value === "string" && IDENTIFIER.test(value) ? value : null;
     return { database: pick(rows[0]?.database), schema: pick(rows[0]?.schema) };

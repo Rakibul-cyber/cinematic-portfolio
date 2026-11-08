@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { describeDatabaseError } from "./database-error";
+import { DATABASE_IDENTITY_SQL, describeDatabaseError } from "./database-error";
+
+describe("DATABASE_IDENTITY_SQL", () => {
+  // Regression: production logged an identity lookup failure because the
+  // driver adapter cannot deserialize PostgreSQL's `name` type.
+  it("casts both identity functions to text", () => {
+    assert.match(DATABASE_IDENTITY_SQL, /current_database\(\)::text AS database\b/);
+    assert.match(DATABASE_IDENTITY_SQL, /current_schema\(\)::text AS schema\b/);
+    assert.doesNotMatch(DATABASE_IDENTITY_SQL, /current_(database|schema)\(\)(?!::text)/);
+  });
+
+  it("is a parameterless read", () => {
+    assert.match(DATABASE_IDENTITY_SQL, /^SELECT /);
+    assert.doesNotMatch(DATABASE_IDENTITY_SQL, /\$\d|;|\b(INSERT|UPDATE|DELETE)\b/i);
+  });
+});
 
 class PrismaClientKnownRequestError extends Error {
   constructor(
