@@ -20,14 +20,6 @@ export type SafeDatabaseError = {
   constraint: string | null;
 };
 
-/**
- * The runtime's database identity. `current_database()` and `current_schema()`
- * return PostgreSQL's `name` type, which Prisma's driver adapter cannot
- * deserialize, so both are cast to `text`.
- */
-export const DATABASE_IDENTITY_SQL =
-  "SELECT current_database()::text AS database, current_schema()::text AS schema";
-
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]{0,62}$/;
 const SQL_STATE = /^[0-9A-Z]{5}$/;
 const PRISMA_CODE = /^P\d{4}$/;

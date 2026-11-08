@@ -2,26 +2,36 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+import { neon } from "@neondatabase/serverless";
 import { headers } from "next/headers";
 
-import { Prisma } from "@/generated/prisma/client";
+import { describeDatabaseError } from "@/lib/diagnostics/database-error";
 import {
-  DATABASE_IDENTITY_SQL,
-  describeDatabaseError,
-} from "@/lib/diagnostics/database-error";
-import { prisma } from "@/server/db/prisma";
+  DIAGNOSTIC_VERSION,
+  lookupDatabaseIdentity,
+} from "@/lib/diagnostics/database-identity";
+import { getServerEnv } from "@/server/env";
 
 /**
  * TEMPORARY DIAGNOSTIC (project save failure). Remove this file, its pure
- * helper in `src/lib/diagnostics/`, and the single call in
- * `saveProject` once the cause is known.
+ * helpers in `src/lib/diagnostics/`, and the single call in `saveProject`
+ * once the cause is known.
  *
  * Writes one `[diag:db-error]` JSON line per failed database operation:
- * which step failed, the Prisma and PostgreSQL codes, the column, relation and
- * constraint names, and the database and schema the runtime is connected to.
+ * the diagnostic version, which step failed, the Prisma and PostgreSQL codes,
+ * the column, relation and constraint names, and the identity of the database
+ * the runtime is connected to (Neon endpoint id, database, schema, whether it
+ * sees `project.categoryId` as nullable, and its latest applied migration).
  * No SQL, no parameters, no message text, no credentials, no user data.
+ *
+ * The identity query runs on the Neon serverless driver over HTTP, with the
+ * same configured `DATABASE_URL` Prisma uses, so Prisma's raw-query
+ * deserialization is not involved. It is a separate connection from the
+ * failed Prisma operation (see `DATABASE_IDENTITY_SQL`).
+ *
+ * Log line versions: v1 (`5ac4412`) and v2 (`020905a`) have no
+ * `diagnosticVersion` or `endpointId` field; v3 has both.
  */
-const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$-]{0,62}$/;
 const REQUEST_ID = /^[A-Za-z0-9-]{1,64}$/;
 
 async function correlationId(): Promise<string> {
@@ -34,31 +44,22 @@ async function correlationId(): Promise<string> {
   return randomUUID();
 }
 
-async function databaseIdentity() {
-  try {
-    const rows = await prisma.$queryRaw<
-      { database: unknown; schema: unknown }[]
-    >(Prisma.raw(DATABASE_IDENTITY_SQL));
-    const pick = (value: unknown) =>
-      typeof value === "string" && IDENTIFIER.test(value) ? value : null;
-    return { database: pick(rows[0]?.database), schema: pick(rows[0]?.schema) };
-  } catch {
-    return { database: null, schema: null, identityLookupFailed: true };
-  }
-}
-
 export async function logDatabaseFailure(
   operation: string,
   error: unknown,
 ): Promise<void> {
   try {
+    const connectionString = getServerEnv().DATABASE_URL;
     const [id, identity] = await Promise.all([
       correlationId(),
-      databaseIdentity(),
+      lookupDatabaseIdentity(connectionString, (sql) =>
+        neon(connectionString).query(sql),
+      ),
     ]);
     console.error(
       "[diag:db-error]",
       JSON.stringify({
+        diagnosticVersion: DIAGNOSTIC_VERSION,
         correlationId: id,
         operation,
         ...describeDatabaseError(error),
