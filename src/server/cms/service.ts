@@ -16,6 +16,7 @@ import { nextProjectVersion } from "@/lib/cms/project-version";
 import { AuditAction, recordAuditLog } from "@/server/audit/audit-log";
 import type { AdminUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
+import { logDatabaseFailure } from "@/server/diagnostics/database-failure";
 
 type Input<T extends z.ZodType> = z.infer<T>;
 export class SlugConflictError extends Error {}
@@ -164,6 +165,8 @@ export async function saveProject(
   data: Input<typeof projectSchema>,
   actor: AdminUser,
 ) {
+  // TEMPORARY DIAGNOSTIC: the database step in progress, logged on failure.
+  let step = "project.transaction";
   try {
     // The project form has no category (MH-13): a new project is created
     // without one, and an update never writes `categoryId`, so a category
@@ -177,6 +180,7 @@ export async function saveProject(
         if (!expectedUpdatedAt) {
           throw new ProjectConflictError("Reload the project before saving.");
         }
+        step = "project.updateMany";
         const updated = await tx.project.updateMany({
           where: { id, updatedAt: expectedUpdatedAt },
           data: {
@@ -190,12 +194,16 @@ export async function saveProject(
             "This project changed in another session. Reload it before saving.",
           );
         }
+        step = "project.findUniqueOrThrow";
         project = await tx.project.findUniqueOrThrow({ where: { id } });
       } else {
+        step = "project.create";
         project = await tx.project.create({ data: { ...fields, publishedAt } });
       }
 
+      step = "projectMedia.deleteMany";
       await tx.projectMedia.deleteMany({ where: { projectId: project.id } });
+      step = "projectMedia.createMany";
       if (mediaIds.length)
         await tx.projectMedia.createMany({
           data: projectMediaRows(mediaIds).map((item) => ({
@@ -203,8 +211,10 @@ export async function saveProject(
             ...item,
           })),
         });
+      step = "project.commit";
       return project;
     });
+    step = "audit";
     await audit(
       actor,
       id ? AuditAction.CmsUpdated : AuditAction.CmsCreated,
@@ -221,6 +231,9 @@ export async function saveProject(
     );
     return row;
   } catch (error) {
+    if (!(error instanceof ProjectConflictError)) {
+      await logDatabaseFailure(step, error);
+    }
     translate(error, "project");
   }
 }

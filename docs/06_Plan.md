@@ -69,6 +69,7 @@ never marked deployed.**
 | Simplified project editor (MH-11) | On `main@0957a7b` (pushed); not published. |
 | Automatic project category (MH-12) | On `main@986ed59` (pushed), not published; superseded by MH-13. |
 | Projects without categories (MH-13) | LOCAL ONLY on `feature/optional-project-category`; migration `20261107200000_make_project_category_optional` NOT APPLIED; not pushed, merged, or deployed. |
+| TEMPORARY project-save diagnostic | LOCAL ONLY on `diag/project-save-error` (parent `a664366`), owner-requested 2026-11-08 to identify the production P2011 on project save. Logs one `[diag:db-error]` line (step, Prisma/SQLSTATE codes, column/relation/constraint, database and schema names, correlation ID). **Must be removed** after diagnosis: revert the commit. Not pushed or deployed. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
