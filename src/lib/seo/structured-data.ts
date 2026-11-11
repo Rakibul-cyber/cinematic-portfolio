@@ -105,8 +105,6 @@ export type ProjectLdInput = {
   slug: string;
   title: string;
   summary: string;
-  /** Category name, used as the work's genre. */
-  genre?: string | null;
   /** Year of the shoot, when the CMS records a date. */
   year?: number | null;
   imageUrl?: string | null;
@@ -128,7 +126,6 @@ export function buildProjectLd(input: ProjectLdInput): JsonLdObject {
     name: input.title,
     url: `${origin}/work/${input.slug}`,
     description: input.summary,
-    genre: input.genre,
     // Year only. The CMS stores a project date, not a publication instant, so
     // a full timestamp would claim more precision than exists.
     dateCreated: input.year ? String(input.year) : undefined,

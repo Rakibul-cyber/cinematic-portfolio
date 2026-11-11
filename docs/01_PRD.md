@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/01_PRD.md` |
-| Version | 1.3.0 (MH-13: projects need no category; an inactive category still hides a project) |
-| Last reviewed | 2026-11-07 |
+| Version | 1.4.0 (MH-15: categories and testimonials removed from the application, a project is public exactly when `PUBLISHED`; LOCAL ONLY, not deployed. MH-13: projects need no category) |
+| Last reviewed | 2026-11-11 |
 | Reviewed against | commit `b517fce` (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 | Product owner | Studio owner, Munir Visuals |
@@ -138,7 +138,9 @@ the behaviour the code already implements unless the status says otherwise.
   best work and points me to more, so I can judge quality at a glance.
 - **Acceptance criteria:**
   1. Renders hero, showreel, featured work, studio statement, services preview,
-     testimonials, and a contact call to action.
+     and a contact call to action. The testimonials section and the category
+     label in the hero were removed in MH-15 (LOCAL ONLY, not deployed; the
+     published build still has them).
   2. All copy and media come from the CMS (`getHomepageContent`). Sections with
      no content are omitted rather than filled: no services means no services
      section, no showreel video means no showreel. Neutral visual placeholders
@@ -153,28 +155,36 @@ the behaviour the code already implements unless the status says otherwise.
 
 #### FR-PUB-02 — Portfolio browsing
 
-- **Story:** As a visitor, I want to browse all published projects and filter
-  them by category.
+- **Story:** As a visitor, I want to browse all published projects.
 - **Acceptance criteria:**
-  1. Lists only projects whose status is `PUBLISHED` and that have no category
-     or an active one, in `sortOrder` (MH-13: a category is optional).
-  2. Category filter uses `?category=<slug>` and offers only active categories
-     that contain published work.
+  1. Lists exactly the projects whose status is `PUBLISHED`, in `sortOrder`
+     (MH-15: `PUBLISHED_PROJECT_WHERE` is `{ status: "PUBLISHED" }`; the
+     earlier MH-13 condition "no category, or an active category" is gone).
+  2. There is no category filter (removed in MH-15). The page takes no
+     `searchParams`; an old `/work?category=...` link shows the whole
+     portfolio. The page revalidates at most hourly (`revalidate = 3600`) and
+     on admin mutations through cache tags, like the other public pages.
   3. Publication is enforced in the query (`src/server/public/`), not hidden in
      the UI.
-- **Status:** IMPLEMENTED. **Release:** PUBLISHED.
-- **Dependencies:** FR-CMS-01, FR-CMS-02.
+- **Status:** IMPLEMENTED. **Release:** PUBLISHED. The MH-15 changes (no
+  filter, status-only visibility, static rendering) are LOCAL ONLY (working
+  tree, uncommitted), not deployed; the published build still filters by
+  category.
+- **Dependencies:** FR-CMS-01.
 - **Routes:** `/work`.
 - **Evidence:** `src/app/(public)/work/page.tsx`,
-  `src/components/public/category-filter.tsx`, `src/server/public/queries.ts`,
-  `src/server/public/public-content.test.ts`.
+  `src/server/public/publication.ts`, `src/server/public/queries.ts`,
+  `src/server/public/public-content.test.ts`,
+  `src/app/(admin)/admin/simplified-admin.test.ts`.
 
 #### FR-PUB-03 — Project detail pages
 
 - **Story:** As a prospective client, I want a full page per project with its
   gallery, description, and film.
 - **Acceptance criteria:**
-  1. `/work/[slug]` renders only a published project with no category or an active one. A
+  1. `/work/[slug]` renders exactly the projects whose status is `PUBLISHED`
+     (MH-15, LOCAL ONLY, not deployed; the page no longer shows a category
+     label or a "Category" fact). A
      draft and a slug that never existed both return the same normal 404.
   2. Gallery follows `ProjectMedia.sortOrder` and roles `COVER`, `HERO`, `GALLERY`.
   3. Per-project SEO title and description override defaults when set.
@@ -222,19 +232,20 @@ the behaviour the code already implements unless the status says otherwise.
 - **Story:** As a prospective client, I want to see the services offered and,
   where the studio chooses, a price label.
 - **Acceptance criteria:** lists active services in `sortOrder` with name, short
-  description, description, and optional `priceLabel`; testimonials follow.
+  description, description, and optional `priceLabel`. The testimonials block
+  that followed was removed in MH-15 (LOCAL ONLY, not deployed).
 - **Status:** IMPLEMENTED. **Release:** PUBLISHED.
-- **Dependencies:** FR-CMS-03, FR-CMS-04, FR-CMS-05.
+- **Dependencies:** FR-CMS-03, FR-CMS-05.
 - **Routes:** `/services`.
 - **Evidence:** `src/app/(public)/services/page.tsx`.
 
 #### FR-PUB-07 — About
 
 - **Story:** As a visitor, I want to learn who is behind the studio.
-- **Acceptance criteria:** renders the `about` page content from the CMS and
-  active testimonials.
+- **Acceptance criteria:** renders the `about` page content from the CMS. The
+  testimonials block was removed in MH-15 (LOCAL ONLY, not deployed).
 - **Status:** IMPLEMENTED. **Release:** PUBLISHED.
-- **Dependencies:** FR-CMS-04, FR-CMS-05.
+- **Dependencies:** FR-CMS-05.
 - **Routes:** `/about`.
 - **Evidence:** `src/app/(public)/about/page.tsx`.
 
@@ -436,28 +447,46 @@ the behaviour the code already implements unless the status says otherwise.
 
 #### FR-ADM-05 — Administrative dashboard
 
-- **Acceptance criteria:** shows counts of projects, media, services,
-  testimonials, and inquiries, with shortcuts to common tasks.
-- **Status:** IMPLEMENTED. **Release:** PUBLISHED.
-- **Routes:** `/admin`. **Evidence:** `src/app/(admin)/admin/page.tsx`.
+- **Acceptance criteria:** shows six counters, in this order: Projects,
+  Published, Drafts, Media, New inquiries, Open inquiries; and three quick
+  actions: "New project" (`/admin/projects/new`), "Upload media"
+  (`/admin/media`), "View inquiries" (`/admin/inquiries`). The Services and
+  Testimonials counters were removed in MH-15.
+- **Status:** IMPLEMENTED. **Release:** PUBLISHED. The MH-15 dashboard is
+  LOCAL ONLY (working tree, uncommitted), not deployed.
+- **Routes:** `/admin`. **Evidence:** `src/app/(admin)/admin/page.tsx`,
+  `src/app/(admin)/admin/simplified-admin.test.ts`.
 
 #### FR-CMS-01 — Projects
 
-- **Acceptance criteria:** create and edit projects with category, summary,
+- **Acceptance criteria:** create and edit projects with summary,
   description, client, location, date, featured flag, order, SEO fields, and
-  video. `DRAFT`/`PUBLISHED` with a maintained `publishedAt`. Media assignment
+  video. A project has no category in the application (MH-13, MH-15): a save
+  never writes `categoryId`, and the admin project list shows no category.
+  The optional fields sit in a collapsed section titled "More options
+  (optional)" (MH-15; formerly "Advanced details"; no field added or removed).
+  `DRAFT`/`PUBLISHED` with a maintained `publishedAt`. Media assignment
   with ordered roles. Stale saves are refused (`project-version`). Deletion
   requires ADMIN and removes only join rows, never media.
-- **Status:** IMPLEMENTED. **Release:** PUBLISHED.
+- **Status:** IMPLEMENTED. **Release:** PUBLISHED. The MH-15 changes are LOCAL
+  ONLY (working tree, uncommitted), not deployed.
 - **Routes:** `/admin/projects`, `/admin/projects/new`, `/admin/projects/[id]`.
 - **Evidence:** `src/server/cms/service.ts`, `src/lib/cms/project-version.ts`,
   `src/components/admin/project-form.tsx`, ADR 0004, `npm run cms:verify`.
 
 #### FR-CMS-02 — Portfolio categories
 
-- **Acceptance criteria:** name, slug, description, order, active flag. Deletion
-  needs ADMIN and is refused while projects reference the category.
-- **Status:** IMPLEMENTED. **Release:** PUBLISHED. **Routes:** `/admin/categories`.
+- **REMOVED in MH-15** (ADR 0013). The application no longer has categories:
+  the admin page `/admin/categories` (now the admin "Page not found" 404), its
+  save and delete actions, the public category filter on `/work`, and the
+  category label on project cards, the project page, and the home hero are
+  deleted. The `portfolio_category` table and the nullable column
+  `project.categoryId` remain in the database, unused: no migration was added
+  and no table, column, or row was dropped or modified (05_Schema).
+- **Status:** REMOVED from the code (not a status of the vocabulary above; the
+  earlier implementation was IMPLEMENTED). **Release:** the removal is LOCAL
+  ONLY (working tree, uncommitted), not deployed; the PUBLISHED build still
+  contains the feature. **Routes:** none (formerly `/admin/categories`).
 
 #### FR-CMS-03 — Services
 
@@ -468,9 +497,16 @@ the behaviour the code already implements unless the status says otherwise.
 
 #### FR-CMS-04 — Testimonials
 
-- **Acceptance criteria:** quote, author, optional role, company, and project
-  name, order, and active flag.
-- **Status:** IMPLEMENTED. **Release:** PUBLISHED. **Routes:** `/admin/testimonials`.
+- **REMOVED in MH-15** (ADR 0013). The application no longer has
+  testimonials: the admin page `/admin/testimonials` (now the admin "Page not
+  found" 404), its save and delete actions, and the testimonial sections on
+  `/`, `/about`, and `/services` are deleted. The `testimonial` table remains
+  in the database, unused: no migration was added and no table or row was
+  dropped or modified (05_Schema).
+- **Status:** REMOVED from the code (not a status of the vocabulary above; the
+  earlier implementation was IMPLEMENTED). **Release:** the removal is LOCAL
+  ONLY (working tree, uncommitted), not deployed; the PUBLISHED build still
+  contains the feature. **Routes:** none (formerly `/admin/testimonials`).
 
 #### FR-CMS-05 — Pages
 

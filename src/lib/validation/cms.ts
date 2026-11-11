@@ -115,14 +115,6 @@ const optional = (max: number) =>
     .max(max)
     .transform((v) => v || null);
 
-export const categorySchema = z.object({
-  id: z.string().uuid().optional(),
-  name: z.string().trim().min(1).max(100),
-  slug,
-  description: optional(1000),
-  sortOrder: order,
-  isActive: z.coerce.boolean(),
-});
 export const serviceSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(1).max(120),
@@ -130,16 +122,6 @@ export const serviceSchema = z.object({
   shortDescription: z.string().trim().min(1).max(300),
   description: z.string().trim().min(1).max(5000),
   priceLabel: optional(100),
-  sortOrder: order,
-  isActive: z.coerce.boolean(),
-});
-export const testimonialSchema = z.object({
-  id: z.string().uuid().optional(),
-  quote: z.string().trim().min(1).max(2000),
-  authorName: z.string().trim().min(1).max(120),
-  authorRole: optional(120),
-  company: optional(120),
-  projectName: optional(120),
   sortOrder: order,
   isActive: z.coerce.boolean(),
 });

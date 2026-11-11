@@ -4,25 +4,20 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { AdminRole } from "@/generated/prisma/enums";
 import {
-  categorySchema,
   pageSchema,
   projectSchema,
   serviceSchema,
   settingsSchema,
   socialSchema,
-  testimonialSchema,
 } from "@/lib/validation/cms";
 import {
-  deleteCategory,
   deleteProject,
   deleteSimple,
-  saveCategory,
   savePage,
   saveProject,
   saveService,
   saveSettings,
   saveSocial,
-  saveTestimonial,
   ProjectConflictError,
   SlugConflictError,
 } from "@/server/cms/service";
@@ -44,39 +39,12 @@ async function main() {
     },
     select: { id: true, name: true, email: true, role: true },
   });
-  let categoryId = "",
-    projectId = "",
+  let projectId = "",
     mediaId = "",
     raceMediaId = "",
     serviceId = "",
-    testimonialId = "",
     socialId = "";
   try {
-    const category = await saveCategory(
-      categorySchema.parse({
-        name: "Verification",
-        slug: `verify-${token}`,
-        description: "",
-        sortOrder: 2,
-        isActive: true,
-      }),
-      actor,
-    );
-    categoryId = category.id;
-    await assert.rejects(
-      () =>
-        saveCategory(
-          categorySchema.parse({
-            name: "Duplicate",
-            slug: `verify-${token}`,
-            description: "",
-            sortOrder: 3,
-            isActive: true,
-          }),
-          actor,
-        ),
-      SlugConflictError,
-    );
     const media = await prisma.media.create({
       data: {
         originalName: "verification.webp",
@@ -99,7 +67,6 @@ async function main() {
         clientName: "",
         location: "",
         projectDate: "",
-        categoryId,
         status: "DRAFT",
         featured: false,
         sortOrder: 1,
@@ -120,7 +87,6 @@ async function main() {
       clientName: "",
       location: "",
       projectDate: "",
-      categoryId,
       status: "PUBLISHED",
       featured: true,
       sortOrder: 1,
@@ -219,6 +185,22 @@ async function main() {
       actor,
     );
     serviceId = service.id;
+    await assert.rejects(
+      () =>
+        saveService(
+          serviceSchema.parse({
+            name: "Duplicate",
+            slug: `service-${token}`,
+            shortDescription: "Short",
+            description: "Long",
+            priceLabel: "",
+            sortOrder: 3,
+            isActive: true,
+          }),
+          actor,
+        ),
+      SlugConflictError,
+    );
     await saveService(
       serviceSchema.parse({
         id: service.id,
@@ -229,32 +211,6 @@ async function main() {
         priceLabel: service.priceLabel ?? "",
         sortOrder: service.sortOrder,
         isActive: service.isActive,
-      }),
-      actor,
-    );
-    const testimonial = await saveTestimonial(
-      testimonialSchema.parse({
-        quote: "Quote",
-        authorName: "Author",
-        authorRole: "",
-        company: "",
-        projectName: "",
-        sortOrder: 2,
-        isActive: true,
-      }),
-      actor,
-    );
-    testimonialId = testimonial.id;
-    await saveTestimonial(
-      testimonialSchema.parse({
-        id: testimonial.id,
-        quote: "Updated quote",
-        authorName: testimonial.authorName,
-        authorRole: "",
-        company: "",
-        projectName: "",
-        sortOrder: 2,
-        isActive: true,
       }),
       actor,
     );
@@ -304,12 +260,8 @@ async function main() {
     assert.ok(await prisma.media.findUnique({ where: { id: mediaId } }));
     await deleteSimple("service", serviceId, actor);
     serviceId = "";
-    await deleteSimple("testimonial", testimonialId, actor);
-    testimonialId = "";
     await deleteSimple("socialLink", socialId, actor);
     socialId = "";
-    await deleteCategory(categoryId, actor);
-    categoryId = "";
     console.log(
       "Live CMS verification passed: CRUD, publishing, slug conflict, ordering, media reference protection, preservation, and audit.",
     );
@@ -319,12 +271,8 @@ async function main() {
     if (mediaId) await prisma.media.deleteMany({ where: { id: mediaId } });
     if (raceMediaId)
       await prisma.media.deleteMany({ where: { id: raceMediaId } });
-    if (categoryId)
-      await prisma.portfolioCategory.deleteMany({ where: { id: categoryId } });
     if (serviceId)
       await prisma.service.deleteMany({ where: { id: serviceId } });
-    if (testimonialId)
-      await prisma.testimonial.deleteMany({ where: { id: testimonialId } });
     if (socialId)
       await prisma.socialLink.deleteMany({ where: { id: socialId } });
     if (previousPage) {

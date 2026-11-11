@@ -8,7 +8,7 @@ and is never installed or run by the site build.
 ## Read-only run
 
 It signs in once, looks at every admin section on a desktop-sized and a
-phone-sized screen, and signs out. About 100 checks, a few minutes.
+phone-sized screen, and signs out. About 85 checks, a few minutes.
 
 **It cannot change data.** Every request that would create, change, or delete
 something is blocked inside the browser. The only exceptions are the sign-in

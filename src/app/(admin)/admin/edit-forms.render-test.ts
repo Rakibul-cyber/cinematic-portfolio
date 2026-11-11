@@ -11,7 +11,7 @@ import { JSDOM } from "jsdom";
  * re-renders the page without remounting it, and React patches the existing
  * uncontrolled fields. A textarea or a `defaultChecked` checkbox then keeps the
  * previous record's value, and saving writes it into the newly selected record
- * (QA: a description copied across categories; an inactive service silently
+ * (QA: a description copied across records; an inactive service silently
  * reactivated). Each such form is keyed by the record it edits, so every target
  * and create mode get freshly mounted fields.
  *
@@ -20,7 +20,7 @@ import { JSDOM } from "jsdom";
  * pages' wiring is asserted from source, as elsewhere in this suite.
  */
 
-const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/admin/categories", pretendToBeVisual: true });
+const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/admin/services", pretendToBeVisual: true });
 type Globals = Record<string, unknown>;
 const replaced: Globals = {};
 let act: typeof import("react").act;
@@ -48,7 +48,7 @@ const WEDDINGS: Row = { id: "a", name: "Weddings", description: "Wedding work.",
 const COMMERCIAL: Row = { id: "b", name: "Commercial", description: null, isActive: true };
 const ARCHIVE: Row = { id: "c", name: "Archive", description: "Old work.", isActive: false };
 
-/** The categories form's fields, keyed as the page keys it (or not, to show the defect). */
+/** A list page's form fields, keyed as the page keys it (or not, to show the defect). */
 function form(current: Row | undefined, keyed: boolean) {
   return createElement(
     "form",
@@ -107,9 +107,7 @@ describe("switching between edit targets", () => {
 
 describe("admin forms selected by a query parameter", () => {
   const forms = [
-    ["categories", "src/app/(admin)/admin/categories/page.tsx", "saveCategoryAction", "current"],
     ["services", "src/app/(admin)/admin/services/page.tsx", "saveServiceAction", "current"],
-    ["testimonials", "src/app/(admin)/admin/testimonials/page.tsx", "saveTestimonialAction", "current"],
     ["social links", "src/app/(admin)/admin/settings/page.tsx", "saveSocialAction", "currentSocial"],
   ] as const;
 

@@ -104,7 +104,6 @@ export async function projectStructuredData(
       slug: project.slug,
       title: project.title,
       summary: project.summary,
-      genre: project.category?.name,
       year: project.year,
       imageUrl: project.shareImageUrl,
     }),

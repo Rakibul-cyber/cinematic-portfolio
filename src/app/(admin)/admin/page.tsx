@@ -6,13 +6,11 @@ import { prisma } from "@/server/db/prisma";
 export const dynamic = "force-dynamic";
 export default async function AdminHomePage() {
   const user = await requireUser("/admin");
-  const [projects, published, media, services, testimonials, newInquiries, openInquiries] =
+  const [projects, published, media, newInquiries, openInquiries] =
     await Promise.all([
       prisma.project.count(),
       prisma.project.count({ where: { status: "PUBLISHED" } }),
       prisma.media.count(),
-      prisma.service.count(),
-      prisma.testimonial.count(),
       prisma.inquiry.count({where:{status:"NEW"}}),
       prisma.inquiry.count({where:{status:{notIn:["COMPLETED","CANCELLED"]}}}),
     ]);
@@ -21,8 +19,6 @@ export default async function AdminHomePage() {
     ["Published", published],
     ["Drafts", projects - published],
     ["Media", media],
-    ["Services", services],
-    ["Testimonials", testimonials],
     ["New inquiries", newInquiries],
     ["Open inquiries", openInquiries],
   ];
@@ -51,15 +47,9 @@ export default async function AdminHomePage() {
         </Link>
         <Link
           className="border border-border px-5 py-3 text-sm"
-          href="/admin/services"
+          href="/admin/inquiries"
         >
-          Add service
-        </Link>
-        <Link
-          className="border border-border px-5 py-3 text-sm"
-          href="/admin/testimonials"
-        >
-          Add testimonial
+          View inquiries
         </Link>
       </div>
     </AdminShell>

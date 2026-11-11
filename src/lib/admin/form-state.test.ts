@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { describeValidationError } from "@/lib/admin/form-state";
-import { categorySchema, pageSchema, projectSchema, settingsSchema, socialSchema } from "@/lib/validation/cms";
+import { pageSchema, projectSchema, serviceSchema, settingsSchema, socialSchema } from "@/lib/validation/cms";
 
 /** The real admin schemas, so a schema change that alters the reported field or message shows up here. */
 function failureOf(result: { success: boolean; error?: unknown }) {
@@ -10,7 +10,7 @@ function failureOf(result: { success: boolean; error?: unknown }) {
   return describeValidationError(result.error as Parameters<typeof describeValidationError>[0]);
 }
 
-const category = { name: "Weddings", slug: "weddings", description: "", sortOrder: "0", isActive: true };
+const service = { name: "Weddings", slug: "weddings", shortDescription: "Short", description: "Long", priceLabel: "", sortOrder: "0", isActive: true };
 const page = { key: "services", title: "Services", eyebrow: "", body: "Body", seoTitle: "", seoDescription: "" };
 const project = { title: "T", slug: "t", summary: "S", description: "D", clientName: "", location: "", projectDate: "", status: "DRAFT", featured: false, sortOrder: "0", seoTitle: "", seoDescription: "", mediaIds: [] };
 const settings = { studioName: "Studio", tagline: "", contactEmail: "", contactPhone: "", whatsappNumber: "", locationText: "", footerCopyright: "", defaultSeoTitle: "", defaultSeoDescription: "" };
@@ -25,9 +25,9 @@ describe("admin validation messages", () => {
   });
 
   it("explains a required field and an out-of-range or non-numeric order", () => {
-    assert.deepEqual(failureOf(categorySchema.safeParse({ ...category, name: "" })), { error: "This field is required.", field: "name" });
-    assert.deepEqual(failureOf(categorySchema.safeParse({ ...category, sortOrder: "99999" })), { error: "Use a number no greater than 10000.", field: "sortOrder" });
-    assert.deepEqual(failureOf(categorySchema.safeParse({ ...category, sortOrder: "abc" })), { error: "Enter a whole number.", field: "sortOrder" });
+    assert.deepEqual(failureOf(serviceSchema.safeParse({ ...service, name: "" })), { error: "This field is required.", field: "name" });
+    assert.deepEqual(failureOf(serviceSchema.safeParse({ ...service, sortOrder: "99999" })), { error: "Use a number no greater than 10000.", field: "sortOrder" });
+    assert.deepEqual(failureOf(serviceSchema.safeParse({ ...service, sortOrder: "abc" })), { error: "Enter a whole number.", field: "sortOrder" });
   });
 
   it("replaces Zod's format defaults for email, URL and option fields", () => {
@@ -43,7 +43,7 @@ describe("admin validation messages", () => {
   });
 
   it("never returns Zod's technical wording", () => {
-    for (const result of [pageSchema.safeParse({ key: "about" }), categorySchema.safeParse({}), projectSchema.safeParse({})]) {
+    for (const result of [pageSchema.safeParse({ key: "about" }), serviceSchema.safeParse({}), projectSchema.safeParse({})]) {
       assert.doesNotMatch(failureOf(result).error, /Invalid input|expected|received|Too (big|small)|UUID/);
     }
   });

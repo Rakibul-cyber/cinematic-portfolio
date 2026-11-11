@@ -13,7 +13,7 @@ import { useEffect, useRef } from "react";
  * the page's content.
  *
  * `alert` (the default) is for a refusal the administrator has to act on, such
- * as why a category could not be deleted: assertive, with the accent border.
+ * as why a change could not be saved: assertive, with the accent border.
  * `status` is for an ordinary outcome such as "Customer updated": polite, so
  * it does not interrupt, with a neutral border. The text is always the fixed,
  * server-chosen message.

@@ -367,7 +367,6 @@ async function verifyStructuredData(): Promise<void> {
     slug: "harbour-light",
     title: "Harbour Light",
     summary: "A winter film.",
-    genre: "Film",
     year: 2026,
     imageUrl: "https://media.example/cover.webp",
   });

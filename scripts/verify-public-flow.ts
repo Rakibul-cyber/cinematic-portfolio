@@ -42,14 +42,12 @@ const BASE_URL = process.env.PUBLIC_VERIFY_URL ?? "http://localhost:3000";
 type Manifest = {
   token: string;
   actorId: string;
-  categoryId: string;
   publishedSlug: string;
   draftSlug: string;
   publishedId: string;
   draftId: string;
   mediaIds: string[];
   serviceIds: string[];
-  testimonialIds: string[];
   socialIds: string[];
   previousSettings: unknown;
   previousPages: unknown[];
@@ -90,15 +88,6 @@ async function seed(): Promise<void> {
     select: { id: true, name: true, email: true, role: true },
   });
 
-  const category = await prisma.portfolioCategory.create({
-    data: {
-      name: `Verification ${token}`,
-      slug: `verify-${token}`,
-      sortOrder: 0,
-      isActive: true,
-    },
-  });
-
   // Real uploads, so public delivery, variant selection, and blur data are all
   // exercised against R2 rather than against fixture rows.
   // Wide enough that Phase 3 produces a capped 2560 master plus a full set of
@@ -112,7 +101,6 @@ async function seed(): Promise<void> {
       slug: `published-${token}`,
       summary: `Published summary ${token}.`,
       description: `Published body ${token}.\n\nSecond paragraph.`,
-      categoryId: category.id,
       status: "PUBLISHED",
       featured: true,
       sortOrder: 0,
@@ -136,7 +124,6 @@ async function seed(): Promise<void> {
       slug: `draft-${token}`,
       summary: `Draft summary ${token}.`,
       description: `Draft body ${token}.`,
-      categoryId: category.id,
       status: "DRAFT",
       sortOrder: 1,
     },
@@ -160,25 +147,6 @@ async function seed(): Promise<void> {
         slug: `inactive-service-${token}`,
         shortDescription: "Inactive short description.",
         description: "Inactive long description.",
-        isActive: false,
-        sortOrder: 1,
-      },
-    }),
-  ]);
-
-  const testimonials = await Promise.all([
-    prisma.testimonial.create({
-      data: {
-        quote: `ActiveQuote ${token}`,
-        authorName: `Active Author ${token}`,
-        isActive: true,
-        sortOrder: 0,
-      },
-    }),
-    prisma.testimonial.create({
-      data: {
-        quote: `InactiveQuote ${token}`,
-        authorName: `Inactive Author ${token}`,
         isActive: false,
         sortOrder: 1,
       },
@@ -242,14 +210,12 @@ async function seed(): Promise<void> {
   const manifest: Manifest = {
     token,
     actorId: actor.id,
-    categoryId: category.id,
     publishedSlug: published.slug,
     draftSlug: draft.slug,
     publishedId: published.id,
     draftId: draft.id,
     mediaIds: [first.id, second.id],
     serviceIds: services.map((service) => service.id),
-    testimonialIds: testimonials.map((testimonial) => testimonial.id),
     socialIds: socials.map((social) => social.id),
     previousSettings,
     previousPages,
@@ -304,8 +270,6 @@ async function check(): Promise<void> {
     !home.html.includes(`InactiveService ${token}`),
     "inactive service hidden",
   );
-  assert.ok(home.html.includes(`ActiveQuote ${token}`), "active testimonial");
-  assert.ok(!home.html.includes(`InactiveQuote ${token}`), "inactive testimonial");
   assert.ok(home.html.includes(`ActiveSocial ${token}`), "active social link");
   assert.ok(!home.html.includes(`InactiveSocial ${token}`), "inactive social link");
 
@@ -320,13 +284,13 @@ async function check(): Promise<void> {
   assert.equal(work.status, 200);
   assert.ok(work.html.includes(`Published ${token}`), "work index lists published");
   assert.ok(!work.html.includes(`Draft ${token}`), "work index excludes drafts");
-  assert.ok(work.html.includes(`Verification ${token}`), "active category offered");
   assert.ok(!work.html.includes("master.webp"), "cards never load the master");
   assert.ok(work.html.includes("w1280.webp"), "cards use small responsive variants");
 
+  // Categories were removed (MH-15): an old filter link shows the whole portfolio.
   const filtered = await get(`/work?category=verify-${token}`);
   assert.equal(filtered.status, 200);
-  assert.ok(filtered.html.includes(`Published ${token}`), "category filter works");
+  assert.ok(filtered.html.includes(`Published ${token}`), "an old category link still lists the work");
 
   const detail = await get(`/work/${manifest.publishedSlug}`);
   assert.equal(detail.status, 200);
@@ -391,7 +355,7 @@ async function check(): Promise<void> {
   assert.ok(contact.html.includes('name="submissionToken"'), "duplicate token rendered");
 
   console.log(
-    "Live public verification passed: publication rules, category filter, gallery order, " +
+    "Live public verification passed: publication rules, gallery order, " +
       "R2 variant delivery, video privacy, metadata, empty-safe 404s, and unauthenticated access.",
   );
 }
@@ -414,11 +378,7 @@ async function cleanup(): Promise<void> {
   }
 
   await prisma.service.deleteMany({ where: { id: { in: manifest.serviceIds } } });
-  await prisma.testimonial.deleteMany({
-    where: { id: { in: manifest.testimonialIds } },
-  });
   await prisma.socialLink.deleteMany({ where: { id: { in: manifest.socialIds } } });
-  await prisma.portfolioCategory.deleteMany({ where: { id: manifest.categoryId } });
 
   // Restore the site exactly as it was before seeding.
   const previousSettings = manifest.previousSettings as Record<

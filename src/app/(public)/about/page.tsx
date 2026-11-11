@@ -3,13 +3,11 @@ import Link from "next/link";
 
 import { FadeReveal } from "@/components/motion/fade-reveal";
 import { PageIntro } from "@/components/public/page-intro";
-import { TestimonialsSection } from "@/components/sections/testimonials-section";
 import { JsonLd } from "@/components/seo/json-ld";
 import { Container } from "@/components/ui/container";
 import { FALLBACK_STUDIO_NAME } from "@/content/site";
 import { buildPublicMetadata } from "@/server/public/metadata";
 import {
-  getActiveTestimonials,
   getPublicPage,
   getPublicSiteSettings,
 } from "@/server/public/queries";
@@ -39,10 +37,9 @@ export async function generateMetadata(): Promise<Metadata> {
  * — quiet, but honest and never a placeholder story.
  */
 export default async function AboutPage() {
-  const [page, settings, testimonials, structuredData] = await Promise.all([
+  const [page, settings, structuredData] = await Promise.all([
     getPublicPage("about"),
     getPublicSiteSettings(),
-    getActiveTestimonials({ take: 4 }),
     aboutStructuredData(),
   ]);
 
@@ -98,11 +95,6 @@ export default async function AboutPage() {
           </FadeReveal>
         </div>
       </Container>
-
-      <TestimonialsSection
-        className="border-t border-border py-20 sm:py-28"
-        testimonials={testimonials}
-      />
 
       <JsonLd nodes={structuredData} />
     </main>

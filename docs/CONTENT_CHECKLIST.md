@@ -40,8 +40,9 @@ media in the repository without an agreed secure workflow.
 
 ## Portfolio structure
 
-- [ ] Portfolio category names and desired ordering
-- [ ] Project titles, unique slugs, and categories
+- Not applicable: portfolio category names and ordering. Categories were
+  removed from the application (MH-15, ADR 0013).
+- [ ] Project titles and unique slugs
 - [ ] Short and full project descriptions
 - [ ] Project dates/locations and publish permissions
 - [ ] Featured-project choices and ordering
@@ -72,11 +73,14 @@ will create responsive derivatives and remove embedded EXIF/GPS data.
 
 ## Testimonials and trust content
 
-- [ ] Approved quote text
-- [ ] Client display name and optional company/role
-- [ ] Optional approved portrait/company mark
-- [ ] Written permission to publish
-- [ ] Featured status and preferred order
+Not applicable. Testimonials were removed from the application (MH-15,
+ADR 0013), so none of the following is requested:
+
+- Approved quote text
+- Client display name and optional company/role
+- Optional approved portrait/company mark
+- Written permission to publish
+- Featured status and preferred order
 
 ## Inquiry and CRM decisions
 

@@ -36,9 +36,7 @@ const hintClass = "mt-1 block text-xs text-muted-foreground";
  *
  * The everyday fields are always visible; everything else sits in a native
  * `<details>` that starts closed. Every advanced field is still submitted with
- * its current value, so saving never clears what is hidden. There is no
- * category: projects do not need one, and a category saved earlier is kept by
- * the save (it never writes `categoryId`). An empty slug on a
+ * its current value, so saving never clears what is hidden. An empty slug on a
  * new project is generated from the title by the save action; an existing slug
  * is shown as-is and only changes if the editor changes it.
  */
@@ -113,7 +111,7 @@ export function ProjectForm({
       </label>
       <details className="border border-border p-4">
         <summary className="min-h-10 cursor-pointer content-center">
-          Advanced details
+          More options (optional)
         </summary>
         <div className="mt-4 grid gap-4">
           <label>

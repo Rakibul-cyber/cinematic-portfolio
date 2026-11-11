@@ -23,9 +23,7 @@ const ADMIN_DIR = path.join(process.cwd(), "src", "app", "(admin)", "admin");
 
 const EXPECTED: Record<string, Record<string, Guard>> = {
   "cms-actions.ts": {
-    saveCategoryAction: "requireUser",
     saveServiceAction: "requireUser",
-    saveTestimonialAction: "requireUser",
     savePageAction: "requireUser",
     saveSettingsAction: "requireAdmin",
     saveSocialAction: "requireAdmin",

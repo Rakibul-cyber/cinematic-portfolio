@@ -10,9 +10,7 @@
  */
 export const PublicTag = {
   Projects: "public:projects",
-  Categories: "public:categories",
   Services: "public:services",
-  Testimonials: "public:testimonials",
   Settings: "public:settings",
   Pages: "public:pages",
   /** Media metadata (alt text, caption) reused by every project rendering. */

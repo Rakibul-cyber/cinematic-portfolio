@@ -4,14 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import {
-  categorySchema,
   pageSchema,
   projectFormValues,
   projectSchema,
   serviceSchema,
   settingsSchema,
   socialSchema,
-  testimonialSchema,
 } from "@/lib/validation/cms";
 import { describeValidationError, type AdminFormState } from "@/lib/admin/form-state";
 import { requireAdmin, requireUser } from "@/server/auth/session";
@@ -20,18 +18,14 @@ import {
   type PublicContentKind,
 } from "@/server/public/revalidate";
 import {
-  deleteCategory,
   deleteProject,
   deleteSimple,
-  saveCategory,
   savePage,
   saveProject,
   saveService,
   saveSettings,
   saveSocial,
-  saveTestimonial,
   ProjectConflictError,
-  ReferencedCategoryError,
   SlugConflictError,
 } from "@/server/cms/service";
 
@@ -41,7 +35,6 @@ function values(form: FormData) {
 function failure(error: unknown): NonNullable<AdminFormState> {
   if (error instanceof SlugConflictError) return { error: error.message, field: "slug" };
   if (error instanceof ProjectConflictError) return { error: error.message };
-  if (error instanceof ReferencedCategoryError) return { error: error.message };
   if (error instanceof z.ZodError) return describeValidationError(error);
   return { error: "The change could not be saved." };
 }
@@ -98,23 +91,6 @@ async function run(
   redirect(target);
 }
 
-export async function saveCategoryAction(
-  _state: AdminFormState,
-  form: FormData,
-): Promise<AdminFormState> {
-  const actor = await requireUser("/admin/categories");
-  const raw = values(form);
-  return save(
-    "/admin/categories",
-    async () => {
-      await saveCategory(
-        categorySchema.parse({ ...raw, isActive: form.has("isActive") }),
-        actor,
-      );
-    },
-    { kind: "category" },
-  );
-}
 export async function saveServiceAction(
   _state: AdminFormState,
   form: FormData,
@@ -130,23 +106,6 @@ export async function saveServiceAction(
       );
     },
     { kind: "service" },
-  );
-}
-export async function saveTestimonialAction(
-  _state: AdminFormState,
-  form: FormData,
-): Promise<AdminFormState> {
-  const actor = await requireUser("/admin/testimonials");
-  const raw = values(form);
-  return save(
-    "/admin/testimonials",
-    async () => {
-      await saveTestimonial(
-        testimonialSchema.parse({ ...raw, isActive: form.has("isActive") }),
-        actor,
-      );
-    },
-    { kind: "testimonial" },
   );
 }
 export async function savePageAction(
@@ -210,28 +169,23 @@ export async function saveProjectAction(
 }
 export async function deleteAction(form: FormData) {
   const kind = z
-    .enum(["category", "project", "service", "testimonial", "socialLink"])
+    .enum(["project", "service", "socialLink"])
     .parse(form.get("kind"));
   const id = z.string().uuid().parse(form.get("id"));
   const actor = await requireAdmin("/admin");
   const path =
-    kind === "category"
-      ? "/admin/categories"
-      : kind === "project"
-        ? "/admin/projects"
-        : kind === "service"
-          ? "/admin/services"
-          : kind === "testimonial"
-            ? "/admin/testimonials"
-            : "/admin/settings";
+    kind === "project"
+      ? "/admin/projects"
+      : kind === "service"
+        ? "/admin/services"
+        : "/admin/settings";
   const publishKind: PublicContentKind =
     kind === "socialLink" ? "settings" : kind;
 
   await run(
     path,
     async () => {
-      if (kind === "category") await deleteCategory(id, actor);
-      else if (kind === "project") await deleteProject(id, actor);
+      if (kind === "project") await deleteProject(id, actor);
       else await deleteSimple(kind, id, actor);
     },
     { kind: publishKind },

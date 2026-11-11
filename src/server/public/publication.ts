@@ -13,13 +13,13 @@ import type { Prisma } from "@/generated/prisma/client";
  */
 
 /**
- * Only `PUBLISHED` projects are ever readable publicly. A project needs no
- * category (MH-13): one without a category is shown, one in an active category
- * is shown, and one in an inactive category stays hidden, as before.
+ * Only `PUBLISHED` projects are ever readable publicly, and status is the
+ * whole rule. Categories were removed from the application (MH-15), so the
+ * earlier "not in an inactive category" condition is gone with them; the
+ * `categoryId` column still exists but nothing reads it.
  */
 export const PUBLISHED_PROJECT_WHERE = {
   status: "PUBLISHED",
-  OR: [{ categoryId: null }, { category: { isActive: true } }],
 } satisfies Prisma.ProjectWhereInput;
 
 /**

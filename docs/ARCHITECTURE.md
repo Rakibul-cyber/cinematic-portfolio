@@ -96,6 +96,12 @@ The domain will grow deliberately. Expected entities include users and roles,
 projects and categories, media, services, inquiries and customers, testimonials,
 pages/settings, SEO data, and audit logs. They are not created during Phase 0.
 
+Categories and testimonials were later removed from the application (task
+MH-15, [ADR 0013](DECISIONS/0013-simplified-admin.md); local only, not
+deployed). Their tables and the nullable `project.categoryId` column remain in
+the database, unused, and a project is public exactly when its status is
+`PUBLISHED`.
+
 ## Transactional email
 
 Email is a side effect of persistence, never a participant in it. The CRM

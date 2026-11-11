@@ -17,7 +17,6 @@ import {
   toPublicService,
   toPublicSiteSettings,
   toPublicSocialLinks,
-  toPublicTestimonial,
   type UrlResolver,
 } from "@/server/public/mappers";
 import {
@@ -30,14 +29,12 @@ import {
 } from "@/server/public/publication";
 import type {
   HomepageContent,
-  PublicCategory,
   PublicPageContent,
   PublicProjectDetail,
   PublicProjectSummary,
   PublicService,
   PublicSiteSettings,
   PublicSocialLink,
-  PublicTestimonial,
 } from "@/server/public/view-models";
 
 /**
@@ -87,7 +84,6 @@ function projectSummarySelect() {
     title: true,
     summary: true,
     projectDate: true,
-    category: { select: { name: true, slug: true, isActive: true } },
     media: projectMediaSelect(),
   };
 }
@@ -132,44 +128,17 @@ function cached<Args extends unknown[], Result>(
   });
 }
 
-/** Active portfolio categories that actually contain published work. */
-export const getPublicCategories = cached(
-  "public-categories",
-  [PublicTag.Categories, PublicTag.Projects],
-  async (): Promise<PublicCategory[]> => {
-    const rows = await prisma.portfolioCategory.findMany({
-      where: {
-        ...ACTIVE_WHERE,
-        projects: { some: { status: "PUBLISHED" } },
-      },
-      orderBy: activeOrderBy("name"),
-      select: { name: true, slug: true },
-    });
-
-    return rows;
-  },
-);
-
-/**
- * Published projects, optionally narrowed to one active category.
- *
- * An unknown or inactive category slug simply matches nothing, which the work
- * index renders as an empty result rather than an error page.
- */
+/** Published projects, optionally only the featured ones. */
 export const getPublishedProjects = cached(
   "public-projects",
-  [PublicTag.Projects, PublicTag.Categories, PublicTag.Media],
+  [PublicTag.Projects, PublicTag.Media],
   async (options?: {
-    categorySlug?: string;
     featuredOnly?: boolean;
     take?: number;
   }): Promise<PublicProjectSummary[]> => {
     const rows = await prisma.project.findMany({
       where: {
         ...PUBLISHED_PROJECT_WHERE,
-        ...(options?.categorySlug
-          ? { category: { isActive: true, slug: options.categorySlug } }
-          : {}),
         ...(options?.featuredOnly ? { featured: true } : {}),
       },
       orderBy: projectOrderBy(),
@@ -184,7 +153,7 @@ export const getPublishedProjects = cached(
 /** Slugs of published projects, for static generation. */
 export const getPublishedProjectSlugs = cached(
   "public-project-slugs",
-  [PublicTag.Projects, PublicTag.Categories],
+  [PublicTag.Projects],
   async (): Promise<string[]> => {
     const rows = await prisma.project.findMany({
       where: PUBLISHED_PROJECT_WHERE,
@@ -205,7 +174,7 @@ export const getPublishedProjectSlugs = cached(
  */
 export const getPublishedProjectSitemapRows = cached(
   "public-project-sitemap",
-  [PublicTag.Projects, PublicTag.Categories],
+  [PublicTag.Projects],
   async (): Promise<{ slug: string; updatedAt: string }[]> => {
     const rows = await prisma.project.findMany({
       where: PUBLISHED_PROJECT_WHERE,
@@ -228,7 +197,7 @@ export const getPublishedProjectSitemapRows = cached(
  */
 export const getPublishedProjectBySlug = cached(
   "public-project",
-  [PublicTag.Projects, PublicTag.Categories, PublicTag.Media],
+  [PublicTag.Projects, PublicTag.Media],
   async (slug: string): Promise<PublicProjectDetail | null> => {
     const row = await prisma.project.findFirst({
       where: { slug, ...PUBLISHED_PROJECT_WHERE },
@@ -257,27 +226,6 @@ export const getActiveServices = cached(
     });
 
     return rows.map(toPublicService);
-  },
-);
-
-export const getActiveTestimonials = cached(
-  "public-testimonials",
-  [PublicTag.Testimonials],
-  async (options?: { take?: number }): Promise<PublicTestimonial[]> => {
-    const rows = await prisma.testimonial.findMany({
-      where: ACTIVE_WHERE,
-      orderBy: activeOrderBy("authorName"),
-      take: options?.take,
-      select: {
-        quote: true,
-        authorName: true,
-        authorRole: true,
-        company: true,
-        projectName: true,
-      },
-    });
-
-    return rows.map(toPublicTestimonial);
   },
 );
 
@@ -340,7 +288,7 @@ export const getPublicPage = cached(
  */
 export const getHomepageContent = unstable_cache(
   async (): Promise<HomepageContent> => {
-    const [settings, featured, services, testimonials, about] =
+    const [settings, featured, services, about] =
       await Promise.all([
         getPublicSiteSettings(),
         getPublishedProjects({
@@ -348,7 +296,6 @@ export const getHomepageContent = unstable_cache(
           take: HOMEPAGE_GRID_LIMIT + 1,
         }),
         getActiveServices({ take: 4 }),
-        getActiveTestimonials({ take: 2 }),
         getPublicPage("about"),
       ]);
 
@@ -371,7 +318,6 @@ export const getHomepageContent = unstable_cache(
       heroShown: work.heroShown,
       workSource: work.source,
       services,
-      testimonials,
       about,
     };
   },

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/(admin)/admin/actions";
-import { adminLinksFor } from "@/components/admin/admin-links";
+import { ADMIN_CONTENT_LINKS, adminLinksFor } from "@/components/admin/admin-links";
 import { AdminMenu } from "@/components/admin/admin-menu";
 import { AdminNavLink } from "@/components/admin/admin-nav-link";
 export { Notice } from "@/components/admin/admin-notice";
@@ -40,6 +40,19 @@ export function AdminShell({
               {adminLinksFor(user.role).map(({ label, href }) => (
                 <AdminNavLink
                   className="min-h-10 border-l-2 border-transparent px-3 py-2 text-sm hover:bg-surface-strong [&[aria-current]]:border-accent [&[aria-current]]:bg-surface-strong"
+                  href={href}
+                  key={href}
+                >
+                  {label}
+                </AdminNavLink>
+              ))}
+              {/* Secondary group: rarely edited, so quieter and below the six everyday links. */}
+              <p className="col-span-full mt-5 px-3 text-[0.6875rem] tracking-wider text-muted-foreground uppercase">
+                Website content
+              </p>
+              {ADMIN_CONTENT_LINKS.map(({ label, href }) => (
+                <AdminNavLink
+                  className="min-h-10 border-l-2 border-transparent px-3 py-2 text-xs text-muted-foreground hover:bg-surface-strong hover:text-foreground [&[aria-current]]:border-accent [&[aria-current]]:bg-surface-strong [&[aria-current]]:text-foreground"
                   href={href}
                   key={href}
                 >

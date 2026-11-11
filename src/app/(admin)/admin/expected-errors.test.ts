@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { adminLinksFor } from "@/components/admin/admin-links";
+import { ADMIN_CONTENT_LINKS, adminLinksFor } from "@/components/admin/admin-links";
 import { Prisma } from "@/generated/prisma/client";
 import { describeValidationError } from "@/lib/admin/form-state";
 import { anonymizeCustomerSchema, customerSchema, noteSchema } from "@/lib/validation/crm";
@@ -92,7 +92,6 @@ describe("customer edits", () => {
 describe("expected failures are returned as form state", () => {
   const crm = read("crm-actions.ts");
   const media = read("media/actions.ts");
-  const cms = read("cms-actions.ts");
 
   for (const [name, guard] of [["updateCustomerAction", "requireUser"], ["addCustomerNoteAction", "requireUser"], ["anonymizeCustomerAction", "requireSuperAdmin"]] as const) {
     it(`${name} checks ${guard} first, then validates without throwing`, () => {
@@ -112,11 +111,6 @@ describe("expected failures are returned as form state", () => {
     const fn = body(media, "deleteMediaAction");
     assert.match(fn, /\(\s*_state: AdminFormState,\s*formData: FormData,\s*\): Promise<AdminFormState>/);
     assert.match(fn, /if \(error instanceof MediaInUseError\) return \{ error: error\.message \};\s*throw error;/);
-  });
-
-  it("category deletion reports the category-in-use reason instead of the generic one", () => {
-    assert.match(cms, /if \(error instanceof ReferencedCategoryError\) return \{ error: error\.message \};/);
-    assert.match(readFileSync("src/server/cms/service.ts", "utf8"), /This category still has projects\. Move them to another category or delete them first\./);
   });
 
   it("the pages submit these forms through AdminForm", () => {
@@ -140,11 +134,15 @@ describe("role-aware admin controls", () => {
     assert.ok(labels(AdminRole.ADMIN).includes("Settings"));
     assert.ok(labels(AdminRole.SUPER_ADMIN).includes("Settings"));
     // Everything an EDITOR can open is still there.
-    assert.deepEqual(labels(AdminRole.EDITOR), ["Dashboard", "Inquiries", "Customers", "Projects", "Categories", "Media", "Services", "Testimonials", "Pages"]);
+    // The six everyday sections (MH-15); an EDITOR gets all but Settings.
+    assert.deepEqual(labels(AdminRole.EDITOR), ["Dashboard", "Projects", "Media", "Inquiries", "Customers"]);
+    assert.deepEqual(labels(AdminRole.ADMIN), ["Dashboard", "Projects", "Media", "Inquiries", "Customers", "Settings"]);
+    // Services and Pages stay reachable for every role, in the secondary group.
+    assert.deepEqual(ADMIN_CONTENT_LINKS.map((link) => [link.label, link.href, link.adminOnly]), [["Services", "/admin/services", undefined], ["Pages", "/admin/pages", undefined]]);
     assert.match(readFileSync("src/components/admin/admin-shell.tsx", "utf8"), /\{adminLinksFor\(user\.role\)\.map\(/);
   });
 
-  for (const page of ["projects/page.tsx", "categories/page.tsx", "services/page.tsx", "testimonials/page.tsx"]) {
+  for (const page of ["projects/page.tsx", "services/page.tsx"]) {
     it(`${page.split("/")[0]}: Delete is offered only to administrators`, () => {
       const source = read(page);
       assert.match(source, /const canDelete = isAdministrative\(user\.role\);/);

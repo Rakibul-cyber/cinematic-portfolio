@@ -87,7 +87,6 @@ export const sectionLabels = {
   showreel: "In motion",
   services: "Practice",
   studio: "The studio",
-  testimonials: "In their words",
   contact: "Start a conversation",
 } as const;
 

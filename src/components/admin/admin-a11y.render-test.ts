@@ -114,7 +114,7 @@ describe("skip link", () => {
 
 describe("page notices", () => {
   it("take focus when they appear, without becoming a Tab stop, and stay an alert", async () => {
-    const m = await mount(h(Notice, { message: "This category still has projects. Move them to another category or delete them first." }));
+    const m = await mount(h(Notice, { message: "This image is used by a project. Remove it from the project first." }));
     const notice = m.container.querySelector("p")!;
     assert.equal(notice.getAttribute("role"), "alert");
     assert.equal(notice.getAttribute("tabindex"), "-1");

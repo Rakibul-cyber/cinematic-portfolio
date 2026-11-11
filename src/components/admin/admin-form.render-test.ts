@@ -14,7 +14,7 @@ import type { AdminFormState } from "@/lib/admin/form-state";
  * suite, because the pages are async Server Components that query the database.
  */
 
-const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/admin/categories", pretendToBeVisual: true });
+const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/admin/services", pretendToBeVisual: true });
 type Globals = Record<string, unknown>;
 const replaced: Globals = {};
 let act: typeof import("react").act;
@@ -42,7 +42,7 @@ after(() => {
   dom.window.close();
 });
 
-/** A category-like form; `respond` decides what the "server" returns for each submission. */
+/** A service-like form; `respond` decides what the "server" returns for each submission. */
 async function mount(respond: (form: FormData) => AdminFormState) {
   const received: FormData[] = [];
   const action = async (_state: AdminFormState, form: FormData) => {
@@ -96,7 +96,7 @@ async function mount(respond: (form: FormData) => AdminFormState) {
   };
 }
 
-const TYPED = { name: "QA Category", slug: "Bad Slug!", description: "Line one\nLine two", status: "PUBLISHED", isActive: false };
+const TYPED = { name: "QA Service", slug: "Bad Slug!", description: "Line one\nLine two", status: "PUBLISHED", isActive: false };
 
 describe("a rejected save", () => {
   it("keeps every typed value: text, textarea, select and an unticked checkbox", async () => {
@@ -173,7 +173,7 @@ describe("a rejected field inside a closed details section", () => {
           createElement(
             "details",
             null,
-            createElement("summary", null, "Advanced details"),
+            createElement("summary", null, "More options (optional)"),
             createElement("label", null, "Slug", createElement("input", { name: "slug", defaultValue: "taken" })),
           ),
           createElement("button", null, "Save"),
@@ -238,9 +238,7 @@ describe("a successful save after a rejected one", () => {
 
 describe("admin save forms", () => {
   const forms = [
-    ["src/app/(admin)/admin/categories/page.tsx", ["saveCategoryAction"]],
     ["src/app/(admin)/admin/services/page.tsx", ["saveServiceAction"]],
-    ["src/app/(admin)/admin/testimonials/page.tsx", ["saveTestimonialAction"]],
     ["src/app/(admin)/admin/pages/page.tsx", ["savePageAction"]],
     ["src/app/(admin)/admin/settings/page.tsx", ["saveSettingsAction", "saveSocialAction"]],
     ["src/components/admin/project-form.tsx", ["saveProjectAction"]],

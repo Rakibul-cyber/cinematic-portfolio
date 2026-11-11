@@ -307,7 +307,7 @@ describe("notices: errors are alerts, ordinary outcomes are polite", () => {
   });
 
   it("an alert notice still takes focus (the default)", async () => {
-    const m = await mount(() => h(Notice, { message: "This category still has projects. Move them to another category or delete them first." }));
+    const m = await mount(() => h(Notice, { message: "This image is used by a project. Remove it from the project first." }));
     assert.equal(active(), m.container.querySelector("[role=alert]"));
     await m.unmount();
   });
@@ -326,7 +326,7 @@ describe("notices: errors are alerts, ordinary outcomes are polite", () => {
       assert.match(source, /message=\{notice\.error\?\?notice\.info\?\?notice\.saved\}/);
       assert.match(source, /tone=\{notice\.error\?"alert":"status"\}/);
     }
-    for (const file of ["categories/page.tsx", "projects/page.tsx", "services/page.tsx", "testimonials/page.tsx", "settings/page.tsx", "pages/page.tsx"]) assert.match(read(`src/app/(admin)/admin/${file}`), /<Notice message=\{error\} \/>/);
+    for (const file of ["projects/page.tsx", "services/page.tsx", "settings/page.tsx", "pages/page.tsx"]) assert.match(read(`src/app/(admin)/admin/${file}`), /<Notice message=\{error\} \/>/);
   });
 
   it("routes accepted, neutral, failed, and domain outcomes through the correct trusted channel", () => {
@@ -342,10 +342,8 @@ describe("notices: errors are alerts, ordinary outcomes are polite", () => {
 
 describe("record-specific admin action names", () => {
   const cases = [
-    ["categories/page.tsx", "category", "r.name"],
     ["projects/page.tsx", "project", "r.title"],
     ["services/page.tsx", "service", "r.name"],
-    ["testimonials/page.tsx", "testimonial from", "r.authorName"],
   ] as const;
 
   it("names every repeated Edit and Delete control after its record and stable id", () => {

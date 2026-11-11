@@ -6,7 +6,6 @@ import { HeroSection } from "@/components/sections/hero-section";
 import { ServicesPreviewSection } from "@/components/sections/services-preview-section";
 import { ShowreelSection } from "@/components/sections/showreel-section";
 import { StudioStatementSection } from "@/components/sections/studio-statement-section";
-import { TestimonialsSection } from "@/components/sections/testimonials-section";
 import { FALLBACK_STUDIO_NAME } from "@/content/site";
 import { buildPublicMetadata } from "@/server/public/metadata";
 import { getHomepageContent } from "@/server/public/queries";
@@ -25,7 +24,7 @@ export function generateMetadata(): Promise<Metadata> {
  *
  * Every section is CMS-backed and every optional section removes itself when
  * its content is absent, so an empty CMS yields a composed hero and contact
- * invitation rather than placeholder work, services, or testimonials.
+ * invitation rather than placeholder work or services.
  *
  * One cached composition supplies the whole page, so the six entities it shows
  * do not each become a separate uncached round trip.
@@ -38,7 +37,6 @@ export default async function HomePage() {
     heroShown,
     services,
     settings,
-    testimonials,
     workSource,
   } = await getHomepageContent();
 
@@ -60,10 +58,6 @@ export default async function HomePage() {
       />
       <ServicesPreviewSection services={services} />
       <StudioStatementSection about={about} />
-      <TestimonialsSection
-        className="border-b border-border py-24 sm:py-32"
-        testimonials={testimonials}
-      />
       <ContactCtaSection settings={settings} />
     </main>
   );

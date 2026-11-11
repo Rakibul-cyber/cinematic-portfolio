@@ -36,6 +36,10 @@ executed).
   suite: 89 checks, 78 PASS, 2 FAIL, 9 NOT RUN. `d0f05a8` is deployed. One
   bug is confirmed and fixed locally (F-6, exports run without a click). The
   other failure could not be reproduced and its cause is unconfirmed.
+- **Update, second signed-in run (section 14):** after the fix was deployed,
+  89 checks, 79 PASS, 1 FAIL, 9 NOT RUN. F-6 is fixed on the live site. The
+  one failure, a React hydration error on a single load of Categories, could
+  not be reproduced; no application bug is confirmed.
 
 ## 2. Inventory of admin sections
 
@@ -362,7 +366,99 @@ component, slow pages, no database) driven by the same browser steps.
 | `npm run lint` | PASS |
 | `git diff --check` | PASS |
 | `npm run test:bundle` | NOT RUN after this change |
-| Signed-in suite rerun | NOT RUN: needs the owner's password. Until the fix is deployed the Audit check will still FAIL on the live site |
+| Signed-in suite rerun | Run by the owner after `c971e05` was deployed; see section 14 |
+
+## 14. Second signed-in run (after `c971e05` was deployed)
+
+Run by the owner as SUPER_ADMIN: **89 checks, 79 PASS, 1 FAIL, 9 NOT RUN, 0
+BLOCKED.**
+
+- **F-6 is fixed on the live site:** zero automatic export requests.
+- **Desktop Inquiries navigation passed.** The first run's failure did not
+  recur; its cause remains unconfirmed.
+- The 9 NOT RUN checks are the same as before: they need categories,
+  services, testimonials, inquiries, or customers, and none exist.
+
+### The one failure: React error 418 on the Categories page (not reproduced)
+
+Error 418 means the page the server sent did not match what React built in
+the browser when it started up (a hydration mismatch, here of an element, not
+of text). React recovers by rebuilding the page in the browser, which is why
+every other part of the same check found the form and its fields.
+
+**Root cause: not confirmed.** What was checked:
+
+| Question | Finding | How |
+| --- | --- | --- |
+| Does the Categories page mismatch on every load? | No. It loaded cleanly in 8 of its 9 loads across the three signed-in runs, including twice in this same run (desktop and mobile menu) | Run results |
+| Browser-only values, dates, random values, or `typeof window` branches in the page or its components? | None. The page, `AdminShell`, `AdminMenu`, `AdminNavLink`, `AdminForm`, `Notice`, and `DeleteButton` render the same output on the server and in the browser. The only date formatting in admin components is in the email-delivery rows, which this page does not use | Code review |
+| Conditional rendering that differs between server and browser? | None. `current`, `rows`, and `canDelete` come from the server and reach the browser unchanged | Code review |
+| Invalid HTML nesting? | None found: no form inside a form, no block element inside a paragraph or inline element. Services and Testimonials use the same structure and passed | Code review |
+| Is Netlify's badge the cause? Netlify adds a script to every page that inserts an `<iframe>` into the body at an unpredictable moment | No. In a copy of the setup, an iframe inserted before React starts, at the end or the start of the body, produced 0 errors in 10 loads | Real Chrome, local copy |
+| Does the live site show the error on pages that need no sign-in? | No. 0 console errors in 120 loads (login, home, work, contact; 30 each) | Real Chrome, live site, read-only |
+| Reproducible in a real browser? | No, by any means available without the owner's session | — |
+
+**Where it comes from: undetermined.** The evidence is against a fault that
+is always present in the Categories page. It does not separate the remaining
+possibilities: a one-off in delivery (for example a response cut short), or a
+rare timing condition in the application that these checks did not trigger.
+One failure in roughly 200 signed-in page loads is the whole sample.
+
+**No application change was made**, because no application bug was confirmed.
+
+**Test change (uncommitted):** when a create-form check sees a console error,
+the suite now loads that page three more times and reports how many of those
+loads show it. The check still fails, but the evidence says "0 of 3" (a
+one-off) or "3 of 3" (a real, repeatable fault).
+
+Checks on the unchanged application at `c971e05`: `npm test` 891 tests
+(889 passed, 0 failed, 2 skipped by design); typecheck, lint PASS;
+`npm run test:bundle` PASSED (56 of 56, 32 of 32; Node.js 22 verification
+pending).
+
+## 15. Admin simplified (MH-15, 2026-11-11): what this changes in the report
+
+The owner approved removing Categories and Testimonials and simplifying the
+admin. It is implemented in the working tree: **not committed, not deployed,
+so the live site is unchanged and the results in sections 11 to 14 still
+describe it.**
+
+**Removed from the application:** the Categories and Testimonials admin
+pages, their save and delete actions and validation, the public category
+filter and labels, and the public testimonial sections. The database tables
+and existing rows are untouched.
+
+**What remains:** Dashboard, Projects, Media, Inquiries, Customers, Settings as
+the main menu; Services and Pages in a smaller "Website content" group below
+them; every project field, image upload, video link, and publishing.
+
+**Effect on earlier results**
+
+| Earlier item | Now |
+| --- | --- |
+| Categories and Testimonials rows in sections 2, 3, 9, 11, 12 | Retired once MH-15 is deployed; the features no longer exist |
+| React error 418 on one load of Categories (section 14) | Closed as not reproducible; the page is removed, so it cannot recur there. Cause was never confirmed |
+| Write tests W7 and W8 (inactive category, testimonial) | Withdrawn. W1 to W6, W9, W10 still stand, still awaiting approval |
+| "Dashboard shows eight counters", "four shortcuts" | Replaced by six counters and three quick actions |
+
+**Checks run on the change**
+
+| Check | Result |
+| --- | --- |
+| `npm test` | 893 tests: 891 passed, 0 failed, 2 skipped by design (604 unit, 289 render) |
+| `npm run typecheck`, `npm run lint` | PASS |
+| `npm run test:bundle` | `npm run test:bundle` PASSED (56 of 56, 32 of 32; Node.js 22 verification pending) |
+| Leftover references in application code | None: a test now fails if application code reads the category or testimonial tables, links to the removed addresses, or mentions either feature |
+| Navigation and dashboard in real Chrome, 1440 px and 390 px, SUPER_ADMIN and EDITOR | PASS on a local copy of the real components with stub data: six links (five for an editor), then Website content: Services, Pages; 40 px link height; no sideways scroll; the phone menu opens and closes after navigation |
+| Signed-in checks on the live site | NOT RUN: needs deployment, then the owner's run |
+| Project create, edit, save, publish; image upload | NOT RUN on the live site: write tests are not approved. Covered offline only |
+| Database verification scripts | NOT RUN: edited to match, but they need a database |
+
+**Read-only QA suite:** updated to the simplified admin. After deployment it
+expects the six links and the Website content group, six counters, three
+quick actions, the renamed "More options (optional)" section, and a 404 on
+`/admin/categories` and `/admin/testimonials`. Run against the live site
+before deployment it will fail those checks, correctly.
 
 ## Summary table
 
@@ -397,7 +493,9 @@ component, slow pages, no database) driven by the same browser steps.
 | Inquiries and Customers | BLOCKED | No credentials; no inquiry data | — |
 | Admin pages at phone width | BLOCKED | No credentials | — |
 | Signed-in read-only suite (section 11) | 78 PASS, 2 FAIL, 9 NOT RUN | Run by the owner as SUPER_ADMIN; the 9 need records that do not exist yet | F-6 |
-| Exports run only on a click | FAIL on the live site | Confirmed and fixed locally; not deployed, so the live result is unchanged | F-6 |
-| Desktop menu: Inquiries opens | FAIL once | Not reproduced; cause unconfirmed; the test now records more evidence | — |
+| Exports run only on a click | PASS on the live site after `c971e05` | Zero automatic export requests in the second run | F-6, fixed |
+| Desktop menu: Inquiries opens | PASS in the second run | Failed once in the first run; never reproduced; cause unconfirmed | — |
+| Categories page loads without console errors | FAIL once in the second run | React error 418 on one load; not reproduced; cause unconfirmed (section 14). The page is removed by MH-15 | — |
+| Admin simplified, Categories and Testimonials removed (MH-15) | Offline checks PASS; live NOT RUN | Implemented locally, not committed or deployed (section 15) | — |
 | Commit `d0f05a8` deployed | PASS | The upload control it added is in the live Project media section | — |
 | Write tests W1 to W10 (section 12) | NOT RUN | Awaiting approval | — |

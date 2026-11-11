@@ -7,7 +7,7 @@ inquiry/customer workflow.
 
 ## Product overview
 
-The public experience will present projects, galleries, services, testimonials,
+The public experience will present projects, galleries, services,
 studio information, and a secure inquiry flow. The private admin experience will
 manage that content, optimized website media, customer inquiries, site settings,
 and SEO data.
@@ -91,12 +91,18 @@ changes no business logic: no schema, CRM, inquiry, email, authentication, media
 Turnstile, or privacy behaviour is touched. See
 [ADR 0009](docs/DECISIONS/0009-seo-production-deployment.md).
 
+Since then, portfolio categories and testimonials (Phases 4 and 5 above) have
+been removed from the application, and the admin navigation and dashboard were
+simplified (task MH-15). The database tables are kept, unused; no migration was
+added. This change is local only: it is not committed, pushed, or deployed. See
+[ADR 0013](docs/DECISIONS/0013-simplified-admin.md).
+
 ## Public site
 
 | Route | Content |
 | --- | --- |
-| `/` | Hero, selected work, showreel, services, studio statement, testimonials, contact invitation. |
-| `/work` | Published projects, filterable by active category via `?category=<slug>`. |
+| `/` | Hero, selected work, showreel, services, studio statement, contact invitation. |
+| `/work` | Every published project. There is no category filter; an old `/work?category=...` link shows the whole portfolio. |
 | `/work/<slug>` | One published project: cover, details, description, optional film, ordered gallery. |
 | `/services` | Active services in configured order, with the studio's own price labels. |
 | `/about` | The CMS About page plus studio settings. |
@@ -116,19 +122,18 @@ Publication rules, enforced in the query rather than the UI:
 
 | Entity | Public when |
 | --- | --- |
-| Project | `status` is `PUBLISHED` **and** its category is active |
-| Category | active **and** it contains published work |
-| Service, testimonial, social link | active |
+| Project | `status` is `PUBLISHED` (nothing else) |
+| Service, social link | active |
 | Page (`about`, `contact`, `services`) | always, if saved |
 
 A draft project and a slug that never existed both return a normal 404. Nothing
 indicates that a draft exists.
 
 Sections with no content are omitted rather than filled: no services means no
-services section, no testimonials means no testimonial block, no showreel video
+services section, no showreel video
 means no showreel. Visitors never see administrative wording.
 
-To publish work, an editor creates a category, uploads media at
+To publish work, an editor uploads media at
 `/admin/media` with alt text, creates a project at `/admin/projects`, selects
 its media in order (the first selection is the cover), sets the status to
 `PUBLISHED`, and saves. The change appears on the public site immediately —
@@ -139,9 +144,10 @@ each mutation invalidates the public cache tags and routes it affects.
 Public reads are cached and tagged per entity; admin saves call
 `revalidatePublicContent`, which purges the affected tags and routes. A
 one-hour `revalidate` bounds staleness if an invalidation is ever missed.
-`/`, `/about`, `/services`, and `/contact` are statically rendered with ISR;
-`/work/<slug>` is pre-rendered for published slugs and renders newly published
-work on demand; `/work` is per-request because of its category filter.
+`/`, `/work`, `/about`, `/services`, and `/contact` are statically rendered
+with ISR; `/work/<slug>` is pre-rendered for published slugs and renders newly
+published work on demand. `/work` takes no `searchParams` and is no longer
+per-request (the category filter was removed).
 
 Do not add a `loading.tsx` to the public route group: a streaming boundary
 commits HTTP 200 before `notFound()` runs and turns draft URLs into soft 404s.
@@ -328,7 +334,8 @@ Every public page declares a canonical URL, Open Graph tags, a Twitter card, and
 explicit robots directives, resolved through the same fallback chain as its title
 and description: the page's own SEO field, then its natural content, then the CMS
 global default, then a neutral constant. A canonical drops query strings, so
-`/work?category=film` stays a view of `/work` rather than a competing document.
+`/work?category=film` (an old link; the filter no longer exists) stays a view of
+`/work` rather than a competing document.
 Project pages share their cover photograph; pages with no image of their own fall
 back to the generated card.
 
@@ -520,10 +527,8 @@ Remove-Item Env:\ADMIN_TEST_PASSWORD
 | `/admin/login` | Public. Redirects to `/admin` when already signed in. |
 | `/admin` | Requires a valid session. Redirects to `/admin/login` otherwise. |
 | `/admin/projects` | Project CRUD, publishing, and ordered media assignment. |
-| `/admin/categories` | Ordered portfolio category management. |
 | `/admin/media` | Media management with project-reference protection. |
 | `/admin/services` | Ordered service and display-price management. |
-| `/admin/testimonials` | Ordered testimonial management. |
 | `/admin/pages` | Stable About, Contact, and Services copy. |
 | `/admin/settings` | ADMIN+ global settings and social links. |
 | `/admin/inquiries` | Searchable, status-filtered and paginated inquiry pipeline. |
@@ -531,6 +536,12 @@ Remove-Item Env:\ADMIN_TEST_PASSWORD
 | `/admin/customers` | Searchable customer records, inquiry history and internal notes. |
 | `/admin/inquiries/<id>` | Inquiry snapshot, status pipeline, and transactional email state with retry. |
 | `/api/auth/*` | Better Auth endpoints. Sign-up is disabled. |
+
+`/admin/categories` and `/admin/testimonials` no longer exist (MH-15, local
+only, not deployed); both now answer with the admin "Page not found" 404. The
+admin navigation shows Dashboard, Projects, Media, Inquiries, Customers, and
+Settings (ADMIN+), then a smaller "Website content" group with Services and
+Pages. See [ADR 0013](docs/DECISIONS/0013-simplified-admin.md).
 
 Middleware redirects visitors without a session cookie for routing convenience
 only; it verifies nothing. Every protected page and mutation enforces

@@ -12,17 +12,10 @@ import type { HomepageWorkSource } from "@/server/public/homepage";
  * change without rewriting components.
  */
 
-export type PublicCategory = {
-  name: string;
-  slug: string;
-};
-
 export type PublicProjectSummary = {
   slug: string;
   title: string;
   summary: string;
-  /** Null when the project has no category, or its category is inactive. */
-  category: PublicCategory | null;
   /** Year of the shoot, when the CMS records a date. */
   year: number | null;
   cover: PublicImage | null;
@@ -47,13 +40,6 @@ export type PublicService = {
   shortDescription: string;
   description: string[];
   priceLabel: string | null;
-};
-
-export type PublicTestimonial = {
-  quote: string;
-  authorName: string;
-  /** Role, company, and project joined into one attribution line, or null. */
-  attribution: string | null;
 };
 
 export type PublicSocialLink = {
@@ -95,6 +81,5 @@ export type HomepageContent = {
   /** Whether the grid holds flagged featured work or the published fallback. */
   workSource: HomepageWorkSource;
   services: PublicService[];
-  testimonials: PublicTestimonial[];
   about: PublicPageContent | null;
 };

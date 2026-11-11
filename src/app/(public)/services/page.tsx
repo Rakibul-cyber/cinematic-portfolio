@@ -3,13 +3,11 @@ import Link from "next/link";
 
 import { FadeReveal } from "@/components/motion/fade-reveal";
 import { PageIntro } from "@/components/public/page-intro";
-import { TestimonialsSection } from "@/components/sections/testimonials-section";
 import { JsonLd } from "@/components/seo/json-ld";
 import { Container } from "@/components/ui/container";
 import { buildPublicMetadata } from "@/server/public/metadata";
 import {
   getActiveServices,
-  getActiveTestimonials,
   getPublicPage,
 } from "@/server/public/queries";
 import { breadcrumbStructuredData } from "@/server/seo/structured-data";
@@ -37,10 +35,9 @@ export async function generateMetadata(): Promise<Metadata> {
  * is derived or invented, and there is no checkout, booking, or quote flow.
  */
 export default async function ServicesPage() {
-  const [page, services, testimonials, structuredData] = await Promise.all([
+  const [page, services, structuredData] = await Promise.all([
     getPublicPage("services"),
     getActiveServices(),
-    getActiveTestimonials({ take: 2 }),
     breadcrumbStructuredData([
       { name: "Home", path: "/" },
       { name: "Services", path: "/services" },
@@ -120,11 +117,6 @@ export default async function ServicesPage() {
           </div>
         </Container>
       )}
-
-      <TestimonialsSection
-        className="border-t border-border py-20 sm:py-28"
-        testimonials={testimonials}
-      />
 
       <JsonLd nodes={structuredData} />
     </main>

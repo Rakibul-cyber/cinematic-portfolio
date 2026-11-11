@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/04_TRD.md` |
-| Version | 1.8.0 (MH-13: optional project category migration, not applied; MH-10: external video embeds) |
-| Last reviewed | 2026-11-07 |
+| Version | 1.9.0 (MH-15: category and testimonial code removed, no migration, schema unchanged; LOCAL ONLY, not deployed; MH-13: optional project category migration, not applied; MH-10: external video embeds) |
+| Last reviewed | 2026-11-11 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -355,9 +355,9 @@ re-checks the session on the server. "Audit" lists `audit_log.action` values.
 | `signInAction` (`login/actions.ts`) | email, password, `next` | result or redirect | Public | `adminLoginSchema`, safe `next` | as `/api/auth` | session, audit `admin.signed_in` or `admin.sign_in_failed` | generic or unavailable message |
 | `signOutAction` (`admin/actions.ts`) | none | redirect | Session | — | — | session deleted, audit `admin.signed_out` | — |
 | `saveProjectAction` (`cms-actions.ts`) | project fields, media, version | form state | EDITOR | `cms.ts` schemas, version check | — | project, project_media, revalidation, audit `cms.*`, `project.*` | field errors or stale-save refusal |
-| `saveCategoryAction`, `saveServiceAction`, `saveTestimonialAction`, `savePageAction` | entity fields | form state | EDITOR | `cms.ts` schemas | — | entity, revalidation, audit `cms.*` | field errors |
+| `saveServiceAction`, `savePageAction` (`saveCategoryAction` and `saveTestimonialAction` removed in MH-15, LOCAL ONLY) | entity fields | form state | EDITOR | `cms.ts` schemas | — | entity, revalidation, audit `cms.*` | field errors |
 | `saveSettingsAction`, `saveSocialAction` | settings, social link | form state | ADMIN | `cms.ts` schemas | — | site_setting, social_link, revalidation | `AuthorizationError` for EDITOR |
-| `deleteAction` | entity type, id | form state | ADMIN | id schema | — | entity deleted, revalidation, audit `cms.deleted` | refusal when referenced |
+| `deleteAction` | entity type (`project`, `service`, `socialLink` only since MH-15), id | form state | ADMIN | id schema | — | entity deleted, revalidation, audit `cms.deleted` | the "refusal when referenced" case (`ReferencedCategoryError`) applied to categories and was removed with them in MH-15 |
 | `deleteMediaAction` (`media/actions.ts`) | id (uuid) | form state | ADMIN (`requireAdmin`, LOCAL ONLY; published build: EDITOR, DEF-01) | role checked before the uuid is parsed | — | R2 objects then row, audit `media.deleted` | `AuthorizationError` for EDITOR (admin error page); in-use refusal as form state; DEF-04 race |
 | `updateMediaMetadataAction` | id, altText ≤ 500, caption ≤ 2000 | void | EDITOR | zod | — | media, revalidation, audit `media.updated` | throws on invalid input |
 | `changeInquiryStatusAction` (`crm-actions.ts`) | id, status | redirect `?saved=Status+updated` | EDITOR | `statusSchema` | — | inquiry, history, audit `inquiry.status_changed` | validation error |
@@ -455,6 +455,22 @@ offline `prisma migrate diff` of the schema change. Apply it before publishing
 the MH-13 build. Before rolling back to older code, give every project a
 category again (`UPDATE "project" SET "categoryId" = '<id>' WHERE "categoryId" IS NULL`):
 older Prisma clients expect a category on every project.
+
+MH-15 (ADR 0013; LOCAL ONLY, working tree, not deployed) removed the category
+and testimonial code but added **no migration** and left `prisma/schema.prisma`
+unchanged: the migration count stays at nine, and the `portfolio_category` and
+`testimonial` tables and the nullable column `project.categoryId` (with its
+foreign key and index) remain, unused by the application. No table, column, or
+row was dropped or modified; dropping them later would need its own approved
+migration. On the public side, `PUBLISHED_PROJECT_WHERE` is now
+`{ status: "PUBLISHED" }`, the cache tags `public:categories` and
+`public:testimonials` and the `category` and `testimonial` revalidation kinds
+are gone (`PublicContentKind` is `project | service | page | settings | media`),
+`AuditEntityType` no longer has `Category` or `Testimonial` constants (historic
+audit rows are untouched), project structured data no longer carries `genre`,
+and `/work` takes no `searchParams` and exports `revalidate = 3600`.
+`scripts/verify-cms-flow.ts` and `scripts/verify-public-flow.ts` no longer
+create categories or testimonials (edited, NOT RUN: they need a database).
 
 MH-10 adds an eighth migration, `20261107120000_add_google_drive_video_provider`
 (`ALTER TYPE "VideoProvider" ADD VALUE 'GOOGLE_DRIVE'`; additive), on

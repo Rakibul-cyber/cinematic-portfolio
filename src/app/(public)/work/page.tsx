@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
 import { FadeReveal } from "@/components/motion/fade-reveal";
-import { CategoryFilter } from "@/components/public/category-filter";
 import { PageIntro } from "@/components/public/page-intro";
 import { ProjectCard } from "@/components/public/project-card";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -9,12 +8,11 @@ import { Container } from "@/components/ui/container";
 import { emptyStates } from "@/content/site";
 import { cn } from "@/lib/utils";
 import { buildPublicMetadata } from "@/server/public/metadata";
-import { getPublicCategories, getPublishedProjects } from "@/server/public/queries";
+import { getPublishedProjects } from "@/server/public/queries";
 import { breadcrumbStructuredData } from "@/server/seo/structured-data";
 
-type WorkPageProps = {
-  searchParams: Promise<{ category?: string | string[] }>;
-};
+// Mirrors PUBLIC_REVALIDATE_SECONDS; Next.js requires a literal here.
+export const revalidate = 3600;
 
 export function generateMetadata(): Promise<Metadata> {
   return buildPublicMetadata({
@@ -27,32 +25,14 @@ export function generateMetadata(): Promise<Metadata> {
 /**
  * Public work index.
  *
- * Rendered per request because it accepts a category filter, but both queries
- * behind it are cached and tagged, so a request without a cache-invalidating
- * admin save costs no database round trip.
- *
- * Only published projects in active categories are ever fetched; the filter
- * narrows an already-safe result rather than being the thing that hides drafts.
+ * Every published project, in the curated order. The query is cached and
+ * tagged, so an admin save shows here on the next request. Only published
+ * projects are ever fetched. There is no category filter (MH-15); an old
+ * `/work?category=...` link simply shows the whole portfolio.
  */
-export default async function WorkPage({ searchParams }: WorkPageProps) {
-  const params = await searchParams;
-  const requested = Array.isArray(params.category)
-    ? params.category[0]
-    : params.category;
+export default async function WorkPage() {
+  const visible = await getPublishedProjects();
 
-  const categories = await getPublicCategories();
-
-  // An unknown or inactive slug is treated as no filter at all rather than as
-  // a 404, so a stale bookmark still lands on the full portfolio.
-  const activeSlug =
-    categories.find((category) => category.slug === requested)?.slug ?? null;
-
-  const visible = await getPublishedProjects(
-    activeSlug ? { categorySlug: activeSlug } : undefined,
-  );
-
-  // The trail names the unfiltered index, matching the canonical URL: a
-  // category filter is a view of this page, not a page of its own.
   const structuredData = await breadcrumbStructuredData([
     { name: "Home", path: "/" },
     { name: "Work", path: "/work" },
@@ -63,9 +43,7 @@ export default async function WorkPage({ searchParams }: WorkPageProps) {
       <PageIntro eyebrow="Portfolio" title="Work" />
 
       <Container>
-        <FadeReveal className="border-t border-border pt-6">
-          <CategoryFilter activeSlug={activeSlug} categories={categories} />
-        </FadeReveal>
+        <div className="border-t border-border pt-6" />
 
         {visible.length === 0 ? (
           <p className="py-24 text-sm leading-7 text-muted-foreground sm:py-32">

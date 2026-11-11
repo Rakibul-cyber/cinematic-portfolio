@@ -16,7 +16,6 @@ import {
   toProjectSummary,
   toPublicImage,
   toPublicSocialLinks,
-  toPublicTestimonial,
   type MediaRow,
   type ProjectRow,
 } from "@/server/public/mappers";
@@ -73,50 +72,28 @@ function project(overrides: Partial<ProjectRow> = {}): ProjectRow {
     videoProvider: null,
     videoId: null,
     videoTitle: null,
-    category: { name: "Editorial", slug: "editorial", isActive: true },
     media: [{ sortOrder: 0, media: media() }],
     ...overrides,
   };
 }
 
 describe("publication rules", () => {
-  it("shows published projects without a category or in an active one, and hides the rest", () => {
-    assert.deepEqual(PUBLISHED_PROJECT_WHERE, {
-      status: "PUBLISHED",
-      OR: [{ categoryId: null }, { category: { isActive: true } }],
-    });
-
-    // The filter above, evaluated the way PostgreSQL applies it to one row.
-    type Row = { status: "DRAFT" | "PUBLISHED"; categoryId: string | null; category: { isActive: boolean } | null };
-    const visible = (row: Row) =>
-      row.status === PUBLISHED_PROJECT_WHERE.status &&
-      PUBLISHED_PROJECT_WHERE.OR.some((branch) =>
-        "categoryId" in branch ? row.categoryId === branch.categoryId : row.category?.isActive === branch.category.isActive,
-      );
-    const cases: [string, Row, boolean][] = [
-      ["published, no category", { status: "PUBLISHED", categoryId: null, category: null }, true],
-      ["published, active category", { status: "PUBLISHED", categoryId: "c1", category: { isActive: true } }, true],
-      ["published, inactive category", { status: "PUBLISHED", categoryId: "c2", category: { isActive: false } }, false],
-      ["draft, no category", { status: "DRAFT", categoryId: null, category: null }, false],
-      ["draft, active category", { status: "DRAFT", categoryId: "c1", category: { isActive: true } }, false],
-    ];
-    for (const [label, row, expected] of cases) assert.equal(visible(row), expected, label);
+  it("shows a project exactly when it is published (MH-15: categories play no part)", () => {
+    assert.deepEqual(PUBLISHED_PROJECT_WHERE, { status: "PUBLISHED" });
   });
 
-  it("maps a project without a category, or with an inactive one, to no category", () => {
-    for (const category of [null, { name: "Old", slug: "old", isActive: false }]) {
-      const detail = toProjectDetail(project({ category }), resolveUrl);
-      assert.equal(detail.category, null);
-      assert.equal(detail.title, "Harbour Light");
-      assert.equal(detail.gallery.length, 1, "images are unaffected");
-    }
-    const active = toProjectDetail(project(), resolveUrl).category;
-    assert.deepEqual(active, { name: "Editorial", slug: "editorial" }, "the active flag never reaches the page");
+  it("maps a project to a view model with no category field", () => {
+    const detail = toProjectDetail(project(), resolveUrl);
+    const summary = toProjectSummary(project(), resolveUrl);
+    assert.ok(!("category" in detail));
+    assert.ok(!("category" in summary));
+    assert.equal(detail.title, "Harbour Light");
+    assert.equal(detail.gallery.length, 1, "images are unaffected");
   });
 
-  it("restricts services, testimonials, and social links to active rows", () => {
-    // One shared filter backs all three lists, so an inactive service,
-    // testimonial, or social link is never fetched publicly.
+  it("restricts services and social links to active rows", () => {
+    // One shared filter backs both lists, so an inactive service or social
+    // link is never fetched publicly.
     assert.deepEqual(ACTIVE_WHERE, { isActive: true });
   });
 
@@ -261,7 +238,6 @@ describe("public view models", () => {
     for (const key of forbidden) {
       assert.ok(!(key in detail), `detail exposes ${key}`);
       assert.ok(!(key in summary), `summary exposes ${key}`);
-      assert.ok(summary.category && !(key in summary.category), `category exposes ${key}`);
     }
   });
 
@@ -272,29 +248,6 @@ describe("public view models", () => {
       "First paragraph.",
       "Second paragraph.",
     ]);
-  });
-
-  it("joins testimonial attribution and omits it when empty", () => {
-    assert.equal(
-      toPublicTestimonial({
-        quote: "Q",
-        authorName: "A",
-        authorRole: "Director",
-        company: "Studio",
-        projectName: null,
-      }).attribution,
-      "Director · Studio",
-    );
-    assert.equal(
-      toPublicTestimonial({
-        quote: "Q",
-        authorName: "A",
-        authorRole: null,
-        company: null,
-        projectName: null,
-      }).attribution,
-      null,
-    );
   });
 
   it("drops social links that are not http(s)", () => {

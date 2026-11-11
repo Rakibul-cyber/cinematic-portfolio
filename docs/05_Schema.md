@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/05_Schema.md` |
-| Version | 1.4.0 (MH-13: `project.categoryId` nullable; MH-10: `GOOGLE_DRIVE` video provider) |
-| Last reviewed | 2026-11-07 |
+| Version | 1.5.0 (MH-15: `portfolio_category`, `testimonial`, and `project.categoryId` retained but unused by the application, schema unchanged, no migration; LOCAL ONLY, not deployed; MH-13: `project.categoryId` nullable; MH-10: `GOOGLE_DRIVE` video provider) |
+| Last reviewed | 2026-11-11 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -229,6 +229,10 @@ Every primary key and every unique constraint is backed by a unique index.
 
 ### `portfolio_category` (model `PortfolioCategory`)
 
+**Retained, unused by the application since MH-15** (ADR 0013; LOCAL ONLY, not
+deployed). The table and the Prisma model still exist; no application code
+reads or writes it. Dropping it would need its own approved migration.
+
 | Column | Prisma type | Database type | Null | Default | Key / constraint |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `String` | `TEXT` | no | `uuid()` (Prisma client, not DB) | PK |
@@ -269,6 +273,8 @@ Every primary key and every unique constraint is backed by a unique index.
 
 - Index: `(status, sortOrder)`
 - Index: `(categoryId)`
+- `categoryId` is retained with its foreign key and index but is never read or
+  written by the application since MH-15 (a project save never writes it).
 
 ### `project_media` (model `ProjectMedia`)
 
@@ -409,6 +415,10 @@ Every primary key and every unique constraint is backed by a unique index.
 - Index: `(customerId, createdAt)`
 
 ### `testimonial` (model `Testimonial`)
+
+**Retained, unused by the application since MH-15** (ADR 0013; LOCAL ONLY, not
+deployed). The table and the Prisma model still exist; no application code
+reads or writes it. Dropping it would need its own approved migration.
 
 | Column | Prisma type | Database type | Null | Default | Key / constraint |
 | --- | --- | --- | --- | --- | --- |
@@ -592,11 +602,20 @@ inquiry keeps `serviceNameSnapshot`.
 
 - `project.status` is `DRAFT` or `PUBLISHED`; `publishedAt` is maintained by the
   CMS service, not by the database.
-- A project is public only when `PUBLISHED` and its category `isActive`.
+- A project is public exactly when `PUBLISHED` (MH-15:
+  `PUBLISHED_PROJECT_WHERE` is `{ status: "PUBLISHED" }`; the earlier
+  category conditions are gone). Before the condition was removed, the owner's
+  production QA runs (2026-11-11) confirmed that production holds zero
+  categories, and the foreign key `project.categoryId` →
+  `portfolio_category.id` means no project can reference a category that does
+  not exist, so no project changes visibility.
+- `portfolio_category` and `project.categoryId` are retained in the database
+  but unused: the application never reads or writes them since MH-15.
 - `project_media` is the ordered gallery with roles. Its composite primary key
   `(projectId, mediaId)` means an image appears at most once per project.
-- Deleting a project cascades its `project_media` rows only. Deleting a category
-  is refused while projects reference it (`RESTRICT`).
+- Deleting a project cascades its `project_media` rows only. The database
+  still refuses to delete a category that projects reference (`RESTRICT`), but
+  the application no longer has a category delete path.
 
 ### 5.4 Media: `media`, `media_variant`
 
@@ -654,7 +673,9 @@ carry no customer PII.
 
 ### 5.10 Testimonials: `testimonial`
 
-Ordered and activatable; no relations.
+Retained, unused by the application since MH-15: no code reads or writes the
+table, and no row was dropped or modified. The columns still describe an
+ordered, activatable record with no relations.
 
 ## 6. Authorization model
 
@@ -681,10 +702,10 @@ No RLS policy is described here, because none exists.
 | Operation | EDITOR | ADMIN | SUPER_ADMIN |
 | --- | --- | --- | --- |
 | Read admin pages, dashboard, inquiries, customers | yes | yes | yes |
-| Create and edit projects, categories, services, testimonials, pages | yes | yes | yes |
+| Create and edit projects, services, pages | yes | yes | yes |
 | Upload media, edit alt text and captions | yes | yes | yes |
 | Delete media (including unassigned images) | **no** (OD-01; LOCAL ONLY fix of DEF-01, published build still allows it) | yes | yes |
-| Delete projects, categories, services, testimonials, social links | no | yes | yes |
+| Delete projects, services, social links | no | yes | yes |
 | Edit site settings and social links | no | yes | yes |
 | Change inquiry status, add notes, edit customer contact data | yes | yes | yes |
 | Retry or recover inquiry email | yes | yes | yes |
@@ -722,6 +743,11 @@ down script.
 | 7 | `20260912090000_add_security_privacy` | 2026-09-12 | `rate_limit_bucket`; `anonymizedAt` on `customer` and `inquiry` | 5 |
 | 8 | `20261107120000_add_google_drive_video_provider` (MH-10, applied to production 2026-11-07) | 2026-11-07 | value `GOOGLE_DRIVE` on `VideoProvider` (`ALTER TYPE … ADD VALUE`; additive, no table or row change) | 4 |
 | 9 | `20261107200000_make_project_category_optional` (MH-13, LOCAL ONLY, **not applied**) | 2026-11-07 | `project.categoryId` `DROP NOT NULL` (FK, index, and rows unchanged) | 2 |
+
+**MH-15 added no migration.** Removing the category and testimonial code
+(ADR 0013; LOCAL ONLY, not deployed) left `prisma/schema.prisma` unchanged and
+the count at nine migrations. `portfolio_category`, `testimonial`, and
+`project.categoryId` remain; no table, column, or row was dropped or modified.
 
 **Withdrawn migration.** `20261106120000_add_uploaded_video` (Mux `video` and
 `project_video` tables, P3-11C) was removed from the directory in MH-10 before

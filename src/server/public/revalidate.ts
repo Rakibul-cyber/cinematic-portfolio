@@ -17,18 +17,14 @@ import { PublicTag } from "@/server/public/cache-tags";
  */
 export type PublicContentKind =
   | "project"
-  | "category"
   | "service"
-  | "testimonial"
   | "page"
   | "settings"
   | "media";
 
 const TAGS: Record<PublicContentKind, readonly string[]> = {
-  project: [PublicTag.Projects, PublicTag.Categories],
-  category: [PublicTag.Categories, PublicTag.Projects],
+  project: [PublicTag.Projects],
   service: [PublicTag.Services],
-  testimonial: [PublicTag.Testimonials],
   page: [PublicTag.Pages],
   settings: [PublicTag.Settings],
   media: [PublicTag.Media, PublicTag.Projects],
@@ -38,13 +34,11 @@ const TAGS: Record<PublicContentKind, readonly string[]> = {
  * Routes each kind of change can appear on.
  *
  * The homepage is in every list because it composes work, services, the studio
- * statement, testimonials, and settings into one page.
+ * statement, and settings into one page.
  */
 const PATHS: Record<PublicContentKind, readonly string[]> = {
   project: ["/", "/work"],
-  category: ["/", "/work"],
   service: ["/", "/services"],
-  testimonial: ["/", "/about", "/services"],
   page: ["/", "/about", "/contact", "/services"],
   settings: ["/", "/about", "/contact", "/services", "/work"],
   media: ["/", "/work"],

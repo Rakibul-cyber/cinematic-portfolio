@@ -28,18 +28,20 @@ const OUT_DIR = fileURLToPath(new URL("./out/", import.meta.url));
 const HEADED = process.argv.includes("--headed");
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
+// The six everyday links, then the quieter "Website content" group (MH-15).
 const SECTIONS = [
   { label: "Dashboard", href: "/admin", title: "Dashboard" },
+  { label: "Projects", href: "/admin/projects", title: "Projects" },
+  { label: "Media", href: "/admin/media", title: "Media library" },
   { label: "Inquiries", href: "/admin/inquiries", title: "Inquiries" },
   { label: "Customers", href: "/admin/customers", title: "Customers" },
-  { label: "Projects", href: "/admin/projects", title: "Projects" },
-  { label: "Categories", href: "/admin/categories", title: "Categories" },
-  { label: "Media", href: "/admin/media", title: "Media library" },
-  { label: "Services", href: "/admin/services", title: "Services" },
-  { label: "Testimonials", href: "/admin/testimonials", title: "Testimonials" },
-  { label: "Pages", href: "/admin/pages", title: "Pages" },
   { label: "Settings", href: "/admin/settings", title: "Settings", adminOnly: true },
+  { label: "Services", href: "/admin/services", title: "Services", secondary: true },
+  { label: "Pages", href: "/admin/pages", title: "Pages", secondary: true },
 ];
+
+// Removed from the application in MH-15; both addresses must now give the admin 404.
+const REMOVED = ["/admin/categories", "/admin/testimonials"];
 
 /* ------------------------------------------------------------------ results */
 
@@ -250,6 +252,17 @@ async function navigationTests(page, tracker, role) {
     return `${hrefs.length} links in the expected order`;
   });
 
+  await test("Navigation", "Services and Pages sit in a separate Website content group", async () => {
+    await openMenuIfCollapsed(page);
+    const nav = page.locator('nav[aria-label="Admin"]');
+    const order = await nav.evaluate((element) => [...element.children].map((child) => (child.tagName === "A" ? child.getAttribute("href") : child.textContent.trim())));
+    const label = order.indexOf("Website content");
+    check(label > 0, "the Website content label is missing");
+    check(JSON.stringify(order.slice(label + 1)) === JSON.stringify(["/admin/services", "/admin/pages"]), `after the label: ${order.slice(label + 1).join(", ")}`);
+    check(!order.some((item) => /categor|testimonial/i.test(item ?? "")), "a removed section is still in the menu");
+    return `${label} everyday links, then Website content: Services, Pages`;
+  });
+
   for (const section of expected) {
     await test("Navigation", `${section.label} opens from the menu and renders cleanly`, async () => {
       await openMenuIfCollapsed(page);
@@ -280,11 +293,12 @@ async function navigationTests(page, tracker, role) {
 
 async function dashboardTests(page) {
   let counters = {};
-  await test("Dashboard", "shows eight numeric counters", async () => {
+  await test("Dashboard", "shows six numeric counters", async () => {
     await go(page, "/admin");
     const pairs = await page.locator("main dl > div").evaluateAll((items) => items.map((item) => [item.querySelector("dt")?.textContent?.trim(), item.querySelector("dd")?.textContent?.trim()]));
     counters = Object.fromEntries(pairs.map(([label, value]) => [label, Number(value)]));
-    check(pairs.length === 8, `found ${pairs.length} counters`);
+    const labels = pairs.map(([label]) => label);
+    check(JSON.stringify(labels) === JSON.stringify(["Projects", "Published", "Drafts", "Media", "New inquiries", "Open inquiries"]), `counters are ${labels.join(", ")}`);
     check(pairs.every(([, value]) => /^\d+$/.test(value ?? "")), "a counter is not a whole number");
     return pairs.map(([label, value]) => `${label} ${value}`).join(", ");
   });
@@ -294,10 +308,10 @@ async function dashboardTests(page) {
     return `${counters.Projects} - ${counters.Published} = ${counters.Drafts}`;
   });
 
-  await test("Dashboard", "four shortcut links point to real pages", async () => {
-    const wanted = ["/admin/projects/new", "/admin/media", "/admin/services", "/admin/testimonials"];
+  await test("Dashboard", "three quick actions point to real pages", async () => {
+    const wanted = ["/admin/projects/new", "/admin/media", "/admin/inquiries"];
     const hrefs = await page.locator("main a").evaluateAll((links) => links.map((link) => link.getAttribute("href")));
-    check(wanted.every((href) => hrefs.includes(href)), `shortcuts found: ${hrefs.join(", ")}`);
+    check(JSON.stringify(hrefs) === JSON.stringify(wanted), `quick actions found: ${hrefs.join(", ")}`);
     return wanted.join(", ");
   });
 
@@ -310,8 +324,6 @@ async function dashboardTests(page) {
     });
   await compare("Projects", "/admin/projects", () => page.locator('main a[aria-label^="Edit project"]').count());
   await compare("Media", "/admin/media", async () => Number((await page.locator("#library-heading").innerText()).match(/\((\d+)\)/)?.[1]));
-  await compare("Services", "/admin/services", () => page.locator('main a[aria-label^="Edit service"]').count());
-  await compare("Testimonials", "/admin/testimonials", () => page.locator('main a[aria-label^="Edit testimonial"]').count());
 }
 
 async function projectTests(page, tracker, role, anonymous) {
@@ -356,11 +368,13 @@ async function projectTests(page, tracker, role, anonymous) {
     return "upload control present in Project media";
   });
 
-  await test("Projects", "Advanced details starts closed and opens", async () => {
+  await test("Projects", "More options (optional) starts closed and opens", async () => {
     const details = page.locator("main details").first();
-    check(!(await details.evaluate((element) => element.open)), "Advanced details is open on arrival");
+    const summary = (await details.locator("summary").innerText()).trim();
+    check(summary === "More options (optional)", `the section is called "${summary}"`);
+    check(!(await details.evaluate((element) => element.open)), "More options is open on arrival");
     await details.locator("summary").click();
-    check(await details.evaluate((element) => element.open), "Advanced details did not open");
+    check(await details.evaluate((element) => element.open), "More options did not open");
     for (const name of ["slug", "description", "clientName", "location", "projectDate", "sortOrder", "featured", "seoTitle", "seoDescription"]) {
       check(await details.locator(`[name="${name}"]`).isVisible(), `advanced field ${name} not visible`);
     }
@@ -562,7 +576,20 @@ async function listFormTests(page, tracker, { area, path, noun, fields, role }) 
     for (const name of fields) check(await page.locator(`main form [name="${name}"]`).count(), `field ${name} missing`);
     check(await page.getByRole("button", { name: `Create ${noun}` }).count(), `Create ${noun} button missing`);
     editCount = await page.locator(`main a[aria-label^="Edit ${noun}"]`).count();
-    await tracker.assertClean(area);
+    try {
+      await tracker.assertClean(area);
+    } catch (error) {
+      // Say whether the problem is there on every load or was a one-off:
+      // load the same page three more times and count the loads with errors.
+      let again = 0;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        tracker.reset();
+        await go(page, path);
+        await page.waitForTimeout(1500);
+        if (await tracker.assertClean(area).then(() => false, () => true)) again += 1;
+      }
+      throw new Error(`[seen again on ${again} of 3 further loads of this page] ${error.message}`);
+    }
     return `${fields.length} fields, ${editCount} existing records`;
   });
 
@@ -729,6 +756,15 @@ async function crmTests(page, tracker, role) {
 }
 
 async function errorPageTests(page) {
+  for (const path of REMOVED) {
+    await test("Error pages", `the removed address ${path} shows the admin 404`, async () => {
+      const response = await go(page, path);
+      check(response.status() === 404, `HTTP ${response.status()}`);
+      check((await page.locator("h1").first().innerText()).trim() === "Page not found", "not the admin 404 page");
+      return "404, Page not found";
+    });
+  }
+
   await test("Error pages", "an unknown admin address shows the admin 404", async () => {
     const response = await go(page, "/admin/qa-no-such-page");
     check(response.status() === 404, `HTTP ${response.status()}`);
@@ -845,9 +881,7 @@ async function main() {
     await dashboardTests(page);
     await projectTests(page, tracker, role, anonymous);
     await mediaTests(page, tracker, role, anonymous);
-    await listFormTests(page, tracker, { area: "Categories", path: "/admin/categories", noun: "category", fields: ["name", "slug", "description", "sortOrder", "isActive"], role });
     await listFormTests(page, tracker, { area: "Services", path: "/admin/services", noun: "service", fields: ["name", "slug", "shortDescription", "description", "priceLabel", "sortOrder", "isActive"], role });
-    await listFormTests(page, tracker, { area: "Testimonials", path: "/admin/testimonials", noun: "testimonial", fields: ["quote", "authorName", "authorRole", "company", "projectName", "sortOrder", "isActive"], role });
     await pagesAndSettingsTests(page, tracker, role);
     await crmTests(page, tracker, role);
     await errorPageTests(page);

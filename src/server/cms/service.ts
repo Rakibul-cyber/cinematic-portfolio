@@ -3,13 +3,11 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import type { z } from "zod";
 import type {
-  categorySchema,
   pageSchema,
   projectSchema,
   serviceSchema,
   settingsSchema,
   socialSchema,
-  testimonialSchema,
 } from "@/lib/validation/cms";
 import { projectMediaRows } from "@/lib/cms/project-media";
 import { nextProjectVersion } from "@/lib/cms/project-version";
@@ -20,7 +18,6 @@ import { logDatabaseFailure } from "@/server/diagnostics/database-failure";
 
 type Input<T extends z.ZodType> = z.infer<T>;
 export class SlugConflictError extends Error {}
-export class ReferencedCategoryError extends Error {}
 export class ProjectConflictError extends Error {}
 
 async function audit(
@@ -46,34 +43,6 @@ function translate(error: unknown, label: string): never {
   throw error;
 }
 
-export async function saveCategory(
-  data: Input<typeof categorySchema>,
-  actor: AdminUser,
-) {
-  try {
-    const { id, ...fields } = data;
-    const row = id
-      ? await prisma.portfolioCategory.update({ where: { id }, data: fields })
-      : await prisma.portfolioCategory.create({ data: fields });
-    await audit(
-      actor,
-      id ? AuditAction.CmsUpdated : AuditAction.CmsCreated,
-      "category",
-      row.id,
-    );
-    return row;
-  } catch (error) {
-    translate(error, "category");
-  }
-}
-export async function deleteCategory(id: string, actor: AdminUser) {
-  if (await prisma.project.count({ where: { categoryId: id } }))
-    throw new ReferencedCategoryError(
-      "This category still has projects. Move them to another category or delete them first.",
-    );
-  await prisma.portfolioCategory.delete({ where: { id } });
-  await audit(actor, AuditAction.CmsDeleted, "category", id);
-}
 export async function saveService(
   data: Input<typeof serviceSchema>,
   actor: AdminUser,
@@ -93,22 +62,6 @@ export async function saveService(
   } catch (error) {
     translate(error, "service");
   }
-}
-export async function saveTestimonial(
-  data: Input<typeof testimonialSchema>,
-  actor: AdminUser,
-) {
-  const { id, ...fields } = data;
-  const row = id
-    ? await prisma.testimonial.update({ where: { id }, data: fields })
-    : await prisma.testimonial.create({ data: fields });
-  await audit(
-    actor,
-    id ? AuditAction.CmsUpdated : AuditAction.CmsCreated,
-    "testimonial",
-    row.id,
-  );
-  return row;
 }
 export async function savePage(
   data: Input<typeof pageSchema>,
@@ -151,13 +104,11 @@ export async function saveSocial(
   return row;
 }
 export async function deleteSimple(
-  kind: "service" | "testimonial" | "socialLink",
+  kind: "service" | "socialLink",
   id: string,
   actor: AdminUser,
 ) {
   if (kind === "service") await prisma.service.delete({ where: { id } });
-  else if (kind === "testimonial")
-    await prisma.testimonial.delete({ where: { id } });
   else await prisma.socialLink.delete({ where: { id } });
   await audit(actor, AuditAction.CmsDeleted, kind, id);
 }
@@ -168,9 +119,9 @@ export async function saveProject(
   // TEMPORARY DIAGNOSTIC: the database step in progress, logged on failure.
   let step = "project.transaction";
   try {
-    // The project form has no category (MH-13): a new project is created
-    // without one, and an update never writes `categoryId`, so a category
-    // saved earlier is kept as it is.
+    // Categories were removed from the application (MH-15). The
+    // `categoryId` column still exists; a save never writes it, so any value
+    // stored earlier is left exactly as it is.
     const { id, expectedUpdatedAt, mediaIds, ...fields } = data;
     const publishedAt = fields.status === "PUBLISHED" ? new Date() : null;
     const row = await prisma.$transaction(async (tx) => {

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  categorySchema,
   defaultProjectSlug,
   projectFormValues,
   projectSchema,
+  serviceSchema,
   settingsSchema,
   slugify,
 } from "@/lib/validation/cms";
@@ -131,10 +131,12 @@ describe("CMS validation", () => {
     assert.equal(slugify("  Côte d'Azur Film  "), "cote-d-azur-film"));
   it("rejects unsafe slugs and invalid settings email", () => {
     assert.equal(
-      categorySchema.safeParse({
+      serviceSchema.safeParse({
         name: "A",
         slug: "../bad",
-        description: "",
+        shortDescription: "S",
+        description: "D",
+        priceLabel: "",
         sortOrder: 0,
         isActive: true,
       }).success,

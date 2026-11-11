@@ -6,8 +6,8 @@
  * slash — assertable without a running application.
  *
  * A canonical URL is a promise to search engines that one address is the
- * authoritative one. `/work` and `/work?category=film` are the same document
- * with a filter applied, so the query never survives normalization.
+ * authoritative one. `/work` and `/work?ref=newsletter` are the same document,
+ * so the query never survives normalization.
  */
 
 /** Paths the public site advertises. Kept here so sitemap and canonical agree. */

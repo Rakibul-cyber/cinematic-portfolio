@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/02_AppFlow.md` |
-| Version | 1.5.0 (MH-14: upload and thumbnails in the project media picker; MH-13: no project category; MH-11: simplified project editor; MH-10: project video by pasted link) |
+| Version | 1.6.0 (MH-15: categories and testimonials removed, simplified admin navigation and dashboard, `/work` static; LOCAL ONLY, not deployed; MH-14: upload and thumbnails in the project media picker; MH-13: no project category; MH-11: simplified project editor; MH-10: project video by pasted link) |
 | Last reviewed | 2026-11-11 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
@@ -55,7 +55,7 @@ Release state uses the vocabulary of [01_PRD.md](01_PRD.md#status-and-release-st
 | Route | Kind | Rendering | Requirement | Release |
 | --- | --- | --- | --- | --- |
 | `/` | Page | ISR 3600 s | FR-PUB-01 | PUBLISHED |
-| `/work` | Page | Dynamic (reads `searchParams.category`) | FR-PUB-02 | PUBLISHED |
+| `/work` | Page | ISR 3600 s (MH-15, LOCAL ONLY; the published build is dynamic and reads `searchParams.category`) | FR-PUB-02 | PUBLISHED |
 | `/work/[slug]` | Page | ISR 3600 s, `generateStaticParams` | FR-PUB-03 | PUBLISHED |
 | `/services` | Page | ISR 3600 s | FR-PUB-06 | PUBLISHED |
 | `/about` | Page | ISR 3600 s | FR-PUB-07 | PUBLISHED |
@@ -77,9 +77,7 @@ All are `force-dynamic` and require a valid session.
 | `/admin/login` | none | FR-ADM-01 |
 | `/admin` | EDITOR | FR-ADM-05 |
 | `/admin/projects`, `/admin/projects/new`, `/admin/projects/[id]` | EDITOR (delete: ADMIN) | FR-CMS-01 |
-| `/admin/categories` | EDITOR (delete: ADMIN) | FR-CMS-02 |
 | `/admin/services` | EDITOR (delete: ADMIN) | FR-CMS-03 |
-| `/admin/testimonials` | EDITOR (delete: ADMIN) | FR-CMS-04 |
 | `/admin/pages` | EDITOR | FR-CMS-05 |
 | `/admin/settings` | ADMIN | FR-CMS-06 |
 | `/admin/media` | EDITOR (delete: ADMIN, fixed locally under DEF-01; published build: EDITOR) | FR-MED-01, FR-MED-02 |
@@ -89,9 +87,21 @@ All are `force-dynamic` and require a valid session.
 | `/admin/customers/[id]/export` | SUPER_ADMIN | FR-CRM-03 |
 | `/admin/[...missing]` | EDITOR, then 404 | FLOW-G-06 |
 
-The admin navigation (`src/components/admin/admin-links.ts`) shows Settings only
-to ADMIN and above. The other admin pages are reached from the navigation or
-from links within admin pages.
+`/admin/categories` and `/admin/testimonials` were removed in MH-15 (FR-CMS-02,
+FR-CMS-04; LOCAL ONLY, not deployed). Both paths now fall to
+`/admin/[...missing]` and answer with the admin "Page not found" 404.
+
+The admin navigation (`src/components/admin/admin-links.ts`,
+`admin-shell.tsx`; MH-15) has six primary links in this order: Dashboard,
+Projects, Media, Inquiries, Customers, Settings. Settings is shown only to
+ADMIN and above. Below them, inside the same `<nav aria-label="Admin">`, a
+small muted label "Website content" introduces a secondary group
+(`ADMIN_CONTENT_LINKS`): Services (`/admin/services`) and Pages
+(`/admin/pages`), rendered smaller (12px, muted). Both pages work as before
+and stay open to every signed-in role. On mobile the secondary group sits
+below the six links in the same Menu disclosure (two-column grid, the label
+spanning both columns). The other admin pages are reached from links within
+admin pages.
 
 ## 2. Screens
 
@@ -106,7 +116,8 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 - **Entry:** direct visit, search, social links, the header logo.
 - **Navigation:** header (Work, Services, About, Contact), footer, section CTAs.
 - **Data:** `getHomepageContent()`: settings (showreel), featured projects,
-  services, testimonials, `Page` content.
+  services, `Page` content. No testimonials and no category label in the hero
+  (removed in MH-15).
 - **Actions:** links to `/work`, `/work/[slug]`, `/services`, `/contact`; the
   showreel play button activates the embed (no request before the click).
 - **Empty:** sections with no content are omitted; visitors never see
@@ -117,11 +128,12 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 
 #### SCR-PUB-02 — Work `/work`
 
-- **Data:** `getPublicCategories()`, `getPublishedProjects()`.
-- **Actions:** category filter links set `?category=<slug>`; project cards link
-  to `/work/[slug]`.
-- **Validation:** an unknown category slug yields an empty, filtered list, not
-  an error (UNVERIFIED for every input; see `category-filter.tsx`).
+- **Data:** `getPublishedProjects()`: every project whose status is
+  `PUBLISHED`.
+- **Actions:** project cards link to `/work/[slug]`. There is no category
+  filter and no category label on the cards (removed in MH-15).
+- **Validation:** the page takes no `searchParams`; an old
+  `/work?category=...` link shows the whole portfolio.
 - **Empty:** "New work is being prepared for this portfolio. Please check back
   soon." (`emptyStates.work` in `src/content/site.ts`).
 
@@ -130,21 +142,22 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 - **Data:** `getPublishedProjectBySlug(slug)`.
 - **Actions:** gallery viewing; the video play button (over the project cover)
   builds the embed URL from provider and ID: YouTube, Vimeo, or Google Drive.
-- **Error / not found:** a draft project, a project in an inactive category, or
-  an unknown slug all call `notFound()` and return the same 404. A project with
-  no category is shown (MH-13); its category line is omitted.
+- **Error / not found:** a draft project or an unknown slug calls `notFound()`
+  and returns the same 404. A project is shown exactly when its status is
+  `PUBLISHED` (MH-15); the page has no category label and no "Category" fact.
 
 #### SCR-PUB-04 — Services `/services`
 
-- **Data:** `getPublicPage("services")`, `getActiveServices()`, `getActiveTestimonials()`.
+- **Data:** `getPublicPage("services")`, `getActiveServices()`.
 - **Actions:** links to `/contact`.
-- **Empty:** no active services means no services list; no testimonials means
-  no testimonial block.
+- **Empty:** no active services means no services list. There is no
+  testimonial block (removed in MH-15).
 
 #### SCR-PUB-05 — About `/about`
 
-- **Data:** `getPublicPage("about")`, `getActiveTestimonials()`, `getPublicSiteSettings()`.
-- **Empty:** sections without content are omitted.
+- **Data:** `getPublicPage("about")`, `getPublicSiteSettings()`.
+- **Empty:** sections without content are omitted. There is no testimonial
+  block (removed in MH-15).
 
 #### SCR-PUB-06 — Contact `/contact`
 
@@ -195,14 +208,16 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 
 #### SCR-ADM-02 — Dashboard `/admin`
 
-- **Data:** counts of projects, media, services, testimonials, inquiries.
-- **Actions:** shortcuts to `/admin/projects/new`, `/admin/media`,
-  `/admin/services`, `/admin/testimonials`; Sign out (`signOutAction`).
+- **Data (MH-15):** six counters, in this order: Projects, Published, Drafts,
+  Media, New inquiries, Open inquiries.
+- **Actions:** three quick actions: "New project" (`/admin/projects/new`),
+  "Upload media" (`/admin/media`), "View inquiries" (`/admin/inquiries`);
+  Sign out (`signOutAction`).
 - **Side effects of sign-out:** session revoked; audit `admin.signed_out`.
 
 #### SCR-ADM-03 — Projects list, new, edit
 
-- **Data:** projects with category and status; project with its media
+- **Data:** projects with status (no category name, MH-15); project with its media
   (`ProjectMediaPicker`), plus the 100 newest library images with their
   thumbnail URLs.
 - **Project media (MH-14):** the picker uploads images in place through
@@ -215,12 +230,14 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
   roles, and order); `deleteAction` (ADMIN, confirm dialog).
 - **Validation:** `src/lib/validation/cms.ts`; slug uniqueness; a project
   version check refuses a save made against stale data.
-- **Form layout (MH-11, MH-13):** visible: title (the only required field),
+- **Form layout (MH-11, MH-13, MH-15):** visible: title (the only required field),
   short description (optional), video link, media (first image = cover), a
   Publish checkbox (`status=PUBLISHED`, absent = `DRAFT`). A closed `<details>`
-  holds slug, description, client, location, date, order, featured, and SEO.
+  titled "More options (optional)" (MH-15; formerly "Advanced details")
+  holds slug, description, client, location, date, order, featured, and SEO;
+  every field is still submitted.
   There is no category control: a new project is saved without one, and the
-  save never writes `categoryId`, so an existing assignment is kept.
+  save never writes `categoryId`.
   An empty slug on a new project is generated from the title
   (`projectFormValues`); an existing slug is never regenerated. A rejected
   field inside the closed section opens it before focus.
@@ -236,14 +253,14 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 - **Side effects:** audit `cms.created`, `cms.updated`, `cms.deleted`,
   `project.published`, `project.unpublished`.
 
-#### SCR-ADM-04 — Categories, Services, Testimonials
+#### SCR-ADM-04 — Services `/admin/services`
 
-- **Actions:** `saveCategoryAction`, `saveServiceAction`, `saveTestimonialAction`;
-  `deleteAction` (ADMIN). The delete control is shown only to ADMIN and above.
-- **Empty:** "No categories yet." (categories). Services and testimonials show
-  their create form.
-- **Error:** deleting a category still used by projects is refused (FK
-  `RESTRICT`).
+The Categories and Testimonials screens were removed in MH-15 (LOCAL ONLY,
+not deployed); this block now covers Services only.
+
+- **Actions:** `saveServiceAction`; `deleteAction` (ADMIN). The delete control
+  is shown only to ADMIN and above.
+- **Empty:** the create form is shown.
 
 #### SCR-ADM-05 — Pages `/admin/pages`
 
@@ -322,9 +339,9 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 | Better Auth `POST /api/auth/sign-in/email` | HTTP clients | Route Handler | public | as above | as above |
 | `signOutAction` | admin shell | Server Action | session | session deleted | `admin.signed_out` |
 | `saveProjectAction` | projects new/edit | Server Action | EDITOR | project, project_media | `cms.*`, `project.*` |
-| `saveCategoryAction`, `saveServiceAction`, `saveTestimonialAction`, `savePageAction` | list pages | Server Action | EDITOR | the entity | `cms.*` |
+| `saveServiceAction`, `savePageAction` (`saveCategoryAction` and `saveTestimonialAction` removed in MH-15) | list pages | Server Action | EDITOR | the entity | `cms.*` |
 | `saveSettingsAction`, `saveSocialAction` | settings | Server Action | ADMIN | site_setting, social_link | `cms.*` |
-| `deleteAction` | list pages, settings | Server Action | ADMIN | deletes the entity | `cms.deleted` |
+| `deleteAction` (kinds `project`, `service`, `socialLink` only since MH-15) | list pages, settings | Server Action | ADMIN | deletes the entity | `cms.deleted` |
 | upload | media | `POST /api/media` | EDITOR | media, media_variant, R2 objects | `media.uploaded` |
 | `updateMediaMetadataAction` | media | Server Action | EDITOR | media | `media.updated` |
 | `deleteMediaAction` | media | Server Action | ADMIN (LOCAL ONLY, DEF-01; published build: EDITOR) | R2 objects, media | `media.deleted` |
@@ -391,13 +408,13 @@ stateDiagram-v2
     Published --> Saved: status DRAFT (publishedAt cleared)
     Saved --> Deleting: ADMIN confirms delete
     Published --> Deleting: ADMIN confirms delete
-    state Deleting <<choice>>
-    Deleting --> Saved: refused, still referenced (FK RESTRICT)
     Deleting --> [*]: deleted (project deletion removes project_media rows only)
 ```
 
 Every successful save or delete writes an audit row and revalidates the
-affected public cache tags.
+affected public cache tags. The earlier "refused, still referenced (FK
+RESTRICT)" outcome of a delete applied to categories only and went with them
+in MH-15; `deleteAction` now handles projects, services, and social links.
 
 ### SM-04 — Media upload and processing
 

@@ -11,7 +11,6 @@ import type {
   PublicService,
   PublicSiteSettings,
   PublicSocialLink,
-  PublicTestimonial,
 } from "@/server/public/view-models";
 
 /**
@@ -92,7 +91,6 @@ export type ProjectSummaryRow = {
   title: string;
   summary: string;
   projectDate: Date | null;
-  category: { name: string; slug: string; isActive: boolean } | null;
   media: { sortOrder: number; media: MediaRow }[];
 };
 
@@ -126,12 +124,6 @@ export function toProjectSummary(
     slug: project.slug,
     title: project.title,
     summary: project.summary,
-    // An inactive category is not shown: it no longer hides the project
-    // (MH-13), but it is not offered as a filter either.
-    category:
-      project.category?.isActive
-        ? { name: project.category.name, slug: project.category.slug }
-        : null,
     year: project.projectDate ? project.projectDate.getUTCFullYear() : null,
     cover: first
       ? toPublicImage(first.media, { maxWidth: CARD_MAX_WIDTH, resolveUrl })
@@ -189,33 +181,6 @@ export function toPublicService(service: ServiceRow): PublicService {
     shortDescription: service.shortDescription,
     description: toParagraphs(service.description),
     priceLabel: service.priceLabel,
-  };
-}
-
-export type TestimonialRow = {
-  quote: string;
-  authorName: string;
-  authorRole: string | null;
-  company: string | null;
-  projectName: string | null;
-};
-
-export function toPublicTestimonial(
-  testimonial: TestimonialRow,
-): PublicTestimonial {
-  const attribution = [
-    testimonial.authorRole,
-    testimonial.company,
-    testimonial.projectName,
-  ]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(" · ");
-
-  return {
-    quote: testimonial.quote,
-    authorName: testimonial.authorName,
-    attribution: attribution || null,
   };
 }
 

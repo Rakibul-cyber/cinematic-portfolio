@@ -22,7 +22,6 @@ export default async function Page({
       status: true,
       featured: true,
       updatedAt: true,
-      category: { select: { name: true } },
     },
   });
   const { error } = await searchParams;
@@ -51,7 +50,7 @@ export default async function Page({
                   {r.title}
                 </Link>
                 <p className="text-sm text-muted-foreground">
-                  {r.category ? `${r.category.name} · ` : ""}{r.status} ·{" "}
+                  {r.status} ·{" "}
                   {r.featured ? "Featured · " : ""}
                   {r.updatedAt.toLocaleDateString()}
                 </p>
