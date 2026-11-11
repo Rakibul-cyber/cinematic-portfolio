@@ -1,7 +1,9 @@
 import { AdminShell, Notice } from "@/components/admin/admin-shell";
 import { ProjectForm } from "@/components/admin/project-form";
+import { PROJECT_MEDIA_OPTION_SELECT, toProjectMediaOption } from "@/lib/cms/project-media";
 import { requireUser } from "@/server/auth/session";
 import { prisma } from "@/server/db/prisma";
+import { mediaUrl } from "@/server/media/r2";
 export const dynamic = "force-dynamic";
 export default async function Page({
   searchParams,
@@ -12,13 +14,13 @@ export default async function Page({
   const media = await prisma.media.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,
-    select: { id: true, originalName: true, altText: true },
+    select: PROJECT_MEDIA_OPTION_SELECT,
   });
   const { error } = await searchParams;
   return (
     <AdminShell user={user} title="New project">
       <Notice message={error} />
-      <ProjectForm media={media} />
+      <ProjectForm media={media.map((item) => toProjectMediaOption(item, mediaUrl))} />
     </AdminShell>
   );
 }

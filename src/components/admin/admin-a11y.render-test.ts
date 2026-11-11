@@ -25,6 +25,7 @@ let createRoot: typeof import("react-dom/client").createRoot;
 let navCurrent: typeof navCurrentType;
 let Notice: typeof NoticeType;
 let ProjectMediaPicker: typeof ProjectMediaPickerType;
+let AppRouterContext: typeof import("next/dist/shared/lib/app-router-context.shared-runtime").AppRouterContext;
 
 before(async () => {
   const w = dom.window;
@@ -42,6 +43,7 @@ before(async () => {
   ({ navCurrent } = await import("@/components/admin/admin-nav-link"));
   ({ Notice } = await import("@/components/admin/admin-notice"));
   ({ ProjectMediaPicker } = await import("@/components/admin/project-media-picker"));
+  ({ AppRouterContext } = await import("next/dist/shared/lib/app-router-context.shared-runtime"));
 });
 
 after(() => {
@@ -148,8 +150,11 @@ describe("page notices", () => {
 });
 
 describe("project media picker focus", () => {
-  const media = ["a", "b", "c", "d", "e"].map((x) => ({ id: `m-${x}`, originalName: `${x}.jpg`, altText: `${x} alt` }));
-  const picker = (selected: string[]) => mount(h(ProjectMediaPicker, { initialMediaIds: selected, media }));
+  const media = ["a", "b", "c", "d", "e"].map((x) => ({ id: `m-${x}`, originalName: `${x}.jpg`, altText: `${x} alt`, thumbnailUrl: null }));
+  // The picker refreshes the page after an upload, so it needs a router (MH-14).
+  const router = { refresh() {}, push() {}, replace() {}, back() {}, forward() {}, prefetch() {} };
+  const picker = (selected: string[]) =>
+    mount(h(AppRouterContext.Provider, { value: router as never }, h(ProjectMediaPicker, { initialMediaIds: selected, media })));
   const button = (c: HTMLElement, label: string) => c.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement;
   const press = (b: HTMLButtonElement) => act(async () => { b.focus(); b.click(); });
   const live = (c: HTMLElement) => c.querySelector("[aria-live=polite]")!.textContent;

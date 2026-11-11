@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/02_AppFlow.md` |
-| Version | 1.4.0 (MH-13: no project category; MH-11: simplified project editor; MH-10: project video by pasted link) |
-| Last reviewed | 2026-11-07 |
+| Version | 1.5.0 (MH-14: upload and thumbnails in the project media picker; MH-13: no project category; MH-11: simplified project editor; MH-10: project video by pasted link) |
+| Last reviewed | 2026-11-11 |
 | Reviewed against | commit `379e53b` (branch `fix/media-delete-admin-only`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -203,7 +203,14 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 #### SCR-ADM-03 — Projects list, new, edit
 
 - **Data:** projects with category and status; project with its media
-  (`ProjectMediaPicker`).
+  (`ProjectMediaPicker`), plus the 100 newest library images with their
+  thumbnail URLs.
+- **Project media (MH-14):** the picker uploads images in place through
+  `POST /api/media` (several at once; on file selection, not on Save), adds
+  images from the library, shows thumbnails, and offers Make cover, Up, Down,
+  and Remove. An upload is stored in the library at once and is attached to
+  the project only when the project is saved. Remove detaches; it never
+  deletes the image.
 - **Actions:** `saveProjectAction` (create and update, including status, media
   roles, and order); `deleteAction` (ADMIN, confirm dialog).
 - **Validation:** `src/lib/validation/cms.ts`; slug uniqueness; a project

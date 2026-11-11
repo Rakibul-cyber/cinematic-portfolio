@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/06_Plan.md` |
-| Version | 1.7.0 (MH-13: projects without categories, local, migration not applied; MH-12 on `main@986ed59`, unpublished) |
-| Last reviewed | 2026-11-07 |
+| Version | 1.8.0 (MH-14: project media picker with upload and thumbnails, local, uncommitted; MH-13: projects without categories; MH-12 on `main@986ed59`, unpublished) |
+| Last reviewed | 2026-11-11 |
 | Reviewed against | commit `b1a579d` and the RR-03 bundle-test changes made on top of it (branch `fix/sentry-production-initialization`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -70,6 +70,7 @@ never marked deployed.**
 | Automatic project category (MH-12) | On `main@986ed59` (pushed), not published; superseded by MH-13. |
 | Projects without categories (MH-13) | LOCAL ONLY on `feature/optional-project-category`; migration `20261107200000_make_project_category_optional` NOT APPLIED; not pushed, merged, or deployed. |
 | TEMPORARY project-save diagnostic | LOCAL ONLY on `diag/project-save-error` (parent `a664366`), owner-requested 2026-11-08 to identify the production P2011 on project save. Logs one `[diag:db-error]` line (step, Prisma/SQLSTATE codes, column/relation/constraint, database and schema names, correlation ID). **Must be removed** after diagnosis: revert the commit. Not pushed or deployed. |
+| Project media picker: upload, thumbnails, cover (MH-14) | LOCAL ONLY: uncommitted on `main` (working tree on top of `4648177`); not pushed or deployed. Real-browser and real-upload checks PENDING. |
 | Controlled release | **NOT AUTHORIZED** |
 
 ## SD work-package history
@@ -722,6 +723,16 @@ the owner's descriptions to commits.
 - **Tests:** `cms.test.ts` (create and edit without category, stale `categoryId` ignored, title-only save), `public-content.test.ts` (+1: null and inactive category; publication truth table), new `project-card.render-test.ts` (4), `admin-form.render-test.ts`, `form-state.test.ts` updated; `project-category.test.ts` removed with its module. `npm test`: 578 tests, 576 passed, 0 failed, 2 skipped; render 285 passed; typecheck, lint, `git diff --check` clean; `test:bundle` PASSED 56/56 and 32/32 (0 network attempts). Full `next build` not run (needs a database). Migration not run against any database.
 - **Correction tests:** `npm test` 578 tests, 576 passed, 0 failed, 2 skipped; render 285 passed; typecheck, lint, `git diff --check` clean.
 - **Release order (owner-authorized):** apply the migration (guarded command, typed confirmation), then merge, push, and publish. Rollback to older code requires every project to have a category again (04_TRD).
+
+#### MH-14 — Project media picker: upload, thumbnails, cover
+- **Status:** DONE locally (automated, offline) · **Completed:** 2026-11-11 · **Release:** LOCAL ONLY: uncommitted on `main` (on top of `4648177`); not pushed or deployed. Owner-requested; no new decision (no schema, route, endpoint, or dependency change).
+- **Root cause (from code; production data not read):** `ProjectMediaPicker` had no upload control and no link to the Media library. Its only way to attach an image was an "Available media" list that it rendered only when the library query returned rows. With an empty library (owner-reported: the live site now uses a database with no media rows) the section showed its description and "No media selected." and nothing else. It also never showed thumbnails: the pages selected only `id`, `originalName`, and `altText`.
+- **Changed:** `project-media-picker.tsx`: a file input (`multiple`, no `name`, so it is never part of the project submission) that prepares each photo with the existing `prepareImageForUpload`, posts it to the unchanged `POST /api/media`, appends the returned ID, and calls `router.refresh()` so the library rows and thumbnails arrive; a status line (alert on failure, per-file messages, successful files kept); 80 px thumbnails on attached images; a **Make cover** button (moves the image first); library images as a thumbnail grid with Add; a new-tab link to the Media library. Remove only detaches. `project-media.ts`: `thumbnailUrl` on `ProjectMediaOption`, `PROJECT_MEDIA_OPTION_SELECT`, `toProjectMediaOption`, `makeProjectMediaCover`. New and Edit project pages select the `THUMBNAIL` variant and build its URL with `mediaUrl`. `project-form.tsx`: type only.
+- **Unchanged:** `/api/media`, `uploadMedia`, R2 keys and variants, `saveProject`, `projectSchema`, `projectMediaRows` (first image `COVER`, the rest `GALLERY`), authentication and authorization (`getCurrentUser` on upload, `requireUser` on save), the schema, and migrations.
+- **Behaviour to know:** an upload is stored in the library immediately; it is attached to the project only on Save, so abandoning the form leaves the image in the library. Saving while an upload is still running does not attach that image.
+- **Tests:** new `project-media-picker.render-test.ts` (7: empty library, thumbnails and add, cover/reorder/remove, multi-file upload and refresh, progress, refused upload, partial failure); `project-media.test.ts` +2 (cover, option mapping); `admin-a11y.render-test.ts` picker tests now mount under a router. `npm test`: 594 tests, 592 passed, 0 failed, 2 skipped; render 292 passed, 0 failed; typecheck, lint, `git diff --check` clean; `test:bundle` (compile-only production build) PASSED 56/56 and 32/32, 0 network attempts (Node 22 PENDING; ran on v24.13.0).
+- **UNVERIFIED:** a real upload to R2, saving associations to a database, and real-browser behaviour (desktop and phone); none can run offline.
+- **Production impact:** none until released.
 - **Production impact:** none until released.
 
 ## Phase 4 — Edge cases and testing

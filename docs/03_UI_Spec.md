@@ -3,8 +3,8 @@
 | Field | Value |
 | --- | --- |
 | Document | `docs/03_UI_Spec.md` |
-| Version | 1.2.0 (MH-11: simplified project editor; MH-10: cover-image poster, Google Drive, admin video link field) |
-| Last reviewed | 2026-11-07 |
+| Version | 1.3.0 (MH-14: project media picker with upload and thumbnails; MH-11: simplified project editor; MH-10: cover-image poster, Google Drive, admin video link field) |
+| Last reviewed | 2026-11-11 |
 | Reviewed against | commit `4f7f564` (branch `docs/context-architecture`) |
 | Document status | Locally maintained draft. This status does not imply owner approval, push, or deployment. |
 
@@ -290,7 +290,7 @@ polite live region; the submit button is disabled while pending.
 | `AdminMenu` | Below `md`, a disclosure (`aria-expanded`, `aria-controls`, `Escape` closes). |
 | `AdminNavLink` | `aria-current` for the active section; active style `border-accent bg-surface-strong`. While its navigation is pending it shows a 6 px accent dot (`motion-safe:animate-pulse`) and announces "Loading…" in a polite live region. |
 | `DeleteButton` | Admin button style, confirm dialog, visually hidden item name for its accessible name. |
-| `ProjectMediaPicker` | Assign images, roles, and order to a project. |
+| `ProjectMediaPicker` | Assign images and their order to a project (MH-14). A file input (`multiple`, no `name`) uploads on selection; a status line reports progress and results (`role="alert"` on failure). Attached images are a list of rows with an 80 px thumbnail and Make cover, Up, Down, Remove buttons (`min-h-10`, wrapping). Library images are a 2-column grid (3 from `sm`) of thumbnail cards with Add. The first image is the cover. |
 
 ## 5. Media and motion
 

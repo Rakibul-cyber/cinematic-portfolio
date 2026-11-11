@@ -7,8 +7,9 @@ import {
 } from "@/components/admin/admin-shell";
 import { ProjectMediaPicker } from "@/components/admin/project-media-picker";
 import { ProjectVideoField } from "@/components/admin/project-video-field";
+import type { ProjectMediaOption } from "@/lib/cms/project-media";
 import { toVideoRef, videoSourceUrl, type VideoProvider } from "@/lib/video";
-type Media = { id: string; originalName: string; altText: string | null };
+type Media = ProjectMediaOption;
 type Project = {
   id: string;
   title: string;
