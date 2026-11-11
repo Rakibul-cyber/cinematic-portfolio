@@ -284,7 +284,8 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 
 - **Data:** 25 per page, ordered newest first, filtered by `status` and `q`.
 - **Actions:** search and filter (GET form), pagination, open detail;
-  "Export CSV" link shown only to ADMIN and above.
+  "Export CSV" link shown only to ADMIN and above. It is a plain
+  `<a download>`, never `next/link`: a prefetched link would run the export.
 - **Empty:** "No inquiries found."
 
 #### SCR-ADM-09 — Inquiry detail `/admin/inquiries/[id]`
@@ -300,7 +301,8 @@ names are Server Actions in `src/app/(admin)/admin/*-actions.ts` unless stated.
 
 - **Data:** 25 per page with search; detail with notes and inquiries.
 - **Actions:** `updateCustomerAction`, `addCustomerNoteAction`;
-  `anonymizeCustomerAction` and the export link only for SUPER_ADMIN.
+  `anonymizeCustomerAction` and the export link (a plain `<a download>`, for
+  the same reason) only for SUPER_ADMIN.
 - **Empty:** "No customers found.", "No notes yet."
 - **Anonymized state:** the record shows it was anonymized; repeating is a no-op.
 

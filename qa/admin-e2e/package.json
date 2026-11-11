@@ -1,0 +1,14 @@
+{
+  "name": "munir-admin-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Signed-in browser checks for the Munir Visuals admin. Separate from the application; never installed by the site build.",
+  "type": "module",
+  "scripts": {
+    "readonly": "node run-readonly.mjs",
+    "readonly:headed": "node run-readonly.mjs --headed"
+  },
+  "dependencies": {
+    "playwright-core": "1.49.1"
+  }
+}

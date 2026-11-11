@@ -167,7 +167,7 @@ describe("role-aware admin controls", () => {
   });
 
   it("inquiries: Export CSV is offered only to administrators", () => {
-    assert.match(read("inquiries/page.tsx"), /\{isAdministrative\(user\.role\)\?<Link [^>]*href="\/admin\/inquiries\/export">Export CSV<\/Link>:null\}/);
+    assert.match(read("inquiries/page.tsx"), /\{isAdministrative\(user\.role\)\?<a [^>]*href="\/admin\/inquiries\/export">Export CSV<\/a>:null\}/);
   });
 
   it("customer privacy operations stay SUPER_ADMIN-only", () => {

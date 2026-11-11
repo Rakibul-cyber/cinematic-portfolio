@@ -257,7 +257,7 @@ describe("inquiry list at narrow widths", () => {
 
   it("still runs the same query and keeps the Fix C export rule", () => {
     assert.match(source, /prisma\.inquiry\.findMany\(\{where,orderBy:\[\{createdAt:"desc"\},\{id:"desc"\}\],skip:\(page-1\)\*SIZE,take:SIZE,/);
-    assert.match(source, /\{isAdministrative\(user\.role\)\?<Link [^>]*href="\/admin\/inquiries\/export">Export CSV<\/Link>:null\}/);
+    assert.match(source, /\{isAdministrative\(user\.role\)\?<a [^>]*href="\/admin\/inquiries\/export">Export CSV<\/a>:null\}/);
   });
 });
 

@@ -264,7 +264,7 @@ describe("labels and table semantics", () => {
   });
 
   it("role-aware controls from Fix C are untouched", () => {
-    assert.match(inquiries, /\{isAdministrative\(user\.role\)\?<Link [^>]*href="\/admin\/inquiries\/export">Export CSV<\/Link>:null\}/);
+    assert.match(inquiries, /\{isAdministrative\(user\.role\)\?<a [^>]*href="\/admin\/inquiries\/export">Export CSV<\/a>:null\}/);
     assert.match(read("src/components/admin/admin-shell.tsx"), /\{adminLinksFor\(user\.role\)\.map\(/);
   });
 });
